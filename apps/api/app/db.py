@@ -33,33 +33,24 @@ def _ensure_runtime_schema_compat() -> None:
         # Backward compatibility: migrate old OWNER role values to ADMIN.
         # Note: Skip these updates if the enum no longer contains OWNER value
         # PostgreSQL will reject the update if the enum value doesn't exist
-        try:
-            if "organization_memberships" in tables:
-                connection.execute(text("UPDATE organization_memberships SET role = 'ADMIN' WHERE role = 'OWNER'"))
-        except Exception:
-            pass
-        try:
-            if "invite_tokens" in tables:
-                connection.execute(text("UPDATE invite_tokens SET role = 'ADMIN' WHERE role = 'OWNER'"))
-        except Exception:
-            pass
-        try:
-            if "shift_templates" in tables:
-                connection.execute(text("UPDATE shift_templates SET required_role = 'ADMIN' WHERE required_role = 'OWNER'"))
-        except Exception:
-            pass
-        try:
-            if "shifts" in tables:
-                connection.execute(text("UPDATE shifts SET required_role = 'ADMIN' WHERE required_role = 'OWNER'"))
-        except Exception:
-            pass
-        try:
-            if "schedule_weekly_overrides" in tables:
-                connection.execute(
-                    text("UPDATE schedule_weekly_overrides SET required_role = 'ADMIN' WHERE required_role = 'OWNER'")
-                )
-        except Exception:
-            pass
+        # Use separate transactions for each operation to avoid "transaction aborted" errors
+        def safe_execute(sql: str) -> None:
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(sql))
+            except Exception:
+                pass
+
+        if "organization_memberships" in tables:
+            safe_execute("UPDATE organization_memberships SET role = 'ADMIN' WHERE role = 'OWNER'")
+        if "invite_tokens" in tables:
+            safe_execute("UPDATE invite_tokens SET role = 'ADMIN' WHERE role = 'OWNER'")
+        if "shift_templates" in tables:
+            safe_execute("UPDATE shift_templates SET required_role = 'ADMIN' WHERE required_role = 'OWNER'")
+        if "shifts" in tables:
+            safe_execute("UPDATE shifts SET required_role = 'ADMIN' WHERE required_role = 'OWNER'")
+        if "schedule_weekly_overrides" in tables:
+            safe_execute("UPDATE schedule_weekly_overrides SET required_role = 'ADMIN' WHERE required_role = 'OWNER'")
 
         if "shift_templates" in tables:
             template_columns = {column["name"] for column in inspector.get_columns("shift_templates")}
