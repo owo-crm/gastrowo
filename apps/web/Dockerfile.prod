@@ -21,4 +21,4 @@ COPY --from=build /app/dist ./dist
 
 EXPOSE 80
 
-CMD ["serve", "-s", "dist", "-l", "80"]
+CMD ["serve", "-s", "dist", "-l", "0.0.0.0:80"]
