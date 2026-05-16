@@ -31,18 +31,35 @@ def _ensure_runtime_schema_compat() -> None:
         tables = set(inspector.get_table_names())
 
         # Backward compatibility: migrate old OWNER role values to ADMIN.
-        if "organization_memberships" in tables:
-            connection.execute(text("UPDATE organization_memberships SET role = 'ADMIN' WHERE role = 'OWNER'"))
-        if "invite_tokens" in tables:
-            connection.execute(text("UPDATE invite_tokens SET role = 'ADMIN' WHERE role = 'OWNER'"))
-        if "shift_templates" in tables:
-            connection.execute(text("UPDATE shift_templates SET required_role = 'ADMIN' WHERE required_role = 'OWNER'"))
-        if "shifts" in tables:
-            connection.execute(text("UPDATE shifts SET required_role = 'ADMIN' WHERE required_role = 'OWNER'"))
-        if "schedule_weekly_overrides" in tables:
-            connection.execute(
-                text("UPDATE schedule_weekly_overrides SET required_role = 'ADMIN' WHERE required_role = 'OWNER'")
-            )
+        # Note: Skip these updates if the enum no longer contains OWNER value
+        # PostgreSQL will reject the update if the enum value doesn't exist
+        try:
+            if "organization_memberships" in tables:
+                connection.execute(text("UPDATE organization_memberships SET role = 'ADMIN' WHERE role = 'OWNER'"))
+        except Exception:
+            pass
+        try:
+            if "invite_tokens" in tables:
+                connection.execute(text("UPDATE invite_tokens SET role = 'ADMIN' WHERE role = 'OWNER'"))
+        except Exception:
+            pass
+        try:
+            if "shift_templates" in tables:
+                connection.execute(text("UPDATE shift_templates SET required_role = 'ADMIN' WHERE required_role = 'OWNER'"))
+        except Exception:
+            pass
+        try:
+            if "shifts" in tables:
+                connection.execute(text("UPDATE shifts SET required_role = 'ADMIN' WHERE required_role = 'OWNER'"))
+        except Exception:
+            pass
+        try:
+            if "schedule_weekly_overrides" in tables:
+                connection.execute(
+                    text("UPDATE schedule_weekly_overrides SET required_role = 'ADMIN' WHERE required_role = 'OWNER'")
+                )
+        except Exception:
+            pass
 
         if "shift_templates" in tables:
             template_columns = {column["name"] for column in inspector.get_columns("shift_templates")}
