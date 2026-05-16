@@ -42,6 +42,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 NIL_ORG_ID = str(UUID(int=0))
 OTP_EXPIRES_SECONDS = 300
+OTP_REUSE_MIN_SECONDS = 60
 
 
 def utc_now_naive() -> datetime:
@@ -76,6 +77,18 @@ def _ensure_single_business_rule(db: Session, user_id: UUID, organization_id: UU
 
 
 def _create_otp_challenge(db: Session, *, email: str, purpose: OtpPurposeEnum, invite_token: str | None) -> str:
+    existing = db.scalar(
+        select(OtpChallenge).where(
+            OtpChallenge.email == email,
+            OtpChallenge.purpose == purpose,
+            OtpChallenge.invite_token == invite_token,
+            OtpChallenge.consumed_at.is_(None),
+        )
+    )
+    now = utc_now_naive()
+    if existing is not None and existing.expires_at > now + timedelta(seconds=OTP_REUSE_MIN_SECONDS):
+        return existing.code
+
     code = str(int(datetime.now(UTC).timestamp() * 1000) % 1000000).zfill(6)
     db.execute(delete(OtpChallenge).where(OtpChallenge.email == email, OtpChallenge.purpose == purpose))
     db.add(
@@ -84,7 +97,7 @@ def _create_otp_challenge(db: Session, *, email: str, purpose: OtpPurposeEnum, i
             purpose=purpose,
             code=code,
             invite_token=invite_token,
-            expires_at=utc_now_naive() + timedelta(seconds=OTP_EXPIRES_SECONDS),
+            expires_at=now + timedelta(seconds=OTP_EXPIRES_SECONDS),
         )
     )
     db.commit()

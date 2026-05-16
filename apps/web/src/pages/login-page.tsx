@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Lock, Mail, Sparkles } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
@@ -53,6 +53,7 @@ export function LoginPage() {
   const [passwordLogin, setPasswordLogin] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const sendInFlightRef = useRef(false);
 
   const effectiveEmail = isInviteJoin ? invitedEmail : email.trim().toLowerCase();
   const resetTransientState = () => {
@@ -81,8 +82,11 @@ export function LoginPage() {
   };
 
   const handleSendCode = async (purpose: "login" | "owner_signup" | "worker_signup" | "invite_join") => {
+    if (sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
     setIsSubmitting(true);
     try {
+      setOtpCode("");
       const response = await sendOtp({
         email: effectiveEmail,
         purpose,
@@ -94,6 +98,7 @@ export function LoginPage() {
     } catch (error) {
       toast.error("Failed to send code", error instanceof Error ? error.message : undefined);
     } finally {
+      sendInFlightRef.current = false;
       setIsSubmitting(false);
     }
   };
