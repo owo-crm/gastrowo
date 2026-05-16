@@ -23,6 +23,13 @@ docker compose up --build
 - API health: `http://localhost:8000/health`
 - Web app: `http://localhost:5173`
 
+## Railway
+- Railway setup guide: [docs/RAILWAY.md](docs/RAILWAY.md)
+- Repo is prepared for:
+  - `apps/api/railway.toml`
+  - `apps/web/railway.toml`
+  - separate `api` and `web` services from the same monorepo
+
 ## Seed credentials
 - Owner: `owner@GastrOWO.app` / `Owner123!`
 - Demo staff/managers: password `Staff123!`
