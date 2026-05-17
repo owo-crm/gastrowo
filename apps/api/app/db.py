@@ -73,6 +73,18 @@ def _ensure_runtime_schema_compat() -> None:
 
         if "users" in tables:
             user_columns = {column["name"] for column in inspector.get_columns("users")}
+            if "public_uid" not in user_columns:
+                connection.execute(text("ALTER TABLE users ADD COLUMN public_uid VARCHAR(32)"))
+            connection.execute(
+                text(
+                    "UPDATE users "
+                    "SET public_uid = CONCAT('WD', UPPER(SUBSTRING(md5(random()::text || clock_timestamp()::text) FROM 1 FOR 10))) "
+                    "WHERE public_uid IS NULL OR TRIM(public_uid) = ''"
+                )
+            )
+            connection.execute(
+                text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_public_uid ON users (public_uid)")
+            )
             if "avatar_url" not in user_columns:
                 connection.execute(text("ALTER TABLE users ADD COLUMN avatar_url TEXT"))
             if "onboarding_source" not in user_columns:

@@ -73,10 +73,15 @@ class OtpPurposeEnum(str, Enum):
     INVITE_JOIN = "invite_join"
 
 
+def generate_legacy_public_uid() -> str:
+    return f"WD{uuid.uuid4().hex[:10].upper()}"
+
+
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    public_uid: Mapped[str] = mapped_column(String(32), unique=True, index=True, default=generate_legacy_public_uid)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     full_name: Mapped[str] = mapped_column(String(120))
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
