@@ -45,8 +45,14 @@ OTP_EXPIRES_SECONDS = 300
 OTP_REUSE_MIN_SECONDS = 60
 
 
-def utc_now_naive() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+def utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+def utc_value(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _pretty_name_from_email(email: str) -> str:
@@ -85,8 +91,8 @@ def _create_otp_challenge(db: Session, *, email: str, purpose: OtpPurposeEnum, i
             OtpChallenge.consumed_at.is_(None),
         )
     )
-    now = utc_now_naive()
-    if existing is not None and existing.expires_at > now + timedelta(seconds=OTP_REUSE_MIN_SECONDS):
+    now = utc_now()
+    if existing is not None and utc_value(existing.expires_at) > now + timedelta(seconds=OTP_REUSE_MIN_SECONDS):
         return existing.code
 
     code = str(int(datetime.now(UTC).timestamp() * 1000) % 1000000).zfill(6)
@@ -125,9 +131,9 @@ def _consume_otp(
         raise HTTPException(status_code=401, detail="Invalid code")
     if challenge.consumed_at is not None:
         raise HTTPException(status_code=409, detail="Code already used")
-    if challenge.expires_at < utc_now_naive():
+    if utc_value(challenge.expires_at) < utc_now():
         raise HTTPException(status_code=410, detail="Code expired")
-    challenge.consumed_at = utc_now_naive()
+    challenge.consumed_at = utc_now()
     db.commit()
     return challenge
 
@@ -172,7 +178,7 @@ def send_otp(payload: OtpSendRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=404, detail="Invite not found")
         if invite.accepted_at is not None:
             raise HTTPException(status_code=409, detail="Invite already used")
-        if invite.expires_at < utc_now_naive():
+        if utc_value(invite.expires_at) < utc_now():
             raise HTTPException(status_code=410, detail="Invite expired")
         if invite.email.lower() != email:
             raise HTTPException(status_code=400, detail="Invite email mismatch")
@@ -295,7 +301,7 @@ def verify_invite_join(payload: InviteJoinVerifyRequest, db: Session = Depends(g
         raise HTTPException(status_code=404, detail="Invite not found")
     if invite.accepted_at is not None:
         raise HTTPException(status_code=409, detail="Invite already used")
-    if invite.expires_at < utc_now_naive():
+    if utc_value(invite.expires_at) < utc_now():
         raise HTTPException(status_code=410, detail="Invite expired")
     if invite.email.lower() != email:
         raise HTTPException(status_code=400, detail="Invite email mismatch")
