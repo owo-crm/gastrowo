@@ -38,10 +38,23 @@ class MembershipOut(APIModel):
     role: RoleEnum
     max_hours_per_week: int
     staff_position: str | None = None
+    staff_can_submit_revenue_reports_override: bool | None = None
+    staff_can_delete_revenue_reports_override: bool | None = None
+    manager_can_submit_revenue_reports_override: bool | None = None
+    manager_can_delete_revenue_reports_override: bool | None = None
+    manager_can_view_full_dashboard_override: bool | None = None
+    manager_can_view_payroll_override: bool | None = None
+    manager_can_manage_team_override: bool | None = None
+    manager_can_manage_business_settings_override: bool | None = None
+    manager_can_access_notes_override: bool | None = None
+    manager_can_access_inventory_override: bool | None = None
 
 
 class OrganizationSettingsOut(APIModel):
     staff_can_submit_revenue_reports: bool = False
+    staff_can_delete_revenue_reports: bool = False
+    manager_can_submit_revenue_reports: bool = True
+    manager_can_delete_revenue_reports: bool = True
     manager_can_view_full_dashboard: bool = False
     manager_can_view_payroll: bool = False
     manager_can_manage_team: bool = True
@@ -73,12 +86,41 @@ class OrganizationPatch(BaseModel):
 
 class OrganizationSettingsPatch(BaseModel):
     staff_can_submit_revenue_reports: bool
+    staff_can_delete_revenue_reports: bool
+    manager_can_submit_revenue_reports: bool
+    manager_can_delete_revenue_reports: bool
     manager_can_view_full_dashboard: bool
     manager_can_view_payroll: bool
     manager_can_manage_team: bool
     manager_can_manage_business_settings: bool
     manager_can_access_notes: bool
     manager_can_access_inventory: bool
+
+
+class MembershipPermissionOverridesOut(APIModel):
+    staff_can_submit_revenue_reports_override: bool | None = None
+    staff_can_delete_revenue_reports_override: bool | None = None
+    manager_can_submit_revenue_reports_override: bool | None = None
+    manager_can_delete_revenue_reports_override: bool | None = None
+    manager_can_view_full_dashboard_override: bool | None = None
+    manager_can_view_payroll_override: bool | None = None
+    manager_can_manage_team_override: bool | None = None
+    manager_can_manage_business_settings_override: bool | None = None
+    manager_can_access_notes_override: bool | None = None
+    manager_can_access_inventory_override: bool | None = None
+
+
+class MembershipPermissionOverridesPatch(BaseModel):
+    staff_can_submit_revenue_reports_override: bool | None = None
+    staff_can_delete_revenue_reports_override: bool | None = None
+    manager_can_submit_revenue_reports_override: bool | None = None
+    manager_can_delete_revenue_reports_override: bool | None = None
+    manager_can_view_full_dashboard_override: bool | None = None
+    manager_can_view_payroll_override: bool | None = None
+    manager_can_manage_team_override: bool | None = None
+    manager_can_manage_business_settings_override: bool | None = None
+    manager_can_access_notes_override: bool | None = None
+    manager_can_access_inventory_override: bool | None = None
 
 
 class LinkByEmailRequest(BaseModel):
@@ -197,6 +239,7 @@ class LocationMemberOut(APIModel):
     max_hours_per_week: int
     hourly_rate_pln: Decimal
     priority: int
+    permission_overrides: MembershipPermissionOverridesOut | None = None
 
 
 class LocationMemberPatch(BaseModel):
@@ -218,6 +261,7 @@ class WorkerSetupOut(APIModel):
     role: RoleEnum
     staff_position: str | None = None
     locations: list[WorkerSetupLocationItem]
+    permission_overrides: MembershipPermissionOverridesOut
 
 
 class WorkerSetupPatchItem(BaseModel):
@@ -228,6 +272,7 @@ class WorkerSetupPatchItem(BaseModel):
 
 class WorkerSetupPatch(BaseModel):
     locations: list[WorkerSetupPatchItem] = Field(min_length=1)
+    permission_overrides: MembershipPermissionOverridesPatch | None = None
 
 
 class AvailabilitySlotInput(BaseModel):

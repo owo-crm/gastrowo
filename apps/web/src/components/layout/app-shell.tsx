@@ -9,6 +9,7 @@ export function AppShell({
   action,
   headerVariant,
   restaurantName,
+  hideBottomNav,
 }: {
   children: ReactNode;
   title: string;
@@ -16,6 +17,7 @@ export function AppShell({
   action?: ReactNode;
   headerVariant?: "default" | "minimal";
   restaurantName?: string;
+  hideBottomNav?: boolean;
 }) {
   return (
     <DashboardWithCollapsibleSidebar
@@ -24,6 +26,7 @@ export function AppShell({
       action={action}
       headerVariant={headerVariant}
       restaurantName={restaurantName}
+      hideBottomNav={hideBottomNav}
     >
       {children}
     </DashboardWithCollapsibleSidebar>

@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.deps import OrgContext, require_org_context
+from app.core.deps import OrgContext, get_current_organization, require_org_context
 from app.core.envelope import ok
+from app.core.permissions import can_manage_team
 from app.db import get_db
 from app.models import PositionCatalog, RoleEnum, ShiftTemplate
 from app.schemas import PositionCatalogCreate, PositionCatalogOut
@@ -15,11 +16,18 @@ from app.schemas import PositionCatalogCreate, PositionCatalogOut
 router = APIRouter(prefix="/positions", tags=["positions"])
 
 
+def _require_team_access(context: OrgContext, db: Session) -> None:
+    organization = get_current_organization(context, db)
+    if not can_manage_team(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
+
+
 @router.get("")
 def list_positions(
     context: OrgContext = Depends(require_org_context()),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     positions = db.scalars(
         select(PositionCatalog).where(
             PositionCatalog.organization_id == context.membership.organization_id,
@@ -35,6 +43,7 @@ def create_position(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     normalized_name = payload.name.strip()
     existing = db.scalar(
         select(PositionCatalog).where(
@@ -67,6 +76,7 @@ def delete_position(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     position = db.scalar(
         select(PositionCatalog).where(
             PositionCatalog.id == position_id,

@@ -2,6 +2,9 @@ export type Role = "ADMIN" | "MANAGER" | "STAFF";
 
 export type OrganizationSettings = {
   staff_can_submit_revenue_reports: boolean;
+  staff_can_delete_revenue_reports: boolean;
+  manager_can_submit_revenue_reports: boolean;
+  manager_can_delete_revenue_reports: boolean;
   manager_can_view_full_dashboard: boolean;
   manager_can_view_payroll: boolean;
   manager_can_manage_team: boolean;
@@ -9,6 +12,26 @@ export type OrganizationSettings = {
   manager_can_access_notes: boolean;
   manager_can_access_inventory: boolean;
 };
+
+export type MembershipPermissionOverrides = {
+  staff_can_submit_revenue_reports_override: boolean | null;
+  staff_can_delete_revenue_reports_override: boolean | null;
+  manager_can_submit_revenue_reports_override: boolean | null;
+  manager_can_delete_revenue_reports_override: boolean | null;
+  manager_can_view_full_dashboard_override: boolean | null;
+  manager_can_view_payroll_override: boolean | null;
+  manager_can_manage_team_override: boolean | null;
+  manager_can_manage_business_settings_override: boolean | null;
+  manager_can_access_notes_override: boolean | null;
+  manager_can_access_inventory_override: boolean | null;
+};
+
+export type MembershipSummary = {
+  organization_id: string;
+  role: Role;
+  max_hours_per_week: number;
+  staff_position?: string | null;
+} & MembershipPermissionOverrides;
 
 export type Envelope<T> = {
   data: T;
@@ -20,7 +43,7 @@ export type AuthLoginResponse = {
   access_token: string;
   token_type: string;
   status: "linked" | "pending_link";
-  memberships: Array<{ organization_id: string; role: Role; max_hours_per_week: number }>;
+  memberships: MembershipSummary[];
   active_organization_id: string | null;
   role: Role | null;
 };
@@ -37,7 +60,7 @@ export type OtpVerifyResponse = {
   access_token?: string | null;
   token_type: string;
   status: "linked" | "pending_link" | "owner_verified";
-  memberships: Array<{ organization_id: string; role: Role; max_hours_per_week: number; staff_position?: string | null }>;
+  memberships: MembershipSummary[];
   active_organization_id: string | null;
   role: Role | null;
   verification_token?: string | null;
@@ -52,7 +75,7 @@ export type MeResponse = {
   active_organization_name: string | null;
   role: Role | null;
   is_linked: boolean;
-  memberships: Array<{ organization_id: string; role: Role; max_hours_per_week: number; staff_position?: string | null }>;
+  memberships: MembershipSummary[];
   organization_settings: OrganizationSettings | null;
 };
 
@@ -116,6 +139,7 @@ export type LocationMember = {
   max_hours_per_week: number;
   hourly_rate_pln: string;
   priority: number;
+  permission_overrides?: MembershipPermissionOverrides | null;
 };
 
 export type WorkerSetupRow = LocationMember;
@@ -133,6 +157,7 @@ export type WorkerSetup = {
   role: Role;
   staff_position?: string | null;
   locations: WorkerSetupLocation[];
+  permission_overrides: MembershipPermissionOverrides;
 };
 
 export type Assignment = {

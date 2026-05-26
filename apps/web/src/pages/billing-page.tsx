@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const activeSubscription = {
@@ -45,31 +46,32 @@ const plans = [
 ];
 
 export function BillingPage() {
+   const { t } = useLanguage();
    return (
-     <AppShell title="Billing" subtitle="Frontend-only subscription status for the current GastrOWO workspace." action={<Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">{activeSubscription.status}</Badge>}>
+      <AppShell title={t("billing.title")} subtitle={t("billing.subtitle")} action={<Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">{t("billing.active")}</Badge>}>
        <div className="space-y-5">
          <Card className="animate-slide-in overflow-hidden border-0 p-0" style={{ animationDelay: "100ms" }}>
           <div className="grid gap-5 bg-[linear-gradient(135deg,#eef5ff_0%,#ffffff_54%,#f1fff5_100%)] px-4 py-5 sm:px-6 sm:py-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Workspace billing</p>
-              <h2 className="mt-3 text-2xl font-bold tracking-[-0.05em] text-[var(--color-heading)] sm:text-3xl">Plan status for your GastrOWO workspace.</h2>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">{t("billing.workspace_billing")}</p>
+              <h2 className="mt-3 text-2xl font-bold tracking-[-0.05em] text-[var(--color-heading)] sm:text-3xl">{t("billing.plan_status_heading")}</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">
-                Billing is still frontend-only in this MVP, but you can already see the active plan, renewal date, and included product modules in one clean account view.
+                {t("billing.plan_status_body")}
               </p>
             </div>
               <div className="grid gap-3 rounded-[1.25rem] bg-white/88 p-4 sm:rounded-[1.4rem]">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm text-[var(--color-text-muted)]">Current plan</p>
+                  <p className="text-sm text-[var(--color-text-muted)]">{t("billing.current_plan")}</p>
                   <p className="mt-1 text-2xl font-bold tracking-[-0.04em] text-[var(--color-heading)]">{activeSubscription.plan}</p>
                 </div>
-                <Badge className="border-blue-200 bg-blue-50 text-blue-700">{activeSubscription.status}</Badge>
+                <Badge className="border-blue-200 bg-blue-50 text-blue-700">{t("billing.active")}</Badge>
               </div>
                 <div className="grid gap-3 sm:grid-cols-3">
                 {[
-                  { label: "Price", value: `${activeSubscription.price}${activeSubscription.cycle}`, icon: Layers3 },
-                  { label: "Active until", value: activeSubscription.activeUntil, icon: CheckCircle2 },
-                  { label: "Seats", value: "Unlimited", icon: Users2 },
+                  { label: t("billing.price"), value: `${activeSubscription.price}${activeSubscription.cycle}`, icon: Layers3 },
+                  { label: t("billing.active_until"), value: activeSubscription.activeUntil, icon: CheckCircle2 },
+                  { label: t("billing.seats"), value: t("billing.unlimited"), icon: Users2 },
                 ].map((item) => (
                   <div key={item.label} className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-3">
                     <item.icon className="size-4 text-[var(--color-primary)]" />
@@ -87,15 +89,15 @@ export function BillingPage() {
             <Card key={plan.name} className={cn("flex min-h-[unset] flex-col justify-between rounded-[1.6rem] border border-[var(--color-border)] bg-[#f7f7f5] p-5 sm:p-6 xl:min-h-[560px]", plan.active && "border-[var(--color-primary)] bg-white")}>
               <div>
                 <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-2xl font-bold tracking-[-0.04em] text-[var(--color-heading)]">{plan.name} plan</h3>
-                  {plan.active ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">Active</Badge> : null}
+                  <h3 className="text-2xl font-bold tracking-[-0.04em] text-[var(--color-heading)]">{t(`billing.plan_${plan.name.toLowerCase()}`)}</h3>
+                  {plan.active ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">{t("billing.active")}</Badge> : null}
                 </div>
                 <div className="mt-6 flex items-end gap-1">
                   <p className="text-[3.2rem] font-bold leading-none tracking-[-0.08em] text-[var(--color-heading)] sm:text-[4rem]">{plan.price}</p>
                   {plan.cycle ? <p className="pb-2 text-base font-semibold text-[var(--color-text-muted)]">{plan.cycle}</p> : null}
                 </div>
                 <div className="mt-6">
-                  <p className="text-sm text-[var(--color-text-muted)]">Available modules:</p>
+                  <p className="text-sm text-[var(--color-text-muted)]">{t("billing.available_modules")}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {plan.modules.map((module) => (
                       <span key={module} className="inline-flex items-center rounded-[0.9rem] bg-[var(--color-surface-muted)] px-3 py-2 text-sm font-medium text-[var(--color-heading)]">
@@ -116,7 +118,7 @@ export function BillingPage() {
                 </div>
                 {plan.active ? (
                   <div className="mt-6 rounded-[1rem] border border-emerald-200 bg-emerald-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">Active until</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">{t("billing.active_until")}</p>
                     <p className="mt-1 text-sm font-semibold text-emerald-800">{activeSubscription.activeUntil}</p>
                   </div>
                 ) : null}

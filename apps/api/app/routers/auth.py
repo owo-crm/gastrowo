@@ -143,6 +143,9 @@ def _settings_out(organization: Organization | None) -> OrganizationSettingsOut 
         return None
     return OrganizationSettingsOut(
         staff_can_submit_revenue_reports=organization.staff_can_submit_revenue_reports,
+        staff_can_delete_revenue_reports=organization.staff_can_delete_revenue_reports,
+        manager_can_submit_revenue_reports=organization.manager_can_submit_revenue_reports,
+        manager_can_delete_revenue_reports=organization.manager_can_delete_revenue_reports,
         manager_can_view_full_dashboard=organization.manager_can_view_full_dashboard,
         manager_can_view_payroll=organization.manager_can_view_payroll,
         manager_can_manage_team=organization.manager_can_manage_team,

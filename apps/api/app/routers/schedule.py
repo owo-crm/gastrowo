@@ -6,7 +6,7 @@ from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import OrgContext, require_org_context
@@ -55,6 +55,7 @@ from app.services.scheduler import (
     apply_week_schedule,
     collect_assignment_validation_issues,
     plan_week_schedule,
+    preview_assignment_has_overlap,
     shift_duration_hours,
 )
 
@@ -667,6 +668,22 @@ def patch_preview_edit(
             created_by=context.user.id,
         )
         db.add(target)
+        db.flush()
+        if (
+            target.assigned_user_id is not None
+            and preview_assignment_has_overlap(
+                db=db,
+                organization_id=organization_id,
+                week_start=payload.week_start,
+                location_id=target.location_id,
+                user_id=target.assigned_user_id,
+                shift_date=payload.week_start + timedelta(days=target.day_of_week),
+                start_time=target.start_time,
+                end_time=target.end_time,
+                exclude_override_ids={target.id},
+            )
+        ):
+            raise HTTPException(status_code=422, detail="Assignment overlap is not allowed")
         db.commit()
         db.refresh(target)
         return ok(_serialize_override(target))
@@ -763,6 +780,23 @@ def patch_preview_edit(
 
     if "assigned_user_id" in payload.model_fields_set:
         target.assigned_user_id = payload.assigned_user_id
+
+    db.flush()
+    if (
+        target.assigned_user_id is not None
+        and preview_assignment_has_overlap(
+            db=db,
+            organization_id=organization_id,
+            week_start=payload.week_start,
+            location_id=target.location_id,
+            user_id=target.assigned_user_id,
+            shift_date=payload.week_start + timedelta(days=target.day_of_week),
+            start_time=target.start_time,
+            end_time=target.end_time,
+            exclude_override_ids={target.id},
+        )
+    ):
+        raise HTTPException(status_code=422, detail="Assignment overlap is not allowed")
 
     db.commit()
     db.refresh(target)

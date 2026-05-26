@@ -1,54 +1,272 @@
-import { useMemo, useState } from "react";
+import { type Dispatch, type SetStateAction, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, CheckCircle2, ClipboardList, Plus, Trash2, UserRound } from "lucide-react";
+import { Camera, Check, Plus, Trash2, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { OverlayPortal } from "@/components/ui/overlay-portal";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { fileToDataUrl } from "@/lib/file";
+import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import type { Task } from "@/lib/types";
 
-function statusTone(status: "pending" | "done") {
-  return status === "done"
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : "border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-heading)]";
+function formatTaskDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function taskMetaTone(isDone: boolean) {
+  return isDone ? "text-emerald-700" : "text-[var(--color-text-muted)]";
+}
+
+function mobileComposerAnimation() {
+  return {
+    initial: { opacity: 0, y: 72, scale: 0.985 },
+    animate: { opacity: 1, y: 0, scale: 1 },
+    exit: { opacity: 0, y: 72, scale: 0.985 },
+    transition: { duration: 0.24, ease: [0.16, 1, 0.3, 1] as const },
+  };
+}
+
+function TaskComposerFields({
+  form,
+  setForm,
+  taskFormErrors,
+  users,
+  locations,
+  submitTask,
+  canSubmitTask,
+  isPending,
+  t,
+  compact = false,
+}: {
+  form: { title: string; description: string; assigned_to: string; location_id: string };
+  setForm: Dispatch<SetStateAction<{ title: string; description: string; assigned_to: string; location_id: string }>>;
+  taskFormErrors: Partial<Record<"title" | "description" | "assigned_to" | "location_id", string>>;
+  users: Array<{ id: string; full_name: string; role: string; staff_position?: string | null }>;
+  locations: Array<{ id: string; name: string }>;
+  submitTask: () => void;
+  canSubmitTask: boolean;
+  isPending: boolean;
+  compact?: boolean;
+  t: (key: string, params?: Record<string, string | number | null | undefined>) => string;
+}) {
+  const fieldBlockClass = compact ? "space-y-1" : "space-y-1.5";
+
+  return (
+    <div className={compact ? "grid gap-3 xl:grid-cols-[1.15fr_1.7fr_1fr_1fr_auto] xl:items-start" : "space-y-3"}>
+      <div className={fieldBlockClass}>
+        <Input
+          placeholder={t("tasks.title_placeholder")}
+          value={form.title}
+          onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+        />
+        {taskFormErrors.title ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.title}</p> : null}
+      </div>
+
+      <div className={fieldBlockClass}>
+        <Textarea
+          placeholder={t("tasks.description_placeholder")}
+          value={form.description}
+          onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+          className={compact ? "min-h-[44px] py-2 sm:min-h-[48px] xl:min-h-[44px]" : undefined}
+        />
+        {taskFormErrors.description ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.description}</p> : null}
+      </div>
+
+      <div className={fieldBlockClass}>
+        <Select
+          options={[
+            { label: t("tasks.assign_to"), value: "" },
+            ...users.map((user) => ({ label: `${user.full_name} (${user.staff_position ?? user.role})`, value: user.id })),
+          ]}
+          value={form.assigned_to}
+          onChange={(event) => setForm((current) => ({ ...current, assigned_to: event.target.value }))}
+        />
+        {taskFormErrors.assigned_to ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.assigned_to}</p> : null}
+      </div>
+
+      <div className={fieldBlockClass}>
+        <Select
+          options={[
+            { label: t("tasks.location_optional"), value: "" },
+            ...locations.map((location) => ({ label: location.name, value: location.id })),
+          ]}
+          value={form.location_id}
+          onChange={(event) => setForm((current) => ({ ...current, location_id: event.target.value }))}
+        />
+        {taskFormErrors.location_id ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.location_id}</p> : null}
+      </div>
+
+      <Button
+        onClick={submitTask}
+        disabled={!canSubmitTask || isPending}
+        className={compact ? "w-full xl:min-h-[44px] xl:self-start xl:px-5" : "w-full"}
+      >
+        <Plus className="size-4" /> {t("tasks.create_task")}
+      </Button>
+    </div>
+  );
+}
+
+function TaskRow({
+  task,
+  assignedName,
+  createdByName,
+  meId,
+  canDelete,
+  isBusy,
+  onToggle,
+  pendingDelete,
+  onDeleteRequest,
+  onDeleteConfirm,
+  onDeleteCancel,
+  onPickPhoto,
+  t,
+}: {
+  task: Task;
+  assignedName: string;
+  createdByName?: string | null;
+  meId?: string;
+  canDelete: boolean;
+  isBusy: boolean;
+  onToggle: (task: Task) => void;
+  pendingDelete: boolean;
+  onDeleteRequest: (task: Task) => void;
+  onDeleteConfirm: (task: Task) => void;
+  onDeleteCancel: () => void;
+  onPickPhoto: (taskId: string, file?: File | null) => Promise<void>;
+  t: (key: string, params?: Record<string, string | number | null | undefined>) => string;
+}) {
+  const canEditStatus = meId ? task.assigned_to === meId || !meId : true;
+  const isDone = task.status === "done";
+  const metaItems = [
+    t("tasks.meta_to", { name: assignedName }),
+    createdByName && createdByName !== assignedName ? t("tasks.meta_by", { name: createdByName }) : null,
+    t("tasks.created_on", { date: formatTaskDate(task.created_at) }),
+  ].filter(Boolean);
+
+  return (
+    <article className="rounded-[1rem] border border-[var(--color-border)] bg-white px-3.5 py-3 shadow-[0_10px_26px_rgba(15,23,42,0.05)] transition hover:border-[var(--color-primary)]/20 hover:shadow-[0_14px_28px_rgba(15,23,42,0.08)] sm:px-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className={`pr-2 text-[0.95rem] font-semibold leading-5 ${isDone ? "text-[var(--color-text-muted)] line-through" : "text-[var(--color-heading)]"}`}>{task.title}</h3>
+          {task.description ? <p className="mt-1.5 text-[13px] leading-5 text-[var(--color-text-muted)]">{task.description}</p> : null}
+          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+            {metaItems.map((item) => (
+              <span key={item} className={taskMetaTone(isDone)}>
+                {item}
+              </span>
+            ))}
+            {task.photos.length ? <span className={taskMetaTone(isDone)}>{t("tasks.photos_count", { count: task.photos.length })}</span> : null}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-start gap-1.5">
+          {canDelete ? (
+            pendingDelete ? (
+              <div className="flex items-center gap-1.5">
+                <Button size="sm" variant="danger" onClick={() => onDeleteConfirm(task)} disabled={isBusy}>
+                  Confirm delete
+                </Button>
+                <Button size="sm" variant="ghost" onClick={onDeleteCancel} disabled={isBusy}>
+                  {t("common.cancel")}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onDeleteRequest(task)}
+                disabled={isBusy}
+                className="h-8 w-8 rounded-full border border-transparent p-0 text-[var(--color-text-muted)] hover:border-[var(--color-danger)]/20 hover:bg-[var(--color-danger)]/8 hover:text-[var(--color-danger)]"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            )
+          ) : null}
+          <button
+            type="button"
+            aria-pressed={isDone}
+            aria-label={isDone ? t("tasks.return_to_pending") : t("tasks.mark_done")}
+            disabled={!canEditStatus || isBusy}
+            onClick={() => onToggle(task)}
+            className={`grid h-8 w-8 place-items-center rounded-full border transition ${
+              isDone
+                ? "border-emerald-500 bg-emerald-500 text-white shadow-[0_10px_18px_rgba(16,185,129,0.22)]"
+                : "border-slate-300 bg-white text-slate-300 hover:border-slate-400 hover:text-slate-400"
+            } disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            <Check className={`size-4 ${isDone ? "text-white" : "text-slate-500"}`} />
+          </button>
+        </div>
+      </div>
+
+      {!isDone ? (
+        <div className="mt-3">
+          <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-[0.85rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 text-xs font-semibold text-[var(--color-heading)] transition hover:bg-white">
+            <Camera className="size-4" />
+            {t("tasks.add_photo")}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async (event) => {
+                await onPickPhoto(task.id, event.target.files?.[0]);
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
+        </div>
+      ) : null}
+
+      {task.photos.length ? (
+        <div className="mt-3 grid gap-2">
+          {task.photos.map((photo) => (
+            <a
+              key={photo.id}
+              href={photo.photo_url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between rounded-[0.85rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-[11px] text-[var(--color-text-muted)] transition hover:bg-white"
+            >
+              <span>{t("tasks.photo_item", { id: photo.id.slice(0, 6) })}</span>
+              <Camera className="size-3.5 text-emerald-600" />
+            </a>
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
 }
 
 export function TasksPage() {
-   const { token, me } = useAuth();
-   const toast = useToast();
-   const queryClient = useQueryClient();
+  const { token, me } = useAuth();
+  const { t } = useLanguage();
+  const toast = useToast();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState({ title: "", description: "", assigned_to: "", location_id: "" });
-  const [photoMap, setPhotoMap] = useState<Record<string, string>>({});
-  const [photoNames, setPhotoNames] = useState<Record<string, string>>({});
   const [mobileStatusTab, setMobileStatusTab] = useState<"pending" | "done">("pending");
   const [mobileComposerOpen, setMobileComposerOpen] = useState(false);
-
-  const clearTaskDraft = (taskId: string) => {
-    setPhotoMap((current) => {
-      const next = { ...current };
-      delete next[taskId];
-      return next;
-    });
-    setPhotoNames((current) => {
-      const next = { ...current };
-      delete next[taskId];
-      return next;
-    });
-  };
+  const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
 
   const usersQuery = useQuery({ queryKey: ["users"], queryFn: () => api.listUsers(token!), enabled: Boolean(token) });
   const locationsQuery = useQuery({ queryKey: ["locations"], queryFn: () => api.listLocations(token!), enabled: Boolean(token) });
   const tasksQuery = useQuery({ queryKey: ["tasks"], queryFn: () => api.listTasks(token!), enabled: Boolean(token) });
+
   const validUserIds = useMemo(() => new Set((usersQuery.data ?? []).map((user) => user.id)), [usersQuery.data]);
   const validLocationIds = useMemo(() => new Set((locationsQuery.data ?? []).map((location) => location.id)), [locationsQuery.data]);
+
   const normalizedTaskPayload = useMemo(() => {
     const title = form.title.trim();
     const description = form.description.trim();
@@ -61,20 +279,21 @@ export function TasksPage() {
       location_id: locationId ? locationId : null,
     };
   }, [form]);
+
   const taskFormErrors = useMemo(() => {
     const errors: Partial<Record<"title" | "description" | "assigned_to" | "location_id", string>> = {};
-    if (normalizedTaskPayload.title.length < 2) errors.title = "Title must be at least 2 characters.";
-    else if (normalizedTaskPayload.title.length > 255) errors.title = "Title must be 255 characters or less.";
-    if (normalizedTaskPayload.description.length > 3000) errors.description = "Description must be 3000 characters or less.";
-    if (!normalizedTaskPayload.assigned_to) errors.assigned_to = "Choose a worker.";
-    else if (!validUserIds.has(normalizedTaskPayload.assigned_to)) errors.assigned_to = "Choose a valid worker.";
+    if (normalizedTaskPayload.title.length < 2) errors.title = t("tasks.validation.title_min");
+    else if (normalizedTaskPayload.title.length > 255) errors.title = t("tasks.validation.title_max");
+    if (normalizedTaskPayload.description.length > 3000) errors.description = t("tasks.validation.description_max");
+    if (!normalizedTaskPayload.assigned_to) errors.assigned_to = t("tasks.validation.worker_required");
+    else if (!validUserIds.has(normalizedTaskPayload.assigned_to)) errors.assigned_to = t("tasks.validation.worker_invalid");
     if (normalizedTaskPayload.location_id && !validLocationIds.has(normalizedTaskPayload.location_id)) {
-      errors.location_id = "Choose a valid location or leave it empty.";
+      errors.location_id = t("tasks.validation.location_invalid");
     }
     return errors;
-  }, [normalizedTaskPayload, validLocationIds, validUserIds]);
-  const canSubmitTask = Object.keys(taskFormErrors).length === 0;
+  }, [normalizedTaskPayload, t, validLocationIds, validUserIds]);
 
+  const canSubmitTask = Object.keys(taskFormErrors).length === 0;
   const submitTask = () => {
     if (!canSubmitTask) return;
     createTaskMutation.mutate();
@@ -89,7 +308,7 @@ export function TasksPage() {
         location_id: normalizedTaskPayload.location_id,
       }),
     onSuccess: (createdTask) => {
-      toast.success("Task created");
+      toast.success(t("tasks.task_created"));
       setForm({ title: "", description: "", assigned_to: "", location_id: "" });
       setMobileComposerOpen(false);
       queryClient.setQueryData<Task[]>(["tasks"], (current) => [createdTask, ...(current ?? []).filter((task) => task.id !== createdTask.id)]);
@@ -97,43 +316,53 @@ export function TasksPage() {
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
     onError: (error) => {
-      toast.error("Failed to create task", error instanceof Error ? error.message : undefined);
+      toast.error(t("tasks.task_create_failed"), error instanceof Error ? error.message : undefined);
     },
   });
+
   const patchTaskMutation = useMutation({
     mutationFn: ({ taskId, status }: { taskId: string; status: "pending" | "done" }) => api.patchTask(token!, taskId, status),
     onSuccess: () => {
-      toast.success("Task updated");
+      toast.success(t("tasks.task_updated"));
       void queryClient.invalidateQueries({ queryKey: ["tasks"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
     onError: (error) => {
-      toast.error("Failed to update task", error instanceof Error ? error.message : undefined);
+      toast.error(t("tasks.task_update_failed"), error instanceof Error ? error.message : undefined);
     },
   });
+
   const addPhotoMutation = useMutation({
     mutationFn: ({ taskId, photoUrl }: { taskId: string; photoUrl: string }) => api.addTaskPhoto(token!, taskId, photoUrl),
     onSuccess: () => {
-      toast.success("Photo attached");
+      toast.success(t("tasks.photo_attached"));
       void queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
     onError: (error) => {
-      toast.error("Failed to attach photo", error instanceof Error ? error.message : undefined);
+      toast.error(t("tasks.photo_attach_failed"), error instanceof Error ? error.message : undefined);
     },
   });
+
   const deleteTaskMutation = useMutation({
     mutationFn: (taskId: string) => api.deleteTask(token!, taskId),
     onSuccess: (_, taskId) => {
-      toast.success("Task deleted");
+      toast.success(t("tasks.task_deleted"));
+      setPendingDeleteTaskId((current) => (current === taskId ? null : current));
       queryClient.setQueryData<Task[]>(["tasks"], (current) => (current ?? []).filter((task) => task.id !== taskId));
-      clearTaskDraft(taskId);
       void queryClient.invalidateQueries({ queryKey: ["tasks"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
     onError: (error) => {
-      toast.error("Failed to delete task", error instanceof Error ? error.message : undefined);
+      setPendingDeleteTaskId(null);
+      toast.error(t("tasks.task_delete_failed"), error instanceof Error ? error.message : undefined);
     },
   });
+
+  const handlePhotoPick = async (taskId: string, file?: File | null) => {
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file);
+    addPhotoMutation.mutate({ taskId, photoUrl: dataUrl });
+  };
 
   const canCreate = Boolean(me);
   const canDelete = me?.role === "ADMIN" || me?.role === "MANAGER";
@@ -152,146 +381,94 @@ export function TasksPage() {
     for (const user of usersQuery.data ?? []) map[user.id] = user.full_name;
     return map;
   }, [usersQuery.data]);
-  const locationNameById = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const location of locationsQuery.data ?? []) map[location.id] = location.name;
-    return map;
-  }, [locationsQuery.data]);
+
+  const visibleStaffTasks = me?.role === "STAFF" ? tasks.filter((task) => task.assigned_to === me.id || task.created_by === me.id) : [];
+  const myPending = visibleStaffTasks.filter((task) => task.status === "pending");
+  const myDone = visibleStaffTasks.filter((task) => task.status === "done");
+
+  const requestDelete = (task: Task) => {
+    if (!canCreate) return;
+    setPendingDeleteTaskId(task.id);
+  };
+
+  const confirmDelete = (task: Task) => {
+    if (!canCreate) return;
+    deleteTaskMutation.mutate(task.id);
+  };
 
   if (me?.role === "STAFF") {
-    const visibleStaffTasks = tasks.filter((task) => task.assigned_to === me.id || task.created_by === me.id);
-    const myPending = visibleStaffTasks.filter((task) => task.status === "pending");
-    const myCreated = visibleStaffTasks.filter((task) => task.created_by === me.id && task.assigned_to !== me.id);
     return (
-      <AppShell title="Tasks" subtitle="Create tasks and follow only your own or assigned work." action={<Badge>{visibleStaffTasks.length} visible</Badge>}>
-        <div className="stagger-grid grid gap-4 xl:grid-cols-[1.05fr_1.95fr]">
-        <Card className="bg-[linear-gradient(145deg,rgba(47,111,237,0.08),rgba(255,255,255,1))]">
-          <CardHeader>
-            <div>
-              <CardTitle>Create task</CardTitle>
-              <CardDescription>Workers can create tasks, but only see tasks assigned to them or created by them.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1">
-              <Input placeholder="Task title" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
-              {taskFormErrors.title ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.title}</p> : null}
-            </div>
-            <div className="space-y-1">
-              <Textarea placeholder="What exactly needs to be done?" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
-              {taskFormErrors.description ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.description}</p> : null}
-            </div>
-            <div className="space-y-1">
-              <Select
-                options={[
-                  { label: "Assign to", value: "" },
-                  ...((usersQuery.data ?? []).map((user) => ({ label: `${user.full_name} (${user.staff_position ?? user.role})`, value: user.id }))),
-                ]}
-                value={form.assigned_to}
-                onChange={(event) => setForm((current) => ({ ...current, assigned_to: event.target.value }))}
+      <AppShell title={t("tasks.title")} subtitle={t("tasks.subtitle.staff")} action={<Badge>{`${myPending.length}/${visibleStaffTasks.length}`}</Badge>}>
+        <div className="stagger-children space-y-4">
+          <Card className="overflow-hidden border-[var(--color-primary)]/12 bg-[linear-gradient(155deg,rgba(47,111,237,0.08),rgba(255,255,255,1))]">
+            <CardHeader className="pb-3">
+              <div>
+                <CardTitle>{t("tasks.create_task")}</CardTitle>
+                <CardDescription>{t("tasks.staff_create_description")}</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <TaskComposerFields
+                form={form}
+                setForm={setForm}
+                taskFormErrors={taskFormErrors}
+                users={usersQuery.data ?? []}
+                locations={locationsQuery.data ?? []}
+                submitTask={submitTask}
+                canSubmitTask={canSubmitTask}
+                isPending={createTaskMutation.isPending}
+                t={t}
+                compact
               />
-              {taskFormErrors.assigned_to ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.assigned_to}</p> : null}
-            </div>
-            <div className="space-y-1">
-              <Select
-                options={[
-                  { label: "Location (optional)", value: "" },
-                  ...((locationsQuery.data ?? []).map((location) => ({ label: location.name, value: location.id }))),
-                ]}
-                value={form.location_id}
-                onChange={(event) => setForm((current) => ({ ...current, location_id: event.target.value }))}
-              />
-              {taskFormErrors.location_id ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.location_id}</p> : null}
-            </div>
-            <Button onClick={submitTask} disabled={!canSubmitTask || createTaskMutation.isPending} className="w-full">
-              <Plus className="size-4" /> Create task
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>My visible tasks</CardTitle>
-              <CardDescription>Assigned to you or created by you.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {myPending.map((task) => (
-              <div key={task.id} className="surface-muted rounded-[1.1rem] px-4 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[var(--color-heading)]">{task.title}</p>
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">{task.description}</p>
-                  </div>
-                  <Button size="sm" variant="secondary" onClick={() => patchTaskMutation.mutate({ taskId: task.id, status: "done" })}>
-                    Done
-                  </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="min-h-0 overflow-hidden">
+            <CardHeader className="border-b border-[var(--color-divider)] pb-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <CardTitle>{t("tasks.my_visible_tasks")}</CardTitle>
+                  <CardDescription>{t("tasks.assigned_or_created")}</CardDescription>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
-                  <span>Assigned: {userNameById[task.assigned_to] ?? "Worker"}</span>
-                  {task.created_by && task.created_by !== me.id ? <span>Created by: {userNameById[task.created_by] ?? "Worker"}</span> : null}
-                </div>
-                <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
-                  <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-[0.9rem] border border-[var(--color-border)] bg-white px-3 text-xs text-[var(--color-heading)] transition hover:bg-[var(--color-surface-muted)]">
-                    <Camera className="size-3.5" />
-                    {photoNames[task.id] ? `Selected: ${photoNames[task.id]}` : "Choose photo"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async (event) => {
-                        const file = event.target.files?.[0];
-                        if (!file) return;
-                        const dataUrl = await fileToDataUrl(file);
-                        setPhotoMap((current) => ({ ...current, [task.id]: dataUrl }));
-                        setPhotoNames((current) => ({ ...current, [task.id]: file.name }));
-                      }}
-                    />
-                  </label>
-                  <Button size="sm" variant="secondary" onClick={() => addPhotoMutation.mutate({ taskId: task.id, photoUrl: photoMap[task.id] ?? "" })} disabled={!photoMap[task.id]}>
-                    Upload
-                  </Button>
+                <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-muted)]">
+                  <span className="rounded-full bg-[var(--color-warning-soft)] px-2.5 py-1 text-[var(--color-warning-text)]">{myPending.length}</span>
+                  <span className="rounded-full bg-[var(--color-success-soft)] px-2.5 py-1 text-[var(--color-success-text)]">{myDone.length}</span>
                 </div>
               </div>
-            ))}
-            {!myPending.length ? (
-              <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">No active tasks.</div>
-            ) : null}
-            {myCreated.length ? (
-              <div className="rounded-[1.2rem] border border-[var(--color-border)] bg-white px-4 py-4">
-                <p className="text-sm font-semibold text-[var(--color-heading)]">Created by you</p>
-                <div className="mt-3 space-y-3">
-                  {myCreated.map((task) => (
-                    <div key={`created-${task.id}`} className="rounded-[0.95rem] border border-[var(--color-divider)] px-3 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-[var(--color-heading)]">{task.title}</p>
-                          <p className="mt-1 text-xs text-[var(--color-text-muted)]">{task.description}</p>
-                        </div>
-                        <Badge className={statusTone(task.status)}>{task.status}</Badge>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
-                        <span>Assigned: {userNameById[task.assigned_to] ?? "Worker"}</span>
-                        {task.location_id ? <span>{locationNameById[task.location_id] ?? "Location"}</span> : null}
-                      </div>
-                    </div>
-                  ))}
+            </CardHeader>
+            <CardContent className="max-h-[70vh] space-y-3 overflow-y-auto pr-2">
+              {[...myPending, ...myDone].map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  assignedName={userNameById[task.assigned_to] ?? t("common.worker")}
+                  createdByName={task.created_by ? userNameById[task.created_by] ?? t("common.worker") : null}
+                  meId={me.id}
+                  canDelete={canDelete}
+                  isBusy={patchTaskMutation.isPending || deleteTaskMutation.isPending || addPhotoMutation.isPending}
+                  onToggle={(currentTask) => patchTaskMutation.mutate({ taskId: currentTask.id, status: currentTask.status === "pending" ? "done" : "pending" })}
+                  pendingDelete={pendingDeleteTaskId === task.id}
+                  onDeleteRequest={requestDelete}
+                  onDeleteConfirm={confirmDelete}
+                  onDeleteCancel={() => setPendingDeleteTaskId(null)}
+                  onPickPhoto={handlePhotoPick}
+                  t={t}
+                />
+              ))}
+              {!visibleStaffTasks.length ? (
+                <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                  {t("tasks.no_active_tasks")}
                 </div>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
+              ) : null}
+            </CardContent>
+          </Card>
         </div>
       </AppShell>
     );
   }
 
   return (
-    <AppShell
-      title="Tasks"
-      subtitle="Assign, complete, and verify operational tasks in one clean workspace."
-      action={<Badge>{columns.pending.length} pending</Badge>}
-    >
+    <AppShell title={t("tasks.title")} subtitle={t("tasks.subtitle.default")} action={<Badge>{columns.pending.length}</Badge>} hideBottomNav={mobileComposerOpen}>
       <div className="stagger-children space-y-4 lg:hidden">
         {canCreate ? (
           <div className="flex items-center justify-between gap-3">
@@ -303,423 +480,184 @@ export function TasksPage() {
                   className={`rounded-[0.8rem] px-3 py-2 text-sm font-semibold transition ${mobileStatusTab === status ? "bg-white text-[var(--color-primary)]" : "text-[var(--color-text-muted)]"}`}
                   onClick={() => setMobileStatusTab(status)}
                 >
-                  {status === "pending" ? `Pending (${columns.pending.length})` : `Done (${columns.done.length})`}
+                  {status === "pending" ? `${t("tasks.pending")} (${columns.pending.length})` : `${t("tasks.done")} (${columns.done.length})`}
                 </button>
               ))}
             </div>
             <Button size="sm" onClick={() => setMobileComposerOpen(true)}>
-              <Plus className="size-4" /> New
+              <Plus className="size-4" /> {t("tasks.new")}
             </Button>
           </div>
-        ) : (
-          <div className="inline-flex rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
-            {(["pending", "done"] as const).map((status) => (
-              <button
-                key={status}
-                type="button"
-                className={`rounded-[0.8rem] px-3 py-2 text-sm font-semibold transition ${mobileStatusTab === status ? "bg-white text-[var(--color-primary)]" : "text-[var(--color-text-muted)]"}`}
-                onClick={() => setMobileStatusTab(status)}
-              >
-                {status === "pending" ? `Pending (${columns.pending.length})` : `Done (${columns.done.length})`}
-              </button>
+        ) : null}
+
+        <Card className="min-h-0 overflow-hidden">
+          <CardHeader className="border-b border-[var(--color-divider)] pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>{mobileStatusTab === "pending" ? t("tasks.pending_queue") : t("tasks.completed")}</CardTitle>
+                <CardDescription>{mobileStatusTab === "pending" ? t("tasks.pending_queue_description") : t("tasks.completed_description")}</CardDescription>
+              </div>
+              <span className="rounded-full bg-[var(--color-surface-muted)] px-2.5 py-1 text-xs font-semibold text-[var(--color-heading)]">{mobileTasks.length}</span>
+            </div>
+          </CardHeader>
+          <CardContent className="max-h-[68vh] space-y-3 overflow-y-auto pr-1">
+            {mobileTasks.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                assignedName={userNameById[task.assigned_to] ?? t("common.worker")}
+                createdByName={task.created_by ? userNameById[task.created_by] ?? t("common.worker") : null}
+                meId={me?.id}
+                canDelete={canDelete}
+                isBusy={patchTaskMutation.isPending || deleteTaskMutation.isPending || addPhotoMutation.isPending}
+                onToggle={(currentTask) => patchTaskMutation.mutate({ taskId: currentTask.id, status: currentTask.status === "pending" ? "done" : "pending" })}
+                pendingDelete={pendingDeleteTaskId === task.id}
+                onDeleteRequest={requestDelete}
+                onDeleteConfirm={confirmDelete}
+                onDeleteCancel={() => setPendingDeleteTaskId(null)}
+                onPickPhoto={handlePhotoPick}
+                t={t}
+              />
             ))}
-          </div>
-        )}
-
-        <div className="space-y-3">
-          {mobileTasks.map((task) => {
-            const canEditStatus = me?.role !== "STAFF" || task.assigned_to === me?.id;
-            const nextStatus = task.status === "pending" ? "done" : "pending";
-            const confirmDelete = () => {
-              if (!canCreate) return;
-              if (!window.confirm(`Delete task "${task.title}"?`)) return;
-              deleteTaskMutation.mutate(task.id);
-            };
-
-            return (
-              <div key={task.id} className="surface-card rounded-[1.2rem] px-4 py-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-base font-semibold tracking-[-0.03em] text-[var(--color-heading)]">{task.title}</p>
-                    <p className="mt-1 text-sm leading-6 text-[var(--color-text-muted)]">{task.description}</p>
-                  </div>
-                  <Badge className={statusTone(task.status)}>{task.status}</Badge>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Badge>
-                    <UserRound className="mr-1 size-3.5" /> {userNameById[task.assigned_to] ?? "Worker"}
-                  </Badge>
-                  {task.location_id ? <Badge>{locationNameById[task.location_id] ?? "Location"}</Badge> : null}
-                </div>
-
-                {task.status === "pending" ? (
-                  <div className="mt-4 grid gap-2">
-                    <Button variant="secondary" onClick={() => patchTaskMutation.mutate({ taskId: task.id, status: nextStatus })} disabled={!canEditStatus}>
-                      Mark done
-                    </Button>
-                    {canDelete ? (
-                      <Button variant="danger" onClick={confirmDelete} disabled={deleteTaskMutation.isPending}>
-                        <Trash2 className="size-4" /> Delete
-                      </Button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="mt-4 grid gap-2">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-text-muted)]">
-                      {task.completed_at ? <span>{new Date(task.completed_at).toLocaleDateString()}</span> : null}
-                      {task.photos.length ? <span>{task.photos.length} photo{task.photos.length === 1 ? "" : "s"}</span> : null}
-                    </div>
-                    <Button variant="secondary" onClick={() => patchTaskMutation.mutate({ taskId: task.id, status: nextStatus })} disabled={!canEditStatus}>
-                      Return
-                    </Button>
-                    {canDelete ? (
-                      <Button variant="danger" onClick={confirmDelete} disabled={deleteTaskMutation.isPending}>
-                        <Trash2 className="size-4" /> Delete
-                      </Button>
-                    ) : null}
-                  </div>
-                )}
-
-                {task.status === "pending" ? (
-                  <div className="mt-4 grid gap-2">
-                    <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-[0.9rem] border border-[var(--color-border)] bg-white px-3 text-sm text-[var(--color-heading)] transition hover:bg-[var(--color-surface-muted)]">
-                      <Camera className="size-4" />
-                      {photoNames[task.id] ? `Selected: ${photoNames[task.id]}` : "Choose photo file"}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={async (event) => {
-                          const file = event.target.files?.[0];
-                          if (!file) return;
-                          const dataUrl = await fileToDataUrl(file);
-                          setPhotoMap((current) => ({ ...current, [task.id]: dataUrl }));
-                          setPhotoNames((current) => ({ ...current, [task.id]: file.name }));
-                        }}
-                      />
-                    </label>
-                    <Button variant="secondary" onClick={() => addPhotoMutation.mutate({ taskId: task.id, photoUrl: photoMap[task.id] ?? "" })} disabled={!photoMap[task.id]}>
-                      <Camera className="size-4" /> Upload photo
-                    </Button>
-                  </div>
-                ) : null}
+            {!mobileTasks.length ? (
+              <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                {t("tasks.no_tasks_in_column")}
               </div>
-            );
-          })}
-
-          {!mobileTasks.length ? (
-            <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-              No tasks in this column.
-            </div>
-          ) : null}
-        </div>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="hidden gap-5 xl:grid-cols-[1.05fr_1.95fr] lg:grid">
-        <aside className="stagger-children space-y-5">
-          {me?.role === "ADMIN" || me?.role === "MANAGER" ? (
-            <Card className="bg-[linear-gradient(145deg,rgba(47,111,237,0.08),rgba(255,255,255,1))]">
-              <CardHeader>
-                <div>
-                  <CardTitle>Create task</CardTitle>
-                  <CardDescription>ADMIN and manager create tasks directly in the flow.</CardDescription>
+      <div className="hidden min-h-0 gap-5 lg:grid">
+        <Card className="overflow-hidden border-[var(--color-primary)]/12 bg-[linear-gradient(155deg,rgba(47,111,237,0.08),rgba(255,255,255,1))]">
+          <CardHeader className="pb-3">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <CardTitle>{t("tasks.create_task")}</CardTitle>
+                <CardDescription>{t("tasks.admin_create_description")}</CardDescription>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-muted)]">
+                <span className="rounded-full bg-[var(--color-warning-soft)] px-2.5 py-1 text-[var(--color-warning-text)]">{columns.pending.length} {t("tasks.pending")}</span>
+                <span className="rounded-full bg-[var(--color-success-soft)] px-2.5 py-1 text-[var(--color-success-text)]">{columns.done.length} {t("tasks.done")}</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <TaskComposerFields
+              form={form}
+              setForm={setForm}
+              taskFormErrors={taskFormErrors}
+              users={usersQuery.data ?? []}
+              locations={locationsQuery.data ?? []}
+              submitTask={submitTask}
+              canSubmitTask={canSubmitTask}
+              isPending={createTaskMutation.isPending}
+              t={t}
+              compact
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="min-h-0 overflow-hidden">
+          <CardHeader className="border-b border-[var(--color-divider)] pb-3">
+            <div>
+              <CardTitle>{t("tasks.execution_lane")}</CardTitle>
+              <CardDescription>{t("tasks.execution_lane_description")}</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid min-h-0 gap-4 p-4 xl:grid-cols-2">
+            {(["pending", "done"] as const).map((status) => (
+              <section key={status} className="min-h-0 overflow-hidden rounded-[1.1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/55">
+                <div className="flex items-center justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--color-heading)]">{status === "pending" ? t("tasks.pending_queue") : t("tasks.completed")}</p>
+                    <p className="text-xs text-[var(--color-text-muted)]">{status === "pending" ? t("tasks.pending_queue_description") : t("tasks.completed_description")}</p>
+                  </div>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--color-heading)] shadow-[0_8px_18px_rgba(15,23,42,0.06)]">{columns[status].length}</span>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1">
-                  <Input placeholder="Task title" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
-                  {taskFormErrors.title ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.title}</p> : null}
+                <div className="max-h-[64vh] space-y-3 overflow-y-auto p-3">
+                  {columns[status].map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      assignedName={userNameById[task.assigned_to] ?? t("common.worker")}
+                      createdByName={task.created_by ? userNameById[task.created_by] ?? t("common.worker") : null}
+                      meId={me?.id}
+                      canDelete={canDelete}
+                      isBusy={patchTaskMutation.isPending || deleteTaskMutation.isPending || addPhotoMutation.isPending}
+                      onToggle={(currentTask) => patchTaskMutation.mutate({ taskId: currentTask.id, status: currentTask.status === "pending" ? "done" : "pending" })}
+                      pendingDelete={pendingDeleteTaskId === task.id}
+                      onDeleteRequest={requestDelete}
+                      onDeleteConfirm={confirmDelete}
+                      onDeleteCancel={() => setPendingDeleteTaskId(null)}
+                      onPickPhoto={handlePhotoPick}
+                      t={t}
+                    />
+                  ))}
+                  {!columns[status].length ? (
+                    <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] bg-white px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                      {t("tasks.no_tasks_in_column")}
+                    </div>
+                  ) : null}
                 </div>
-                <div className="space-y-1">
-                  <Textarea placeholder="What exactly needs to be done?" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
-                  {taskFormErrors.description ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.description}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Select
-                    options={[
-                      { label: "Assign to", value: "" },
-                      ...((usersQuery.data ?? []).map((user) => ({ label: `${user.full_name} (${user.role})`, value: user.id }))),
-                    ]}
-                    value={form.assigned_to}
-                    onChange={(event) => setForm((current) => ({ ...current, assigned_to: event.target.value }))}
-                  />
-                  {taskFormErrors.assigned_to ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.assigned_to}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Select
-                    className="border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary)]"
-                    options={[
-                      { label: "Location (optional)", value: "" },
-                      ...((locationsQuery.data ?? []).map((location) => ({ label: location.name, value: location.id }))),
-                    ]}
-                    value={form.location_id}
-                    onChange={(event) => setForm((current) => ({ ...current, location_id: event.target.value }))}
-                  />
-                  {taskFormErrors.location_id ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.location_id}</p> : null}
-                </div>
-                <Button
-                  onClick={submitTask}
-                  disabled={!canSubmitTask || createTaskMutation.isPending}
-                  className="w-full"
+              </section>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <AnimatePresence>
+        {canCreate && mobileComposerOpen ? (
+          <OverlayPortal>
+            <motion.div
+              className="fixed inset-0 z-[140] bg-slate-950/42 backdrop-blur-sm lg:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              onClick={() => setMobileComposerOpen(false)}
+            >
+              <div className="flex h-full w-full flex-col justify-end px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-16">
+                <motion.section
+                  {...mobileComposerAnimation()}
+                  className="flex w-full max-h-[calc(100dvh-5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-[0_-24px_60px_rgba(15,23,42,0.18)]"
+                  role="dialog"
+                  aria-modal="true"
+                  onClick={(event) => event.stopPropagation()}
                 >
-                  <Plus className="size-4" /> Create task
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <div>
-                  <CardTitle>Your execution lane</CardTitle>
-                  <CardDescription>Update assigned tasks, attach proof, and keep movement visible.</CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-                <div className="surface-muted rounded-[1.3rem] px-4 py-4">
-                  <p className="text-sm font-medium text-[var(--color-text-muted)]">Pending</p>
-                  <p className="mt-3 text-[2rem] font-semibold tracking-[-0.04em] text-[var(--color-heading)]">{columns.pending.length}</p>
-                </div>
-                <div className="surface-muted rounded-[1.3rem] px-4 py-4">
-                  <p className="text-sm font-medium text-[var(--color-text-muted)]">Done</p>
-                  <p className="mt-3 text-[2rem] font-semibold tracking-[-0.04em] text-[var(--color-heading)]">{columns.done.length}</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>Task status</CardTitle>
-                <CardDescription>Simple two-state workflow for MVP.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-              <div className="surface-muted rounded-[1.3rem] px-4 py-4">
-                <div className="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-heading)]">
-                  <ClipboardList className="size-4" /> pending
-                </div>
-              </div>
-              <div className="surface-muted rounded-[1.3rem] px-4 py-4">
-                <div className="inline-flex items-center gap-2 text-sm font-medium text-emerald-600">
-                  <CheckCircle2 className="size-4" /> done
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </aside>
-
-        <section className="stagger-grid grid gap-5 lg:grid-cols-2">
-          {(["pending", "done"] as const).map((status) => (
-            <Card key={status}>
-              <CardHeader>
-                <div>
-                  <CardTitle>{status === "pending" ? "Pending queue" : "Completed"}</CardTitle>
-                  <CardDescription>
-                    {status === "pending"
-                      ? "Tasks waiting for execution by the assigned worker."
-                      : "Finished tasks with optional photo evidence."}
-                  </CardDescription>
-                </div>
-                <Badge className={statusTone(status)}>{columns[status].length}</Badge>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {columns[status].map((task) => {
-                  const canEditStatus = me?.role !== "STAFF" || task.assigned_to === me?.id;
-                  const nextStatus = task.status === "pending" ? "done" : "pending";
-                  const confirmDelete = () => {
-                    if (!canCreate) return;
-                    if (!window.confirm(`Delete task "${task.title}"?`)) return;
-                    deleteTaskMutation.mutate(task.id);
-                  };
-                  if (status === "done") {
-                    return (
-                      <div key={task.id} className="rounded-[1rem] border border-[var(--color-border)] bg-white px-3 py-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-[var(--color-heading)]">{task.title}</p>
-                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-text-muted)]">
-                              <span>{userNameById[task.assigned_to] ?? "Worker"}</span>
-                              {task.location_id ? <span>{locationNameById[task.location_id] ?? "Location"}</span> : null}
-                              {task.completed_at ? <span>{new Date(task.completed_at).toLocaleDateString()}</span> : null}
-                              {task.photos.length ? <span>{task.photos.length} photo{task.photos.length === 1 ? "" : "s"}</span> : null}
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => patchTaskMutation.mutate({ taskId: task.id, status: nextStatus })}
-                              disabled={!canEditStatus}
-                            >
-                              Return
-                            </Button>
-                            {canCreate ? (
-                              <Button
-                                size="sm"
-                                variant="danger"
-                                onClick={confirmDelete}
-                                disabled={deleteTaskMutation.isPending}
-                                aria-label="Delete completed task"
-                              >
-                                <Trash2 className="size-4" />
-                              </Button>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={task.id} className="surface-muted rounded-[1.4rem] px-4 py-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-lg font-semibold tracking-[-0.03em] text-[var(--color-heading)]">{task.title}</p>
-                          <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">{task.description}</p>
-                        </div>
-                        <Badge className={statusTone(task.status)}>{task.status}</Badge>
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <Badge>
-                          <UserRound className="mr-1 size-3.5" /> {userNameById[task.assigned_to] ?? "Worker"}
-                        </Badge>
-                        {task.location_id ? (
-                          <Badge>{locationNameById[task.location_id] ?? "Location"}</Badge>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <Button variant="secondary" onClick={() => patchTaskMutation.mutate({ taskId: task.id, status: nextStatus })} disabled={!canEditStatus}>
-                          {task.status === "pending" ? "Mark done" : "Return to pending"}
-                        </Button>
-                        {canDelete ? (
-                          <Button variant="danger" onClick={confirmDelete} disabled={deleteTaskMutation.isPending}>
-                            <Trash2 className="size-4" /> Delete
-                          </Button>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-                        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[0.9rem] border border-[var(--color-border)] bg-white px-3 text-sm text-[var(--color-heading)] transition hover:bg-[var(--color-surface-muted)]">
-                          <Camera className="size-4" />
-                          {photoNames[task.id] ? `Selected: ${photoNames[task.id]}` : "Choose photo file"}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={async (event) => {
-                              const file = event.target.files?.[0];
-                              if (!file) return;
-                              const dataUrl = await fileToDataUrl(file);
-                              setPhotoMap((current) => ({ ...current, [task.id]: dataUrl }));
-                              setPhotoNames((current) => ({ ...current, [task.id]: file.name }));
-                            }}
-                          />
-                        </label>
-                        <Button
-                          variant="secondary"
-                          onClick={() => addPhotoMutation.mutate({ taskId: task.id, photoUrl: photoMap[task.id] ?? "" })}
-                          disabled={!photoMap[task.id]}
-                        >
-                          <Camera className="size-4" /> Upload photo
-                        </Button>
-                      </div>
-
-                      {task.photos.length ? (
-                        <div className="mt-4 grid gap-2">
-                          {task.photos.map((photo) => (
-                            <a
-                              key={photo.id}
-                              href={photo.photo_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex items-center justify-between rounded-[1rem] border border-[var(--color-border)] bg-white px-3 py-3 text-sm text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)]"
-                            >
-                              <span>Photo {photo.id.slice(0, 6)}</span>
-                              <Camera className="size-4 text-emerald-600" />
-                            </a>
-                          ))}
-                        </div>
-                      ) : null}
+                  <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4">
+                    <div className="min-w-0">
+                      <p className="text-lg font-semibold text-[var(--color-heading)]">{t("tasks.create_task")}</p>
+                      <p className="mt-1 text-sm text-[var(--color-text-muted)]">{t("tasks.mobile_composer_description")}</p>
                     </div>
-                  );
-                })}
-
-                {!columns[status].length ? (
-                  <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-                    No tasks in this column.
+                    <button
+                      type="button"
+                      className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
+                      onClick={() => setMobileComposerOpen(false)}
+                      aria-label={t("common.close")}
+                    >
+                      <X className="size-5" />
+                    </button>
                   </div>
-                ) : null}
-              </CardContent>
-            </Card>
-          ))}
-        </section>
-      </div>
-
-      {canCreate && mobileComposerOpen ? (
-        <div className="mobile-sheet-backdrop lg:hidden">
-          <div className="mobile-sheet-panel">
-            <div className="flex items-center justify-between border-b border-[var(--color-divider)] px-4 py-4">
-              <div>
-                <p className="text-lg font-semibold text-[var(--color-heading)]">Create task</p>
-                <p className="text-sm text-[var(--color-text-muted)]">Assign and publish directly from mobile.</p>
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-5">
+                    <TaskComposerFields
+                      form={form}
+                      setForm={setForm}
+                      taskFormErrors={taskFormErrors}
+                      users={usersQuery.data ?? []}
+                      locations={locationsQuery.data ?? []}
+                      submitTask={submitTask}
+                      canSubmitTask={canSubmitTask}
+                      isPending={createTaskMutation.isPending}
+                      t={t}
+                    />
+                  </div>
+                </motion.section>
               </div>
-              <Button size="sm" variant="secondary" onClick={() => setMobileComposerOpen(false)}>
-                Close
-              </Button>
-            </div>
-            <div className="mobile-sheet-scroll p-4">
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <Input placeholder="Task title" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
-                  {taskFormErrors.title ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.title}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Textarea placeholder="What exactly needs to be done?" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
-                  {taskFormErrors.description ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.description}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Select
-                    options={[
-                      { label: "Assign to", value: "" },
-                      ...((usersQuery.data ?? []).map((user) => ({ label: `${user.full_name} (${user.role})`, value: user.id }))),
-                    ]}
-                    value={form.assigned_to}
-                    onChange={(event) => setForm((current) => ({ ...current, assigned_to: event.target.value }))}
-                  />
-                  {taskFormErrors.assigned_to ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.assigned_to}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Select
-                    options={[
-                      { label: "Location (optional)", value: "" },
-                      ...((locationsQuery.data ?? []).map((location) => ({ label: location.name, value: location.id }))),
-                    ]}
-                    value={form.location_id}
-                    onChange={(event) => setForm((current) => ({ ...current, location_id: event.target.value }))}
-                  />
-                  {taskFormErrors.location_id ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.location_id}</p> : null}
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-[var(--color-divider)] px-4 py-4">
-              <Button
-                onClick={submitTask}
-                disabled={!canSubmitTask || createTaskMutation.isPending}
-                className="w-full"
-              >
-                <Plus className="size-4" /> Create task
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+            </motion.div>
+          </OverlayPortal>
+        ) : null}
+      </AnimatePresence>
     </AppShell>
   );
 }
-
-
-
-

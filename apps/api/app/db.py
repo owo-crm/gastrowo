@@ -75,13 +75,21 @@ def _ensure_runtime_schema_compat() -> None:
             user_columns = {column["name"] for column in inspector.get_columns("users")}
             if "public_uid" not in user_columns:
                 connection.execute(text("ALTER TABLE users ADD COLUMN public_uid VARCHAR(32)"))
-            connection.execute(
-                text(
-                    "UPDATE users "
-                    "SET public_uid = CONCAT('WD', UPPER(SUBSTRING(md5(random()::text || clock_timestamp()::text) FROM 1 FOR 10))) "
-                    "WHERE public_uid IS NULL OR TRIM(public_uid) = ''"
+            existing_uids = {
+                row[0]
+                for row in connection.execute(text("SELECT public_uid FROM users WHERE public_uid IS NOT NULL AND TRIM(public_uid) <> ''"))
+                if row[0]
+            }
+            user_rows = connection.execute(text("SELECT id FROM users WHERE public_uid IS NULL OR TRIM(public_uid) = ''")).fetchall()
+            for row in user_rows:
+                generated = f"WD{uuid.uuid4().hex[:10].upper()}"
+                while generated in existing_uids:
+                    generated = f"WD{uuid.uuid4().hex[:10].upper()}"
+                existing_uids.add(generated)
+                connection.execute(
+                    text("UPDATE users SET public_uid = :public_uid WHERE id = :id"),
+                    {"public_uid": generated, "id": row[0]},
                 )
-            )
             connection.execute(
                 text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_public_uid ON users (public_uid)")
             )
@@ -94,6 +102,12 @@ def _ensure_runtime_schema_compat() -> None:
             organization_columns = {column["name"] for column in inspector.get_columns("organizations")}
             if "staff_can_submit_revenue_reports" not in organization_columns:
                 connection.execute(text("ALTER TABLE organizations ADD COLUMN staff_can_submit_revenue_reports BOOLEAN NOT NULL DEFAULT 0"))
+            if "staff_can_delete_revenue_reports" not in organization_columns:
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN staff_can_delete_revenue_reports BOOLEAN NOT NULL DEFAULT 0"))
+            if "manager_can_submit_revenue_reports" not in organization_columns:
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_submit_revenue_reports BOOLEAN NOT NULL DEFAULT 1"))
+            if "manager_can_delete_revenue_reports" not in organization_columns:
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_delete_revenue_reports BOOLEAN NOT NULL DEFAULT 1"))
             if "manager_can_view_full_dashboard" not in organization_columns:
                 connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_view_full_dashboard BOOLEAN NOT NULL DEFAULT 0"))
             if "manager_can_view_payroll" not in organization_columns:
@@ -111,6 +125,26 @@ def _ensure_runtime_schema_compat() -> None:
             membership_columns = {column["name"] for column in inspector.get_columns("organization_memberships")}
             if "staff_position" not in membership_columns:
                 connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN staff_position VARCHAR(80)"))
+            if "staff_can_submit_revenue_reports_override" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN staff_can_submit_revenue_reports_override BOOLEAN"))
+            if "staff_can_delete_revenue_reports_override" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN staff_can_delete_revenue_reports_override BOOLEAN"))
+            if "manager_can_submit_revenue_reports_override" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN manager_can_submit_revenue_reports_override BOOLEAN"))
+            if "manager_can_delete_revenue_reports_override" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN manager_can_delete_revenue_reports_override BOOLEAN"))
+            if "manager_can_view_full_dashboard_override" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN manager_can_view_full_dashboard_override BOOLEAN"))
+            if "manager_can_view_payroll_override" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN manager_can_view_payroll_override BOOLEAN"))
+            if "manager_can_manage_team_override" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN manager_can_manage_team_override BOOLEAN"))
+            if "manager_can_manage_business_settings_override" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN manager_can_manage_business_settings_override BOOLEAN"))
+            if "manager_can_access_notes_override" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN manager_can_access_notes_override BOOLEAN"))
+            if "manager_can_access_inventory_override" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN manager_can_access_inventory_override BOOLEAN"))
             connection.execute(text("UPDATE organization_memberships SET staff_position = NULL WHERE staff_position = 'Staff'"))
             connection.execute(
                 text(

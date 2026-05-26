@@ -4,6 +4,7 @@ import { canAccessInventory, canAccessNotes, canAccessReport, canManageTeam, can
 import { DashboardPage } from "@/pages/dashboard-page";
 import { BillingPage } from "@/pages/billing-page";
 import { InventoryPage } from "@/pages/inventory-page";
+import { LandingPage } from "@/pages/landing-page";
 import { LoginPage } from "@/pages/login-page";
 import { NotesDocumentsPage } from "@/pages/notes-documents-page";
 import { PendingLinkPage } from "@/pages/pending-link-page";
@@ -13,13 +14,15 @@ import { SchedulePage } from "@/pages/schedule-page";
 import { TasksPage } from "@/pages/tasks-page";
 import { TeamPage } from "@/pages/team-page";
 import { useAuth } from "@/lib/auth";
+import { useLanguage } from "@/lib/i18n";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { token, me, isLoading } = useAuth();
   const location = useLocation();
+  const { t } = useLanguage();
 
   if (isLoading) {
-    return <div className="p-6 text-center text-[var(--color-text-muted)]">Loading...</div>;
+    return <div className="p-6 text-center text-[var(--color-text-muted)]">{t("common.loading")}</div>;
   }
 
   if (!token) {
@@ -85,6 +88,7 @@ export function App() {
 
   return (
     <Routes>
+      <Route path="/" element={token ? <Navigate to={linkedDefaultRoute} replace /> : <LandingPage />} />
       <Route path="/login" element={token ? <Navigate to={linkedDefaultRoute} replace /> : <LoginPage />} />
       <Route path="/join" element={token ? <Navigate to={linkedDefaultRoute} replace /> : <LoginPage />} />
       <Route
@@ -189,7 +193,7 @@ export function App() {
 
       <Route path="/home" element={<Navigate to="/overview" replace />} />
       <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
-      <Route path="*" element={<Navigate to={token ? linkedDefaultRoute : "/login"} replace />} />
+      <Route path="*" element={<Navigate to={token ? linkedDefaultRoute : "/"} replace />} />
     </Routes>
   );
 }

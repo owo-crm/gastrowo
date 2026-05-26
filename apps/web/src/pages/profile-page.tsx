@@ -19,6 +19,9 @@ type SettingsTab = "personal" | "business";
 
 const defaultWorkspaceSettings = {
   staff_can_submit_revenue_reports: false,
+  staff_can_delete_revenue_reports: false,
+  manager_can_submit_revenue_reports: true,
+  manager_can_delete_revenue_reports: true,
   manager_can_view_full_dashboard: false,
   manager_can_view_payroll: false,
   manager_can_manage_team: true,
@@ -30,7 +33,7 @@ const defaultWorkspaceSettings = {
 export function ProfilePage() {
   const { me, token, logout, refreshMe } = useAuth();
   const toast = useToast();
-  const { lang, setLang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
   const canManageBusiness = canManageBusinessSettings(me);
   const [activeTab, setActiveTab] = useState<SettingsTab>("personal");
   const [fullName, setFullName] = useState(me?.full_name ?? "");
@@ -56,11 +59,11 @@ export function ProfilePage() {
   const saveProfileMutation = useMutation({
     mutationFn: () => api.patchMe(token!, { full_name: fullName.trim(), avatar_url: avatarUrl }),
     onSuccess: async () => {
-      toast.success("Profile updated");
+      toast.success(t("profile.profile_updated"));
       await refreshMe();
     },
     onError: (error) => {
-      toast.error("Failed to update profile", error instanceof Error ? error.message : undefined);
+      toast.error(t("profile.profile_update_failed"), error instanceof Error ? error.message : undefined);
     },
   });
 
@@ -71,11 +74,11 @@ export function ProfilePage() {
       saveBusinessLogo(me?.active_organization_id, businessLogo);
     },
     onSuccess: async () => {
-      toast.success("Business settings updated");
+      toast.success(t("profile.business_updated"));
       await refreshMe();
     },
     onError: (error) => {
-      toast.error("Failed to update business settings", error instanceof Error ? error.message : undefined);
+      toast.error(t("profile.business_update_failed"), error instanceof Error ? error.message : undefined);
     },
   });
 
@@ -92,15 +95,15 @@ export function ProfilePage() {
   }, [workspaceName, me?.active_organization_name]);
 
   const tabs: Array<{ key: SettingsTab; label: string; icon: typeof UserCircle2 }> = [
-    { key: "personal", label: "Personal settings", icon: UserCircle2 },
-    ...(canManageBusiness ? [{ key: "business" as const, label: "Business settings", icon: Building2 }] : []),
+    { key: "personal", label: t("profile.personal_tab"), icon: UserCircle2 },
+    ...(canManageBusiness ? [{ key: "business" as const, label: t("profile.business_tab"), icon: Building2 }] : []),
   ];
 
   return (
     <AppShell
-      title="Settings"
-      subtitle="Personal account controls and, when allowed, business-level workspace configuration."
-      action={<Badge>{lang === "en" ? "English" : "Polski"}</Badge>}
+      title={t("profile.title")}
+      subtitle={t("profile.subtitle")}
+      action={<Badge>{t("profile.language_badge")}</Badge>}
     >
       <div className="stagger-children space-y-5">
         <div className="inline-flex flex-wrap items-center gap-2 rounded-[1.1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
@@ -122,8 +125,8 @@ export function ProfilePage() {
             <Card>
               <CardHeader>
                 <div>
-                  <CardTitle>Personal settings</CardTitle>
-                  <CardDescription>Update your name, avatar, language, and account preferences.</CardDescription>
+                  <CardTitle>{t("profile.personal_tab")}</CardTitle>
+                  <CardDescription>{t("profile.personal_description")}</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="grid gap-6 md:grid-cols-[180px_1fr]">
@@ -133,7 +136,7 @@ export function ProfilePage() {
                   </div>
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-[0.95rem] border border-[var(--color-border)] bg-white px-3 py-2 text-sm text-[var(--color-heading)] transition hover:bg-[var(--color-surface-muted)]">
                     <ImagePlus className="size-4" />
-                    Upload avatar
+                    {t("profile.upload_avatar")}
                     <input
                       type="file"
                       accept="image/*"
@@ -151,25 +154,32 @@ export function ProfilePage() {
                 <div className="space-y-5">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-[var(--color-heading)]">Full name</p>
+                      <p className="text-sm font-medium text-[var(--color-heading)]">{t("login.full_name")}</p>
                       <Input value={fullName} onChange={(event) => setFullName(event.target.value)} />
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-[var(--color-heading)]">Workspace language</p>
+                      <p className="text-sm font-medium text-[var(--color-heading)]">{t("profile.workspace_language")}</p>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <button
                           type="button"
                           onClick={() => setLang("en")}
                           className={`rounded-[0.95rem] border px-3 py-2 text-left text-sm transition ${lang === "en" ? "border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary)]" : "border-[var(--color-border)] bg-white text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"}`}
                         >
-                          <span className="inline-flex items-center gap-2 font-medium"><Languages className="size-4" /> English</span>
+                          <span className="inline-flex items-center gap-2 font-medium"><Languages className="size-4" /> {t("language.english")}</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setLang("pl")}
                           className={`rounded-[0.95rem] border px-3 py-2 text-left text-sm transition ${lang === "pl" ? "border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary)]" : "border-[var(--color-border)] bg-white text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"}`}
                         >
-                          <span className="inline-flex items-center gap-2 font-medium"><Languages className="size-4" /> Polski</span>
+                          <span className="inline-flex items-center gap-2 font-medium"><Languages className="size-4" /> {t("language.polish")}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLang("ru")}
+                          className={`rounded-[0.95rem] border px-3 py-2 text-left text-sm transition ${lang === "ru" ? "border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary)]" : "border-[var(--color-border)] bg-white text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"}`}
+                        >
+                          <span className="inline-flex items-center gap-2 font-medium"><Languages className="size-4" /> {t("language.russian")}</span>
                         </button>
                       </div>
                     </div>
@@ -177,21 +187,21 @@ export function ProfilePage() {
 
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="surface-muted rounded-[1rem] px-4 py-4">
-                      <p className="text-xs uppercase tracking-[0.14em] text-[var(--color-text-muted)]">Role</p>
+                      <p className="text-xs uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("profile.role")}</p>
                       <p className="mt-2 text-lg font-semibold text-[var(--color-heading)]">{me?.role}</p>
                     </div>
                       <div className="surface-muted rounded-[1rem] px-4 py-4">
-                        <p className="text-xs uppercase tracking-[0.14em] text-[var(--color-text-muted)]">Account</p>
+                        <p className="text-xs uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("profile.account")}</p>
                         <p className="mt-2 text-base font-semibold text-[var(--color-heading)]">{me?.email}</p>
                       </div>
                   </div>
 
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button onClick={() => saveProfileMutation.mutate()} disabled={!fullName.trim() || saveProfileMutation.isPending} className="sm:flex-1">
-                      Save personal settings
+                      {t("profile.save_personal")}
                     </Button>
                     <Button variant="danger" onClick={logout}>
-                      <LogOut className="size-4" /> Logout
+                      <LogOut className="size-4" /> {t("common.logout")}
                     </Button>
                   </div>
                 </div>
@@ -201,15 +211,15 @@ export function ProfilePage() {
             <Card>
               <CardHeader>
                 <div>
-                  <CardTitle>Account summary</CardTitle>
-                  <CardDescription>Role-aware context for your current workspace membership.</CardDescription>
+                  <CardTitle>{t("profile.account_summary")}</CardTitle>
+                  <CardDescription>{t("profile.account_summary_description")}</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  { icon: UserCircle2, title: "Profile", body: "Personal account changes affect only your own identity and language preferences." },
-                  { icon: Settings2, title: "Workspace", body: canManageBusiness ? "Business settings are available in the second tab." : "Business-level settings are controlled by an admin or an authorized manager." },
-                  { icon: ShieldCheck, title: "Access", body: "Your visible surfaces depend on workspace role and business permission toggles." },
+                  { icon: UserCircle2, title: t("nav.profile"), body: t("profile.summary_profile") },
+                  { icon: Settings2, title: t("common.workspace"), body: canManageBusiness ? t("profile.summary_workspace_manage") : t("profile.summary_workspace_readonly") },
+                  { icon: ShieldCheck, title: t("profile.access"), body: t("profile.summary_access") },
                 ].map((item) => (
                   <div key={item.title} className="flex items-start gap-3 rounded-[1rem] border border-[var(--color-border)] bg-white px-4 py-3">
                     <div className="grid size-10 flex-shrink-0 place-items-center rounded-[0.9rem] bg-slate-100 text-[var(--color-primary)]">
@@ -229,8 +239,8 @@ export function ProfilePage() {
             <Card>
               <CardHeader>
                 <div>
-                  <CardTitle>Business identity</CardTitle>
-                  <CardDescription>Manage the workspace name and visual identity used across GastrOWO.</CardDescription>
+                  <CardTitle>{t("profile.business_identity")}</CardTitle>
+                  <CardDescription>{t("profile.business_identity_description")}</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -240,12 +250,12 @@ export function ProfilePage() {
                   </div>
                   <div className="flex-1 min-w-[220px] space-y-3">
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-[var(--color-heading)]">Business name</p>
+                      <p className="text-sm font-medium text-[var(--color-heading)]">{t("login.business_name")}</p>
                       <Input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} />
                     </div>
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-[0.95rem] border border-[var(--color-border)] bg-white px-3 py-2 text-sm text-[var(--color-heading)] transition hover:bg-[var(--color-surface-muted)]">
                       <ImagePlus className="size-4" />
-                      Upload business logo preview
+                      {t("profile.upload_business_logo")}
                       <input
                         type="file"
                         accept="image/*"
@@ -261,10 +271,10 @@ export function ProfilePage() {
                   </div>
                 </div>
                 <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-4 text-sm leading-6 text-[var(--color-text-muted)]">
-                  Business logo is preview-only in this iteration. It is stored locally in the browser and reused in the workspace topbar.
+                  {t("profile.business_logo_note")}
                 </div>
                 <Button onClick={() => saveBusinessMutation.mutate()} disabled={!workspaceName.trim() || saveBusinessMutation.isPending} className="w-full">
-                  Save business settings
+                  {t("profile.save_business")}
                 </Button>
               </CardContent>
             </Card>
@@ -272,19 +282,22 @@ export function ProfilePage() {
             <Card>
               <CardHeader>
                 <div>
-                  <CardTitle>Business permissions</CardTitle>
-                  <CardDescription>Control reporting, dashboard visibility, and management surfaces for the workspace.</CardDescription>
+                  <CardTitle>{t("profile.business_permissions")}</CardTitle>
+                  <CardDescription>{t("profile.business_permissions_description")}</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  { key: "staff_can_submit_revenue_reports", label: "Staff can submit revenue reports" },
-                  { key: "manager_can_view_full_dashboard", label: "Managers can view full dashboard" },
-                  { key: "manager_can_view_payroll", label: "Managers can view payroll" },
-                  { key: "manager_can_manage_team", label: "Managers can access Team" },
-                  { key: "manager_can_manage_business_settings", label: "Managers can manage business settings" },
-                  { key: "manager_can_access_notes", label: "Managers can access Notes & Documents" },
-                  { key: "manager_can_access_inventory", label: "Managers can access Inventory" },
+                  { key: "staff_can_submit_revenue_reports", label: t("profile.perm_staff_reports") },
+                  { key: "staff_can_delete_revenue_reports", label: t("profile.perm_staff_report_delete") },
+                  { key: "manager_can_submit_revenue_reports", label: t("profile.perm_manager_report_submit") },
+                  { key: "manager_can_delete_revenue_reports", label: t("profile.perm_manager_report_delete") },
+                  { key: "manager_can_view_full_dashboard", label: t("profile.perm_manager_dashboard") },
+                  { key: "manager_can_view_payroll", label: t("profile.perm_manager_payroll") },
+                  { key: "manager_can_manage_team", label: t("profile.perm_manager_team") },
+                  { key: "manager_can_manage_business_settings", label: t("profile.perm_manager_business") },
+                  { key: "manager_can_access_notes", label: t("profile.perm_manager_notes") },
+                  { key: "manager_can_access_inventory", label: t("profile.perm_manager_inventory") },
                 ].map((item) => {
                   const checked = workspaceSettings[item.key as keyof typeof workspaceSettings];
                   return (

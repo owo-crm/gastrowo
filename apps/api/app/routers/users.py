@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.deps import OrgContext, get_current_user, require_org_context
+from app.core.deps import OrgContext, get_current_organization, get_current_user, require_org_context
 from app.core.envelope import ok
+from app.core.permissions import can_manage_team
 from app.db import get_db
 from app.models import LocationMembership, OrganizationMembership, RoleEnum, User
 from app.schemas import ProfilePatch, StaffPositionPatch
@@ -15,11 +16,18 @@ from app.schemas import ProfilePatch, StaffPositionPatch
 router = APIRouter(prefix="/users", tags=["users"])
 
 
+def _require_team_access(context: OrgContext, db: Session) -> None:
+    organization = get_current_organization(context, db)
+    if not can_manage_team(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
+
+
 @router.get("")
 def list_users(
     context: OrgContext = Depends(require_org_context()),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     rows = db.execute(
         select(User, OrganizationMembership)
         .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
@@ -71,6 +79,7 @@ def patch_staff_position(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     membership = db.scalar(
         select(OrganizationMembership).where(
             OrganizationMembership.organization_id == context.membership.organization_id,

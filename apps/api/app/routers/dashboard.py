@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import OrgContext, get_current_organization, require_org_context
 from app.core.envelope import ok
+from app.core.permissions import can_view_full_dashboard, can_view_payroll
 from app.db import get_db
 from app.models import Assignment, Location, LocationMembership, OrganizationMembership, RevenueReport, RoleEnum, Shift, User
 from app.models import Timesheet, TimesheetStatusEnum
@@ -35,7 +36,7 @@ def owner_dashboard(
     db: Session = Depends(get_db),
 ):
     organization = get_current_organization(context, db)
-    if context.membership.role == RoleEnum.MANAGER and not organization.manager_can_view_full_dashboard:
+    if not can_view_full_dashboard(context.membership, organization):
         raise HTTPException(status_code=403, detail="Manager dashboard access is disabled in this workspace")
 
     if end_date is None:
@@ -252,7 +253,7 @@ def owner_dashboard(
         employee_payroll.append(row)
 
     employee_payroll.sort(key=lambda item: (-Decimal(item["payroll_pln"]), item["full_name"].lower()))
-    payroll_visible_rows = employee_payroll if context.membership.role == RoleEnum.ADMIN or organization.manager_can_view_payroll else []
+    payroll_visible_rows = employee_payroll if can_view_payroll(context.membership, organization) else []
 
     response = {
         "totals_by_location": totals_by_location,

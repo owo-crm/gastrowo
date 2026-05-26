@@ -1,43 +1,48 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Lock, Mail, Sparkles } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Lock, Mail } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
+import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 type Persona = "owner" | "worker";
+type AuthMode = "onboarding" | "signin";
 type SourceOption = "Google" | "Instagram" | "TikTok" | "Recommendation" | "Friends" | "Other";
 
 const sourceOptions: SourceOption[] = ["Google", "Instagram", "TikTok", "Recommendation", "Friends", "Other"];
 
-function StepPill({ current, total }: { current: number; total: number }) {
+function StepPill({ current, total, label }: { current: number; total: number; label: string }) {
   return (
     <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-      <span>Step {current} of {total}</span>
+      <span>{label}</span>
     </div>
   );
 }
 
-function DevHint({ code }: { code?: string | null }) {
+function DevHint({ code, label }: { code?: string | null; label: string }) {
   if (!code) return null;
-  return <p className="text-xs text-[var(--color-text-muted)]">Dev code: <span className="font-mono text-[var(--color-heading)]">{code}</span></p>;
+  return <p className="text-xs text-[var(--color-text-muted)]">{label} <span className="font-mono text-[var(--color-heading)]">{code}</span></p>;
 }
 
 export function LoginPage() {
   const { sendOtp, verifyOtp, loginWithPassword, completeOwnerOnboarding, verifyInviteJoin } = useAuth();
   const toast = useToast();
+  const { lang, setLang, t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const inviteToken = searchParams.get("token")?.trim() || "";
   const invitedEmail = searchParams.get("email")?.trim().toLowerCase() || "";
   const isInviteJoin = Boolean(inviteToken && invitedEmail);
+  const requestedMode: AuthMode = searchParams.get("mode") === "signin" ? "signin" : "onboarding";
 
-  const [mode, setMode] = useState<"onboarding" | "signin">("onboarding");
+  const [mode, setMode] = useState<AuthMode>(requestedMode);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [persona, setPersona] = useState<Persona>("owner");
   const [fullName, setFullName] = useState("");
@@ -55,7 +60,18 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const sendInFlightRef = useRef(false);
 
+  useEffect(() => {
+    if (!isInviteJoin) {
+      setMode(requestedMode);
+    }
+  }, [isInviteJoin, requestedMode]);
+
   const effectiveEmail = isInviteJoin ? invitedEmail : email.trim().toLowerCase();
+  const updateModeParam = (nextMode: AuthMode) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("mode", nextMode);
+    setSearchParams(nextParams, { replace: true });
+  };
   const resetTransientState = () => {
     setOtpCode("");
     setOtpSent(false);
@@ -73,12 +89,14 @@ export function LoginPage() {
     resetTransientState();
     setMode("signin");
     setStep(1);
+    updateModeParam("signin");
   };
 
   const switchToOnboarding = () => {
     resetTransientState();
     setMode("onboarding");
     setStep(1);
+    updateModeParam("onboarding");
   };
 
   const handleSendCode = async (purpose: "login" | "owner_signup" | "worker_signup" | "invite_join") => {
@@ -94,9 +112,9 @@ export function LoginPage() {
       });
       setOtpSent(true);
       setDebugCode(response.debug_code ?? null);
-      toast.success("Code sent", `Check ${effectiveEmail}`);
+      toast.success(t("login.code_sent"), t("login.code_sent_body", { email: effectiveEmail }));
     } catch (error) {
-      toast.error("Failed to send code", error instanceof Error ? error.message : undefined);
+      toast.error(t("login.send_failed"), error instanceof Error ? error.message : undefined);
     } finally {
       sendInFlightRef.current = false;
       setIsSubmitting(false);
@@ -117,12 +135,12 @@ export function LoginPage() {
         return;
       }
       if (!response.verification_token) {
-        throw new Error("Verification token missing");
+        throw new Error(t("login.missing_token"));
       }
       setVerificationToken(response.verification_token);
       setStep(3);
     } catch (error) {
-      toast.error("Verification failed", error instanceof Error ? error.message : undefined);
+      toast.error(t("login.verify_failed"), error instanceof Error ? error.message : undefined);
     } finally {
       setIsSubmitting(false);
     }
@@ -130,19 +148,19 @@ export function LoginPage() {
 
   const handleCompleteOwner = async () => {
     if (password.length < 8) {
-      toast.error("Password is too short", "Use at least 8 characters.");
+      toast.error(t("login.password_short"), t("login.password_short_body"));
       return;
     }
     if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
+      toast.error(t("login.password_mismatch"));
       return;
     }
     if (!organizationName.trim()) {
-      toast.error("Business name is required");
+      toast.error(t("login.business_name_required"));
       return;
     }
     if (!source) {
-      toast.error("Choose how you heard about us");
+      toast.error(t("login.source_required"));
       return;
     }
 
@@ -155,9 +173,9 @@ export function LoginPage() {
         password,
         source,
       });
-      toast.success("Business created");
+      toast.success(t("login.business_created"));
     } catch (error) {
-      toast.error("Onboarding failed", error instanceof Error ? error.message : undefined);
+      toast.error(t("login.verify_failed"), error instanceof Error ? error.message : undefined);
     } finally {
       setIsSubmitting(false);
     }
@@ -167,9 +185,9 @@ export function LoginPage() {
     setIsSubmitting(true);
     try {
       await verifyOtp({ email: effectiveEmail, code: otpCode, purpose: "login" });
-      toast.success("Signed in");
+      toast.success(t("login.sign_in_success"));
     } catch (error) {
-      toast.error("Sign in failed", error instanceof Error ? error.message : undefined);
+      toast.error(t("login.sign_in_failed"), error instanceof Error ? error.message : undefined);
     } finally {
       setIsSubmitting(false);
     }
@@ -179,9 +197,9 @@ export function LoginPage() {
     setIsSubmitting(true);
     try {
       await loginWithPassword(effectiveEmail, loginPassword);
-      toast.success("Signed in");
+      toast.success(t("login.sign_in_success"));
     } catch (error) {
-      toast.error("Password sign in failed", error instanceof Error ? error.message : undefined);
+      toast.error(t("login.password_sign_in_failed"), error instanceof Error ? error.message : undefined);
     } finally {
       setIsSubmitting(false);
     }
@@ -191,12 +209,12 @@ export function LoginPage() {
     setIsSubmitting(true);
     try {
       await verifyInviteJoin({ email: effectiveEmail, code: otpCode, invite_token: inviteToken });
-      toast.success("Joined business");
+      toast.success(t("login.business_joined"));
       searchParams.delete("token");
       searchParams.delete("email");
       setSearchParams(searchParams, { replace: true });
     } catch (error) {
-      toast.error("Invite verification failed", error instanceof Error ? error.message : undefined);
+      toast.error(t("login.invite_verify_failed"), error instanceof Error ? error.message : undefined);
     } finally {
       setIsSubmitting(false);
     }
@@ -204,29 +222,29 @@ export function LoginPage() {
 
   const renderInviteJoin = () => (
     <div className="space-y-5">
-      <StepPill current={1} total={1} />
+      <StepPill current={1} total={1} label={t("login.step", { current: 1, total: 1 })} />
       <div>
-        <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">Join your team</h2>
-        <p className="mt-2 text-sm text-[var(--color-text-muted)]">Confirm the invited email and enter the 6-digit code to create your account and join the business.</p>
+        <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.invite.title")}</h2>
+        <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.invite.body")}</p>
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium text-[var(--color-heading)]">Email</label>
+        <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.email")}</label>
         <Input value={effectiveEmail} disabled />
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Button type="button" onClick={() => handleSendCode("invite_join")} disabled={isSubmitting}>
-          <Mail className="size-4" /> Send code
+          <Mail className="size-4" /> {t("login.send_code")}
         </Button>
-        <DevHint code={debugCode} />
+        <DevHint code={debugCode} label={t("login.dev_code", { code: "" }).replace(/\s*$/, "")} />
       </div>
       {otpSent ? (
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--color-heading)]">6-digit code</label>
-            <Input value={otpCode} onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="123456" />
+            <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.code_label")}</label>
+            <Input value={otpCode} onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder={t("login.code_placeholder")} />
           </div>
           <Button type="button" className="w-full" onClick={handleInviteJoin} disabled={isSubmitting || otpCode.length !== 6}>
-            Join business
+            {t("login.join_business")}
           </Button>
         </div>
       ) : null}
@@ -236,53 +254,61 @@ export function LoginPage() {
   const renderSignin = () => (
     <div className="space-y-5">
       <div>
-        <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">Returning sign in</h2>
-        <p className="mt-2 text-sm text-[var(--color-text-muted)]">Workers use email + OTP. Owners can also use password.</p>
+        <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.signin.title")}</h2>
+        <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.signin.body")}</p>
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium text-[var(--color-heading)]">Email</label>
-        <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@restaurant.com" />
+        <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.email")}</label>
+        <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("login.email_placeholder")} />
       </div>
       {passwordLogin ? (
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--color-heading)]">Password</label>
-            <Input type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} placeholder="Owner password" />
+            <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.password")}</label>
+            <Input type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} placeholder={t("login.password_placeholder")} />
           </div>
           <Button type="button" className="w-full" onClick={handlePasswordLogin} disabled={isSubmitting || !effectiveEmail || !loginPassword}>
-            Sign in with password
+            {t("login.signin_with_password")}
           </Button>
           <button type="button" className="text-sm text-[var(--color-primary)]" onClick={() => setPasswordLogin(false)}>
-            Use email code instead
+            {t("login.use_code_instead")}
           </button>
         </div>
       ) : (
         <>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button type="button" onClick={() => handleSendCode("login")} disabled={isSubmitting || !effectiveEmail}>
-              <Mail className="size-4" /> Send code
+              <Mail className="size-4" /> {t("login.send_code")}
             </Button>
-            <DevHint code={debugCode} />
+            <DevHint code={debugCode} label={t("login.dev_code", { code: "" }).replace(/\s*$/, "")} />
           </div>
           {otpSent ? (
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-[var(--color-heading)]">6-digit code</label>
-                <Input value={otpCode} onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="123456" />
+                <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.code_label")}</label>
+                <Input value={otpCode} onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder={t("login.code_placeholder")} />
               </div>
               <Button type="button" className="w-full" onClick={handleVerifyLoginCode} disabled={isSubmitting || otpCode.length !== 6}>
-                Sign in
+                {t("login.sign_in")}
               </Button>
             </div>
           ) : null}
-          <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary)]" onClick={() => setPasswordLogin(true)}>
-            <Lock className="size-4" /> Use password instead
-          </button>
         </>
       )}
-      <button type="button" className="text-sm text-[var(--color-primary)]" onClick={switchToOnboarding}>
-        Need a new account? Start onboarding
-      </button>
+      <div className="flex flex-col items-start gap-3 pt-1">
+        {!passwordLogin ? (
+          <button
+            type="button"
+            className="inline-flex max-w-full items-start gap-2 text-left text-sm leading-5 text-[var(--color-primary)]"
+            onClick={() => setPasswordLogin(true)}
+          >
+            <Lock className="mt-0.5 size-4 shrink-0" /> <span>{t("login.use_password_instead")}</span>
+          </button>
+        ) : null}
+        <button type="button" className="max-w-full text-left text-sm leading-5 text-[var(--color-primary)]" onClick={switchToOnboarding}>
+          {t("login.start_onboarding")}
+        </button>
+      </div>
     </div>
   );
 
@@ -290,14 +316,14 @@ export function LoginPage() {
     if (step === 1) {
       return (
         <div className="space-y-5">
-          <StepPill current={1} total={4} />
+          <StepPill current={1} total={4} label={t("login.step", { current: 1, total: 4 })} />
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">Are you an Owner or a Worker?</h2>
-            <p className="mt-2 text-sm text-[var(--color-text-muted)]">Start with your name and choose the account type.</p>
+            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step1.title")}</h2>
+            <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step1.body")}</p>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--color-heading)]">Full name</label>
-            <Input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your name" />
+            <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.full_name")}</label>
+            <Input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder={t("login.full_name_placeholder")} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <button
@@ -308,8 +334,8 @@ export function LoginPage() {
                 persona === "owner" ? "border-[var(--color-primary)] bg-[rgba(47,111,237,0.08)]" : "border-[var(--color-border)] bg-white",
               )}
             >
-              <p className="font-semibold text-[var(--color-heading)]">I&apos;m an Owner</p>
-              <p className="mt-1 text-sm text-[var(--color-text-muted)]">Create the business and keep password fallback.</p>
+              <p className="font-semibold text-[var(--color-heading)]">{t("login.owner_title")}</p>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">{t("login.owner_body")}</p>
             </button>
             <button
               type="button"
@@ -319,16 +345,16 @@ export function LoginPage() {
                 persona === "worker" ? "border-[var(--color-primary)] bg-[rgba(47,111,237,0.08)]" : "border-[var(--color-border)] bg-white",
               )}
             >
-              <p className="font-semibold text-[var(--color-heading)]">I&apos;m a Worker</p>
-              <p className="mt-1 text-sm text-[var(--color-text-muted)]">OTP-only access. No password required.</p>
+              <p className="font-semibold text-[var(--color-heading)]">{t("login.worker_title")}</p>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">{t("login.worker_body")}</p>
             </button>
           </div>
           <div className="flex items-center justify-between gap-3">
             <button type="button" className="text-sm text-[var(--color-primary)]" onClick={switchToSignin}>
-              Already have an account? Sign in
+              {t("login.have_account")}
             </button>
             <Button type="button" onClick={() => setStep(2)} disabled={fullName.trim().length < 2}>
-              Continue <ArrowRight className="size-4" />
+              {t("common.continue")} <ArrowRight className="size-4" />
             </Button>
           </div>
         </div>
@@ -339,33 +365,33 @@ export function LoginPage() {
       return (
         <div className="space-y-5">
           <div className="flex items-center justify-between gap-3">
-            <StepPill current={2} total={4} />
+            <StepPill current={2} total={4} label={t("login.step", { current: 2, total: 4 })} />
             <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary)]" onClick={() => setStep(1)}>
-              <ArrowLeft className="size-4" /> Back
+              <ArrowLeft className="size-4" /> {t("common.back")}
             </button>
           </div>
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">Verify your email</h2>
-            <p className="mt-2 text-sm text-[var(--color-text-muted)]">We send a 6-digit code valid for 5 minutes.</p>
+            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step2.title")}</h2>
+            <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step2.body")}</p>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--color-heading)]">Email</label>
-            <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@restaurant.com" />
+            <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.email")}</label>
+            <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("login.email_placeholder")} />
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button type="button" onClick={() => handleSendCode(persona === "owner" ? "owner_signup" : "worker_signup")} disabled={isSubmitting || !effectiveEmail}>
-              <Mail className="size-4" /> Send code
+              <Mail className="size-4" /> {t("login.send_code")}
             </Button>
-            <DevHint code={debugCode} />
+            <DevHint code={debugCode} label={t("login.dev_code", { code: "" }).replace(/\s*$/, "")} />
           </div>
           {otpSent ? (
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-[var(--color-heading)]">6-digit code</label>
-                <Input value={otpCode} onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder="123456" />
+                <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.code_label")}</label>
+                <Input value={otpCode} onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder={t("login.code_placeholder")} />
               </div>
               <Button type="button" className="w-full" onClick={handleVerifyOnboardingCode} disabled={isSubmitting || otpCode.length !== 6}>
-                Verify code
+                {t("login.verify_code")}
               </Button>
             </div>
           ) : null}
@@ -377,25 +403,25 @@ export function LoginPage() {
       return (
         <div className="space-y-5">
           <div className="flex items-center justify-between gap-3">
-            <StepPill current={3} total={4} />
+            <StepPill current={3} total={4} label={t("login.step", { current: 3, total: 4 })} />
             <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary)]" onClick={() => setStep(2)}>
-              <ArrowLeft className="size-4" /> Back
+              <ArrowLeft className="size-4" /> {t("common.back")}
             </button>
           </div>
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">Set your password</h2>
-            <p className="mt-2 text-sm text-[var(--color-text-muted)]">Owners keep password sign-in as an alternative to OTP.</p>
+            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step3.title")}</h2>
+            <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step3.body")}</p>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--color-heading)]">Password</label>
-            <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 8 characters" />
+            <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.password")}</label>
+            <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t("login.password_min_placeholder")} />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--color-heading)]">Confirm password</label>
-            <Input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Repeat password" />
+            <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.confirm_password")}</label>
+            <Input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder={t("login.confirm_password_placeholder")} />
           </div>
           <Button type="button" className="w-full" onClick={() => setStep(4)} disabled={password.length < 8 || confirmPassword.length < 8 || password !== confirmPassword}>
-            Continue
+            {t("common.continue")}
           </Button>
         </div>
       );
@@ -404,21 +430,21 @@ export function LoginPage() {
     return (
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-3">
-          <StepPill current={4} total={4} />
+          <StepPill current={4} total={4} label={t("login.step", { current: 4, total: 4 })} />
           <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary)]" onClick={() => setStep(3)}>
-            <ArrowLeft className="size-4" /> Back
+            <ArrowLeft className="size-4" /> {t("common.back")}
           </button>
         </div>
         <div>
-          <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">Finish business setup</h2>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">Choose the business name and tell us how you heard about GastrOWO.</p>
+          <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step4.title")}</h2>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step4.body")}</p>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-[var(--color-heading)]">Business name</label>
-          <Input value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} placeholder="Chicken i Kimchi" />
+          <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.business_name")}</label>
+          <Input value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} placeholder={t("login.business_name_placeholder")} />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-[var(--color-heading)]">How did you hear about us?</label>
+          <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.heard_about")}</label>
           <div className="grid gap-2 sm:grid-cols-2">
             {sourceOptions.map((item) => (
               <button
@@ -430,103 +456,76 @@ export function LoginPage() {
                   source === item ? "border-[var(--color-primary)] bg-[rgba(47,111,237,0.08)] text-[var(--color-primary)]" : "border-[var(--color-border)] bg-white text-[var(--color-heading)]",
                 )}
               >
-                {item}
+                {t(`source.${item}`)}
               </button>
             ))}
           </div>
         </div>
         <Button type="button" className="w-full" onClick={handleCompleteOwner} disabled={isSubmitting || !organizationName.trim() || !source}>
-          Create business
+          {t("login.create_business")}
         </Button>
       </div>
     );
   };
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-[linear-gradient(180deg,#f7fafc,#eef4fb)] px-4 py-6 md:px-8 md:py-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(47,111,237,0.10),transparent_24%),radial-gradient(circle_at_center_right,rgba(104,240,93,0.10),transparent_26%)]" />
-      <div className="relative mx-auto grid min-h-[calc(100dvh-3rem)] max-w-[1440px] gap-4 lg:gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="order-2 surface-card relative overflow-hidden rounded-[1.6rem] p-5 sm:p-6 md:p-8 xl:order-1 xl:rounded-[2rem] xl:p-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(47,111,237,0.12),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(104,240,93,0.16),transparent_26%)]" aria-hidden />
-          <div className="relative flex h-full flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="grid size-12 place-items-center rounded-[1.25rem] bg-[#68f05d] text-[#08100c] shadow-[0_18px_36px_rgba(104,240,93,0.18)]">
-                  <Sparkles className="size-5" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold tracking-[-0.04em] text-[var(--color-heading)]">GastrOWO</p>
-                  <p className="text-sm text-[var(--color-text-muted)]">Restaurant operations workspace</p>
-                </div>
-              </div>
-              <div className="mt-10 inline-flex items-center rounded-full bg-[rgba(47,111,237,0.10)] px-3 py-1 text-sm font-medium text-[var(--color-primary)]">
-                GastrOWO workspace
-              </div>
-              <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.07em] text-[var(--color-heading)] sm:text-5xl">
-                Stay on top of shifts, staff, and restaurant operations without friction.
-              </h1>
-              <p className="mt-5 max-w-2xl text-base leading-7 text-[var(--color-text-muted)]">
-                Streamline your workflow with intuitive task management. Keep everyone on the same page. Share your ideas, feedback,
-                and files in one place.
-              </p>
-              <div className="mt-8 hidden gap-4 md:grid md:grid-cols-2">
-                <div className="rounded-[1.35rem] border border-[var(--color-border)] bg-white/78 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
-                  <p className="text-sm font-semibold text-emerald-600">Completed</p>
-                  <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.04em] text-[var(--color-heading)]">Weekly schedule</p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">Generate, review, and apply restaurant shifts in one clean calendar.</p>
-                </div>
-                <div className="rounded-[1.35rem] border border-[var(--color-border)] bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Low</p>
-                      <p className="mt-3 text-[1.45rem] font-semibold tracking-[-0.04em] text-[var(--color-heading)]">Shift requests</p>
-                    </div>
-                    <div className="flex -space-x-2">
-                      {["AM", "KN", "IO"].map((initial) => (
-                        <div key={initial} className="grid size-8 place-items-center rounded-full border-2 border-white bg-[var(--color-accent)] text-[11px] font-semibold text-[var(--color-primary)]">
-                          {initial}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">Keep workers aligned across locations, availability, and schedule changes.</p>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 hidden gap-4 md:grid md:grid-cols-3">
-              {[
-                ["Fast owner setup", "Create the workspace and invite existing users by email."],
-                ["Worker-first access", "Workers only see compact tools they actually need."],
-                ["Email-first auth", "OTP login and invite join replace the old UID fallback."],
-              ].map(([title, description]) => (
-                <div key={title} className="rounded-[1.15rem] border border-[var(--color-border)] bg-white/72 px-4 py-4 text-sm leading-6 text-[var(--color-text-muted)]">
-                  <p className="font-semibold text-[var(--color-heading)]">{title}</p>
-                  <p className="mt-2">{description}</p>
-                </div>
-              ))}
-            </div>
+    <div className="relative min-h-dvh overflow-hidden bg-[linear-gradient(180deg,#f8fbff,#eef4fb)] px-4 py-6 md:px-8 md:py-10">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(47,111,237,0.10),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(104,240,93,0.10),transparent_26%)]" />
+      <div className="relative mx-auto max-w-[1180px]">
+        <div className="flex items-center justify-between gap-4">
+          <Link to="/" className="shrink-0">
+            <BrandLogo kind="wordmark" tone="light" className="h-12 w-auto sm:h-14" />
+          </Link>
+          <div className="inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-white/92 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.06)] backdrop-blur">
+            {(["en", "pl", "ru"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setLang(item)}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition",
+                  lang === item ? "bg-[var(--color-primary)] text-white" : "text-[var(--color-text-muted)] hover:text-[var(--color-heading)]",
+                )}
+              >
+                {item}
+              </button>
+            ))}
           </div>
-        </motion.section>
+        </div>
 
-        <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, delay: 0.06 }} className="order-1 flex items-start xl:order-2">
-          <Card className="w-full p-1">
-            <CardHeader className="p-5 pb-2 md:p-6 md:pb-2">
-              <CardTitle className="text-[2rem]">{isInviteJoin ? "Join invitation" : mode === "signin" ? "Sign in" : "Get started"}</CardTitle>
-              <CardDescription>
-                {isInviteJoin
-                  ? "Use the invited email and one-time code to join the business."
-                  : mode === "signin"
-                    ? "Returning access for owners, managers, and workers."
-                    : "New onboarding wizard for owners and workers."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-5 pt-2 md:p-6 md:pt-2">
-              <motion.div key={`${mode}-${step}-${isInviteJoin ? "invite" : "default"}`} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.18 }}>
-                {isInviteJoin ? renderInviteJoin() : mode === "signin" ? renderSignin() : renderOnboarding()}
-              </motion.div>
-            </CardContent>
-          </Card>
-        </motion.section>
+        <div className="flex min-h-[calc(100dvh-8.5rem)] items-center justify-center py-8 md:py-12">
+          <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="w-full max-w-[38rem]">
+            <Card className="w-full rounded-[1.9rem] border border-[rgba(148,163,184,0.16)] bg-white/98 p-2 shadow-[0_28px_65px_rgba(15,23,42,0.08)]">
+              <CardHeader className="p-5 pb-3 md:p-6 md:pb-3">
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {[t("login.mode.onboarding_title"), t("login.mode.signin_title"), t("login.mode.join_title")].map((label) => (
+                    <span
+                      key={label}
+                      className="rounded-full border border-[rgba(216,225,236,0.92)] bg-[rgba(243,247,251,0.86)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+                <CardTitle className="text-[2rem] tracking-tight">
+                  {isInviteJoin ? t("login.mode.join_title") : mode === "signin" ? t("login.mode.signin_title") : t("login.mode.onboarding_title")}
+                </CardTitle>
+                <CardDescription>
+                  {isInviteJoin
+                    ? t("login.mode.join_description")
+                    : mode === "signin"
+                      ? t("login.mode.signin_description")
+                      : t("login.mode.onboarding_description")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-5 pt-2 md:p-6 md:pt-2">
+                <motion.div key={`${mode}-${step}-${isInviteJoin ? "invite" : "default"}`} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.18 }}>
+                  {isInviteJoin ? renderInviteJoin() : mode === "signin" ? renderSignin() : renderOnboarding()}
+                </motion.div>
+              </CardContent>
+            </Card>
+          </motion.section>
+        </div>
       </div>
     </div>
   );

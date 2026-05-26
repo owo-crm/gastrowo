@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.deps import OrgContext, get_current_organization, get_current_user, require_org_context
 from app.core.envelope import ok
+from app.core.permissions import can_manage_business_settings, can_manage_team
 from app.db import get_db
 from app.models import InviteToken, Location, LocationMembership, Organization, OrganizationMembership, RoleEnum, User
 from app.schemas import (
@@ -28,6 +29,9 @@ router = APIRouter(prefix="/organizations", tags=["organizations"])
 def _serialize_settings(organization: Organization) -> dict:
     return OrganizationSettingsOut(
         staff_can_submit_revenue_reports=organization.staff_can_submit_revenue_reports,
+        staff_can_delete_revenue_reports=organization.staff_can_delete_revenue_reports,
+        manager_can_submit_revenue_reports=organization.manager_can_submit_revenue_reports,
+        manager_can_delete_revenue_reports=organization.manager_can_delete_revenue_reports,
         manager_can_view_full_dashboard=organization.manager_can_view_full_dashboard,
         manager_can_view_payroll=organization.manager_can_view_payroll,
         manager_can_manage_team=organization.manager_can_manage_team,
@@ -38,9 +42,7 @@ def _serialize_settings(organization: Organization) -> dict:
 
 
 def _require_business_settings_access(context: OrgContext, organization: Organization) -> None:
-    if context.membership.role == RoleEnum.ADMIN:
-        return
-    if context.membership.role == RoleEnum.MANAGER and organization.manager_can_manage_business_settings:
+    if can_manage_business_settings(context.membership, organization):
         return
     raise HTTPException(status_code=403, detail="Business settings access is disabled for this role")
 
@@ -124,6 +126,9 @@ def patch_current_organization_settings(
     organization = get_current_organization(context, db)
     _require_business_settings_access(context, organization)
     organization.staff_can_submit_revenue_reports = payload.staff_can_submit_revenue_reports
+    organization.staff_can_delete_revenue_reports = payload.staff_can_delete_revenue_reports
+    organization.manager_can_submit_revenue_reports = payload.manager_can_submit_revenue_reports
+    organization.manager_can_delete_revenue_reports = payload.manager_can_delete_revenue_reports
     organization.manager_can_view_full_dashboard = payload.manager_can_view_full_dashboard
     organization.manager_can_view_payroll = payload.manager_can_view_payroll
     organization.manager_can_manage_team = payload.manager_can_manage_team
@@ -141,6 +146,9 @@ def link_member_by_email(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    organization = get_current_organization(context, db)
+    if not can_manage_team(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
     normalized_email = payload.email.lower()
     user = db.scalar(select(User).where(User.email == normalized_email))
     if user is None:
@@ -156,7 +164,6 @@ def link_member_by_email(
         db.add(invite)
         db.commit()
         join_link = f"{settings.frontend_url.rstrip('/')}/join?email={normalized_email}&token={invite_token}"
-        organization = get_current_organization(context, db)
         send_invite_email(email=normalized_email, business_name=organization.name, join_link=join_link)
         return ok(
             {

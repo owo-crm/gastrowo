@@ -6,13 +6,20 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.deps import OrgContext, require_org_context
+from app.core.deps import OrgContext, get_current_organization, require_org_context
 from app.core.envelope import ok
+from app.core.permissions import can_manage_business_settings, can_manage_team, membership_permission_overrides
 from app.db import get_db
 from app.models import Location, LocationMembership, OrganizationMembership, RoleEnum, User
 from app.schemas import WorkerSetupOut, WorkerSetupPatch
 
 router = APIRouter(prefix="/workers", tags=["workers"])
+
+
+def _require_team_access(context: OrgContext, db: Session) -> None:
+    organization = get_current_organization(context, db)
+    if not can_manage_team(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
 
 
 def _get_worker_membership_or_404(db: Session, context: OrgContext, user_id: UUID) -> OrganizationMembership:
@@ -35,6 +42,7 @@ def get_worker_setup(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     membership = _get_worker_membership_or_404(db, context, user_id)
     user = db.get(User, user_id)
     if user is None:
@@ -70,6 +78,7 @@ def get_worker_setup(
             role=membership.role,
             staff_position=membership.staff_position,
             locations=items,
+            permission_overrides=membership_permission_overrides(membership),
         ).model_dump(mode="json")
     )
 
@@ -81,7 +90,9 @@ def patch_worker_setup(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
-    _get_worker_membership_or_404(db, context, user_id)
+    _require_team_access(context, db)
+    membership = _get_worker_membership_or_404(db, context, user_id)
+    organization = get_current_organization(context, db)
 
     valid_location_ids = set(
         db.scalars(
@@ -119,6 +130,13 @@ def patch_worker_setup(
         else:
             row.priority = item.priority
             row.hourly_rate_pln = item.hourly_rate_pln
+
+    if payload.permission_overrides is not None:
+        if not can_manage_business_settings(context.membership, organization):
+            raise HTTPException(status_code=403, detail="Business permission overrides are disabled for this account")
+        overrides = payload.permission_overrides.model_dump()
+        for key, value in overrides.items():
+            setattr(membership, key, value)
 
     db.commit()
     return ok({"updated": True, "user_id": str(user_id), "count": len(incoming_by_location)})

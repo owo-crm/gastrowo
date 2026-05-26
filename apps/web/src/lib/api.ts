@@ -114,6 +114,9 @@ export const api = {
     token: string,
     body: {
       staff_can_submit_revenue_reports: boolean;
+      staff_can_delete_revenue_reports: boolean;
+      manager_can_submit_revenue_reports: boolean;
+      manager_can_delete_revenue_reports: boolean;
       manager_can_view_full_dashboard: boolean;
       manager_can_view_payroll: boolean;
       manager_can_manage_team: boolean;
@@ -198,7 +201,21 @@ export const api = {
   patchWorkerSetup(
     token: string,
     userId: string,
-    body: { locations: Array<{ location_id: string; priority: number; hourly_rate_pln: string }> },
+    body: {
+      locations: Array<{ location_id: string; priority: number; hourly_rate_pln: string }>;
+      permission_overrides?: {
+        staff_can_submit_revenue_reports_override: boolean | null;
+        staff_can_delete_revenue_reports_override: boolean | null;
+        manager_can_submit_revenue_reports_override: boolean | null;
+        manager_can_delete_revenue_reports_override: boolean | null;
+        manager_can_view_full_dashboard_override: boolean | null;
+        manager_can_view_payroll_override: boolean | null;
+        manager_can_manage_team_override: boolean | null;
+        manager_can_manage_business_settings_override: boolean | null;
+        manager_can_access_notes_override: boolean | null;
+        manager_can_access_inventory_override: boolean | null;
+      };
+    },
   ) {
     return request<{ updated: boolean; user_id: string; count: number }>(`/workers/${userId}/setup`, {
       method: "PATCH",
@@ -435,6 +452,9 @@ export const api = {
     body: { location_id: string; report_date: string; revenue: string; currency: string; photo_url: string | null },
   ) {
     return request("/reports/revenue", { method: "POST", body: JSON.stringify(body) }, token);
+  },
+  deleteRevenueReport(token: string, reportId: string) {
+    return request<{ deleted: boolean; id: string }>(`/reports/revenue/${reportId}`, { method: "DELETE" }, token);
   },
   ownerDashboard(token: string, startDate: string, endDate: string) {
     return request<DashboardData>(`/dashboard/owner?start_date=${startDate}&end_date=${endDate}`, {}, token);

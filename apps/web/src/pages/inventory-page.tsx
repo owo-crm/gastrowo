@@ -3,6 +3,7 @@ import { AlertTriangle, Boxes, CalendarClock, Search, Wrench } from "lucide-reac
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { useLanguage } from "@/lib/i18n";
 
 const previewRows = [
   { name: "Rational iCombi Pro", code: "EQ-OV-0041", status: "In use", category: "Kitchen", location: "Old Town Kitchen", condition: "91%", next: "May 05" },
@@ -11,8 +12,9 @@ const previewRows = [
 ];
 
 export function InventoryPage() {
+   const { t } = useLanguage();
    return (
-     <AppShell title="Inventory" subtitle="Equipment, condition, and service tracking preview." action={<Badge className="border-slate-300 bg-slate-100 text-slate-700">Preview</Badge>}>
+     <AppShell title={t("inventory.title")} subtitle={t("inventory.subtitle")} action={<Badge className="border-slate-300 bg-slate-100 text-slate-700">{t("common.preview")}</Badge>}>
       <div className="animate-slide-in relative overflow-hidden rounded-[2rem]" style={{ animationDelay: "100ms" }}>
         <div className="space-y-5 opacity-45">
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">

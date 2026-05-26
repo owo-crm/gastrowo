@@ -220,6 +220,9 @@ def _build_shift_key(template_id: UUID, shift_date: date) -> str:
     return f"{template_id}:{shift_date.isoformat()}"
 
 
+AUTO_PLANNING_MIN_OVERLAP_RATIO = 0.75
+
+
 def _load_demand_specs(db: Session, organization_id: UUID, week_start: date, location_id: UUID | None = None) -> list[ShiftDemand]:
     locations = db.scalars(select(Location).where(Location.organization_id == organization_id)).all()
     location_name_by_id = {location.id: location.name for location in locations}
@@ -353,19 +356,48 @@ def _load_demand_specs(db: Session, organization_id: UUID, week_start: date, loc
     return merged_specs
 
 
-def _load_existing_manual_state(
-    db: Session, organization_id: UUID, week_start: date, week_end: date
-) -> tuple[dict[UUID, float], dict[UUID, list[tuple[date, time, time]]]]:
-    existing_rows = db.execute(
+def _load_existing_assignment_rows(
+    db: Session,
+    organization_id: UUID,
+    week_start: date,
+    week_end: date,
+    replaced_location_id: UUID | None = None,
+    user_id: UUID | None = None,
+) -> list[tuple[Assignment, Shift]]:
+    query = (
         select(Assignment, Shift)
         .join(Shift, Shift.id == Assignment.shift_id)
         .where(
             Shift.organization_id == organization_id,
             Shift.date >= week_start,
             Shift.date <= week_end,
-            Shift.source != ShiftSourceEnum.AUTO,
         )
-    ).all()
+    )
+    if user_id is not None:
+        query = query.where(Assignment.user_id == user_id)
+    if replaced_location_id is None:
+        query = query.where(Shift.source != ShiftSourceEnum.AUTO)
+    else:
+        query = query.where(
+            (Shift.source != ShiftSourceEnum.AUTO) | (Shift.location_id != replaced_location_id)
+        )
+    return db.execute(query).all()
+
+
+def _load_existing_manual_state(
+    db: Session,
+    organization_id: UUID,
+    week_start: date,
+    week_end: date,
+    replaced_location_id: UUID | None = None,
+) -> tuple[dict[UUID, float], dict[UUID, list[tuple[date, time, time]]]]:
+    existing_rows = _load_existing_assignment_rows(
+        db=db,
+        organization_id=organization_id,
+        week_start=week_start,
+        week_end=week_end,
+        replaced_location_id=replaced_location_id,
+    )
 
     hours_by_user = calculate_week_hours(existing_rows)
     windows_by_user: dict[UUID, list[tuple[date, time, time]]] = defaultdict(list)
@@ -431,7 +463,13 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
     for slot in availability_slots:
         availability_slots_by_user[slot.user_id].append(slot)
 
-    hours_by_user, windows_by_user = _load_existing_manual_state(db, organization_id, week_start, week_end)
+    hours_by_user, windows_by_user = _load_existing_manual_state(
+        db,
+        organization_id,
+        week_start,
+        week_end,
+        replaced_location_id=location_id,
+    )
 
     planned_assignments: list[PlannedAssignment] = []
     rejected_candidates: list[RejectedCandidate] = []
@@ -480,12 +518,10 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
                     demand.end_time,
                 )
                 start_covered = has_start_time_coverage(member_slots, demand.date.weekday(), demand.start_time)
-                if not is_available_for_shift(
-                    member_slots,
-                    demand.date.weekday(),
-                    demand.start_time,
-                    demand.end_time,
-                ):
+                overlap_ratio = overlap_hours / shift_hours if shift_hours > 0 else 0.0
+                # Auto-planning should be conservative: partial overlap is fine for manual overrides,
+                # but generated shifts should stay close to submitted availability windows.
+                if overlap_hours <= 0 or overlap_ratio < AUTO_PLANNING_MIN_OVERLAP_RATIO:
                     reasons.append("availability_window_mismatch")
 
                 if current_hours + shift_hours > availability_week.desired_hours:
@@ -519,8 +555,8 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
                 )
                 if (
                     location_member is not None
-                    and overlap_hours > 0
-                    and set(reasons).issubset({"desired_hours_cap_exceeded", "availability_window_mismatch"})
+                    and start_covered
+                    and set(reasons) == {"desired_hours_cap_exceeded"}
                 ):
                     fallback_candidates.append(
                         (
@@ -563,10 +599,8 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
             )
             selected.extend(fallback_candidates[:remaining])
 
-        # Apply should be blocked only when no one is assigned at all to shift start.
-        # If at least one employee is assigned, we keep planning actionable and surface
-        # availability-start mismatches in warnings/rejections instead of hard blocking apply.
-        has_assigned_start_coverage = len(selected) > 0
+        # Keep apply actionable, but surface shifts where nobody covers the actual start time.
+        has_assigned_start_coverage = any(item[4] for item in selected)
         if not has_assigned_start_coverage:
             start_coverage_alerts.append(
                 StartCoverageAlert(
@@ -709,9 +743,104 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
             "fill_rate_pct": fill_rate,
         },
         start_coverage_alerts=start_coverage_alerts,
-        apply_blocked=len(start_coverage_alerts) > 0,
+        apply_blocked=False,
         demand_specs=demand_specs,
     )
+
+
+def preview_assignment_has_overlap(
+    db: Session,
+    organization_id: UUID,
+    week_start: date,
+    location_id: UUID,
+    user_id: UUID,
+    shift_date: date,
+    start_time: time,
+    end_time: time,
+    exclude_override_ids: set[UUID] | None = None,
+) -> bool:
+    week_end = week_start + timedelta(days=6)
+    existing_rows = _load_existing_assignment_rows(
+        db=db,
+        organization_id=organization_id,
+        week_start=week_start,
+        week_end=week_end,
+        replaced_location_id=location_id,
+        user_id=user_id,
+    )
+    for _assignment, existing_shift in existing_rows:
+        if shifts_overlap(
+            a_date=existing_shift.date,
+            a_start=existing_shift.start_time,
+            a_end=existing_shift.end_time,
+            b_date=shift_date,
+            b_start=start_time,
+            b_end=end_time,
+        ):
+            return True
+
+    override_rows = db.scalars(
+        select(ScheduleWeeklyOverride).where(
+            ScheduleWeeklyOverride.organization_id == organization_id,
+            ScheduleWeeklyOverride.week_start == week_start,
+            ScheduleWeeklyOverride.assigned_user_id == user_id,
+        )
+    ).all()
+    for override in override_rows:
+        if exclude_override_ids and override.id in exclude_override_ids:
+            continue
+        if override.is_deleted or override.required_count <= 0:
+            continue
+        override_date = week_start + timedelta(days=override.day_of_week)
+        if shifts_overlap(
+            a_date=override_date,
+            a_start=override.start_time,
+            a_end=override.end_time,
+            b_date=shift_date,
+            b_start=start_time,
+            b_end=end_time,
+        ):
+            return True
+
+    return False
+
+
+def _plan_has_assignment_overlap(
+    db: Session,
+    organization_id: UUID,
+    week_start: date,
+    replaced_location_id: UUID | None,
+    assignments: list[PlannedAssignment],
+) -> bool:
+    week_end = week_start + timedelta(days=6)
+    windows_by_user: dict[UUID, list[tuple[date, time, time]]] = defaultdict(list)
+
+    for assignment, shift in _load_existing_assignment_rows(
+        db=db,
+        organization_id=organization_id,
+        week_start=week_start,
+        week_end=week_end,
+        replaced_location_id=replaced_location_id,
+    ):
+        windows_by_user[assignment.user_id].append((shift.date, shift.start_time, shift.end_time))
+
+    for item in assignments:
+        user_windows = windows_by_user[item.user_id]
+        if any(
+            shifts_overlap(
+                a_date=existing_date,
+                a_start=existing_start,
+                a_end=existing_end,
+                b_date=item.date,
+                b_start=item.start_time,
+                b_end=item.end_time,
+            )
+            for existing_date, existing_start, existing_end in user_windows
+        ):
+            return True
+        user_windows.append((item.date, item.start_time, item.end_time))
+
+    return False
 
 
 def apply_week_schedule(
@@ -723,9 +852,14 @@ def apply_week_schedule(
 ) -> SchedulePlanResult:
     week_end = week_start + timedelta(days=6)
     plan = plan_week_schedule(db=db, organization_id=organization_id, week_start=week_start, location_id=location_id)
-    if plan.apply_blocked:
-        first_message = plan.start_coverage_alerts[0].message if plan.start_coverage_alerts else "Missing start-time coverage"
-        raise HTTPException(status_code=422, detail=f"Apply blocked: {first_message}")
+    if _plan_has_assignment_overlap(
+        db=db,
+        organization_id=organization_id,
+        week_start=week_start,
+        replaced_location_id=location_id,
+        assignments=plan.assignments,
+    ):
+        raise HTTPException(status_code=422, detail="Schedule contains overlapping assignments for the same employee")
 
     existing_auto_shift_query = select(Shift.id).where(
         Shift.organization_id == organization_id,

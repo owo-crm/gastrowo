@@ -6,13 +6,20 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.deps import OrgContext, require_org_context
+from app.core.deps import OrgContext, get_current_organization, require_org_context
 from app.core.envelope import ok
+from app.core.permissions import can_manage_team, membership_permission_overrides
 from app.db import get_db
 from app.models import Location, LocationMembership, OrganizationMembership, RoleEnum, User
 from app.schemas import LocationCreate, LocationMemberOut, LocationMemberPatch, LocationOut, LocationPatch
 
 router = APIRouter(prefix="/locations", tags=["locations"])
+
+
+def _require_team_access(context: OrgContext, db: Session) -> None:
+    organization = get_current_organization(context, db)
+    if not can_manage_team(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
 
 
 def _get_location_or_404(db: Session, organization_id: UUID, location_id: UUID) -> Location:
@@ -32,6 +39,7 @@ def list_locations(
     context: OrgContext = Depends(require_org_context()),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     locations = db.scalars(
         select(Location).where(Location.organization_id == context.membership.organization_id)
     ).all()
@@ -92,6 +100,7 @@ def create_location(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     location = Location(
         organization_id=context.membership.organization_id,
         name=payload.name,
@@ -130,6 +139,7 @@ def patch_location(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     location = _get_location_or_404(db, context.membership.organization_id, location_id)
     location.name = payload.name
     location.timezone = payload.timezone
@@ -200,6 +210,7 @@ def delete_location(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     location = _get_location_or_404(db, context.membership.organization_id, location_id)
     db.delete(location)
     db.commit()
@@ -212,6 +223,7 @@ def location_members(
     context: OrgContext = Depends(require_org_context()),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     _get_location_or_404(db, context.membership.organization_id, location_id)
 
     rows = db.execute(
@@ -235,6 +247,7 @@ def location_members(
             max_hours_per_week=membership.max_hours_per_week,
             hourly_rate_pln=location_membership.hourly_rate_pln,
             priority=location_membership.priority,
+            permission_overrides=membership_permission_overrides(membership),
         ).model_dump(mode="json")
         for user, membership, location_membership in rows
     ]
@@ -250,6 +263,7 @@ def patch_location_member(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    _require_team_access(context, db)
     _get_location_or_404(db, context.membership.organization_id, location_id)
 
     location_membership = db.scalar(
@@ -288,5 +302,6 @@ def patch_location_member(
         max_hours_per_week=organization_membership.max_hours_per_week,
         hourly_rate_pln=location_membership.hourly_rate_pln,
         priority=location_membership.priority,
+        permission_overrides=membership_permission_overrides(organization_membership),
     )
     return ok(response.model_dump(mode="json"))

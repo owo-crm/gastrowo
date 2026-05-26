@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import OrgContext, get_current_organization, require_org_context
 from app.core.envelope import ok
+from app.core.permissions import can_delete_revenue_reports, can_submit_revenue_reports
 from app.db import get_db
 from app.models import Location, RevenueReport, RoleEnum
 from app.schemas import RevenueReportCreate
@@ -24,7 +25,7 @@ def create_revenue_report(
     db: Session = Depends(get_db),
 ):
     organization = get_current_organization(context, db)
-    if context.membership.role == RoleEnum.STAFF and not organization.staff_can_submit_revenue_reports:
+    if not can_submit_revenue_reports(context.membership, organization):
         raise HTTPException(status_code=403, detail="Staff revenue reports are disabled in this workspace")
 
     location = db.scalar(
@@ -97,3 +98,29 @@ def list_revenue_reports(
     ]
 
     return ok(data)
+
+
+@router.delete("/revenue/{report_id}")
+def delete_revenue_report(
+    report_id: UUID,
+    context: OrgContext = Depends(require_org_context()),
+    db: Session = Depends(get_db),
+):
+    organization = get_current_organization(context, db)
+    if not can_delete_revenue_reports(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Revenue report deletion is disabled in this workspace")
+
+    report = db.scalar(
+        select(RevenueReport).where(
+            RevenueReport.id == report_id,
+            RevenueReport.organization_id == context.membership.organization_id,
+        )
+    )
+    if report is None:
+        raise HTTPException(status_code=404, detail="Revenue report not found")
+    if context.membership.role == RoleEnum.STAFF and report.created_by != context.user.id:
+        raise HTTPException(status_code=403, detail="Staff can only delete their own revenue reports")
+
+    db.delete(report)
+    db.commit()
+    return ok({"deleted": True, "id": str(report_id)})

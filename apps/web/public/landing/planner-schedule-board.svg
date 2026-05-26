@@ -1,0 +1,119 @@
+<svg width="980" height="520" viewBox="0 0 980 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="980" height="520" rx="24" fill="#ffffff"/>
+  
+  <!-- Header Section -->
+  <text x="32" y="44" fill="#0F172A" font-family="'Manrope', 'Segoe UI', system-ui, sans-serif" font-size="22" font-weight="800">Grafik tygodniowy</text>
+  <text x="32" y="66" fill="#64748B" font-family="'Manrope', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="500">20 – 26 maja 2034</text>
+  
+  <text x="742" y="38" fill="#64748B" font-family="'Manrope', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="600">Dołącz grafik</text>
+  <rect x="852" y="18" width="28" height="28" rx="14" fill="#ffffff" stroke="#DCE6F2"/>
+  <text x="866" y="37" fill="#64748B" font-family="'Manrope', 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="700" text-anchor="middle">&lt;</text>
+  
+  <rect x="888" y="18" width="28" height="28" rx="14" fill="#ffffff" stroke="#DCE6F2"/>
+  <text x="902" y="37" fill="#64748B" font-family="'Manrope', 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="700" text-anchor="middle">&gt;</text>
+  
+  <!-- Top Horizontal Line separating Header -->
+  <line x1="0" y1="80" x2="980" y2="80" stroke="#E5EDF7" stroke-width="1"/>
+  
+  <!-- Left Hours Sidebar Background -->
+  <rect x="0" y="80" width="70" height="315" fill="#FCFDFE"/>
+  <line x1="70" y1="80" x2="70" y2="395" stroke="#E5EDF7" stroke-width="1"/>
+  
+  <!-- Day Headers (Perfectly Centered Columns: Width 130, start at 70) -->
+  <g fill="#64748B" font-family="'Manrope', 'Segoe UI', system-ui, sans-serif" font-size="10" font-weight="700" text-anchor="middle">
+    <text x="135" y="104">PON</text><text x="135" y="120" fill="#0F172A" font-size="14" font-weight="800">20</text>
+    <text x="265" y="104">WT</text><text x="265" y="120" fill="#0F172A" font-size="14" font-weight="800">21</text>
+    <text x="395" y="104">ŚR</text><text x="395" y="120" fill="#0F172A" font-size="14" font-weight="800">22</text>
+    <text x="525" y="104">CZW</text><text x="525" y="120" fill="#0F172A" font-size="14" font-weight="800">23</text>
+    <text x="655" y="104">PT</text><text x="655" y="120" fill="#0F172A" font-size="14" font-weight="800">24</text>
+    <text x="785" y="104">SOB</text><text x="785" y="120" fill="#0F172A" font-size="14" font-weight="800">25</text>
+    <text x="915" y="104">ND</text><text x="915" y="120" fill="#0F172A" font-size="14" font-weight="800">26</text>
+  </g>
+  
+  <!-- Hour Grid Labels (Centered in Sidebar) -->
+  <g fill="#64748B" font-family="'Manrope', 'Segoe UI', system-ui, sans-serif" font-size="10" font-weight="600" text-anchor="middle">
+    <text x="35" y="148">10:00</text>
+    <text x="35" y="176">11:00</text>
+    <text x="35" y="204">12:00</text>
+    <text x="35" y="232">13:00</text>
+    <text x="35" y="260">14:00</text>
+    <text x="35" y="288">15:00</text>
+    <text x="35" y="316">16:00</text>
+    <text x="35" y="344">17:00</text>
+    <text x="35" y="372">18:00</text>
+  </g>
+  
+  <!-- Grid Lines (Horizontal & Vertical) -->
+  <g stroke="#E5EDF7" stroke-width="1">
+    <!-- Horizontal Rows (28px height each) -->
+    <line x1="70" y1="129" x2="980" y2="129"/>
+    <line x1="70" y1="157" x2="980" y2="157"/>
+    <line x1="70" y1="185" x2="980" y2="185"/>
+    <line x1="70" y1="213" x2="980" y2="213"/>
+    <line x1="70" y1="241" x2="980" y2="241"/>
+    <line x1="70" y1="269" x2="980" y2="269"/>
+    <line x1="70" y1="297" x2="980" y2="297"/>
+    <line x1="70" y1="325" x2="980" y2="325"/>
+    <line x1="70" y1="353" x2="980" y2="353"/>
+    <line x1="70" y1="381" x2="980" y2="381"/>
+    
+    <!-- Vertical Columns (130px width each, starting at 70) -->
+    <line x1="200" y1="80" x2="200" y2="395"/>
+    <line x1="330" y1="80" x2="330" y2="395"/>
+    <line x1="460" y1="80" x2="460" y2="395"/>
+    <line x1="590" y1="80" x2="590" y2="395"/>
+    <line x1="720" y1="80" x2="720" y2="395"/>
+    <line x1="850" y1="80" x2="850" y2="395"/>
+  </g>
+  
+  <!-- Assignments (Pristine grid-aligned capsules, matching project HSL branding colors) -->
+  <g font-family="'Manrope', 'Segoe UI', system-ui, sans-serif" font-size="10" font-weight="700" text-anchor="middle">
+    <!-- PON: Marta -->
+    <rect x="78" y="133" width="114" height="20" rx="10" fill="#DBF5E7" stroke="#7AD7AB"/>
+    <text x="135" y="146" fill="#166534">Marta</text>
+    
+    <!-- WT Shifts -->
+    <!-- Lane 0 (Sara) -->
+    <rect x="208" y="189" width="54" height="132" rx="12" fill="#DBEAFE" stroke="#9BBFFC"/>
+    <text x="235" y="207" fill="#1D4ED8">Sara</text>
+    
+    <!-- Lane 1 (Lena) -->
+    <rect x="268" y="189" width="54" height="132" rx="12" fill="#DBEAFE" stroke="#9BBFFC"/>
+    <text x="295" y="207" fill="#1D4ED8">Lena</text>
+    
+    <!-- Lane 0 Bottom (Michał) -->
+    <rect x="208" y="273" width="54" height="104" rx="12" fill="#FEF3C7" stroke="#FDC86B"/>
+    <text x="235" y="291" fill="#B45309">Michał</text>
+    
+    <!-- Lane 1 Bottom (Ewa) -->
+    <rect x="268" y="273" width="54" height="104" rx="12" fill="#FEF3C7" stroke="#FDC86B"/>
+    <text x="295" y="291" fill="#B45309">Ewa</text>
+    
+    <!-- ŚR Shifts -->
+    <!-- Lane 0 (Igor) -->
+    <rect x="338" y="189" width="54" height="132" rx="12" fill="#DBEAFE" stroke="#9BBFFC"/>
+    <text x="365" y="207" fill="#1D4ED8">Igor</text>
+    
+    <!-- Lane 1 (Julia) -->
+    <rect x="398" y="273" width="54" height="104" rx="12" fill="#FEF3C7" stroke="#FDC86B"/>
+    <text x="425" y="291" fill="#B45309">Julia</text>
+    
+    <!-- CZW 3 Lanes: Marta, Dawid, Anna -->
+    <rect x="468" y="133" width="36" height="188" rx="10" fill="#DBF5E7" stroke="#7AD7AB"/>
+    <text x="486" y="151" fill="#166534" font-size="8">Marta</text>
+    
+    <rect x="509" y="133" width="36" height="188" rx="10" fill="#DBF5E7" stroke="#7AD7AB"/>
+    <text x="527" y="151" fill="#166534" font-size="8">Dawid</text>
+    
+    <rect x="550" y="133" width="36" height="188" rx="10" fill="#DBF5E7" stroke="#7AD7AB"/>
+    <text x="568" y="151" fill="#166534" font-size="8">Anna</text>
+    
+    <!-- SOB: Kasia -->
+    <rect x="728" y="189" width="114" height="132" rx="12" fill="#EEE5FF" stroke="#C8B5FF"/>
+    <text x="785" y="207" fill="#7C3AED">Kasia</text>
+    
+    <!-- ND: Karolina -->
+    <rect x="858" y="245" width="114" height="104" rx="12" fill="#EEE5FF" stroke="#C8B5FF"/>
+    <text x="915" y="263" fill="#7C3AED">Karolina</text>
+  </g>
+</svg>

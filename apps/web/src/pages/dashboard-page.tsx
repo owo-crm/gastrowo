@@ -17,22 +17,25 @@ import {
   Gauge,
   MapPinned,
   ReceiptText,
+  Trash2,
   TrendingUp,
   Users2,
   X,
 } from "lucide-react";
 
-import { canViewPayroll } from "@/lib/access";
+import { canDeleteReports, canViewPayroll } from "@/lib/access";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { OverlayPortal } from "@/components/ui/overlay-portal";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { parseLocalIso, toLocalIso } from "@/lib/date";
 import { fileToDataUrl } from "@/lib/file";
+import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
@@ -103,8 +106,8 @@ function formatMoneyShort(value: number) {
 }
 
 function formatChangeText(value: number | null) {
-  if (value === null || Number.isNaN(value)) return "No comparison yet";
-  return `${Math.abs(value).toFixed(1)}% vs yesterday`;
+  if (value === null || Number.isNaN(value)) return "";
+  return `${Math.abs(value).toFixed(1)}%`;
 }
 
 function toneClasses(tone: Tone) {
@@ -151,31 +154,31 @@ function toneClasses(tone: Tone) {
 function laborState(percent: number | null) {
   if (percent === null) {
     return {
-      label: "No revenue yet",
-      helper: "Save revenue first to calculate labor share.",
+      label: "dashboard.labor_state_empty",
+      helper: "dashboard.labor_state_empty_helper",
       tone: "bg-slate-100 text-slate-700",
       icon: AlertCircle,
     };
   }
   if (percent >= 40) {
     return {
-      label: "Critical",
-      helper: "Labor is above the 40% control line.",
+      label: "dashboard.labor_state_critical",
+      helper: "dashboard.labor_state_critical_helper",
       tone: "bg-rose-100 text-rose-700",
       icon: AlertCircle,
     };
   }
   if (percent >= 30) {
     return {
-      label: "Watch",
-      helper: "Labor is above the 30% warning line.",
+      label: "dashboard.labor_state_watch",
+      helper: "dashboard.labor_state_watch_helper",
       tone: "bg-amber-100 text-amber-700",
       icon: AlertCircle,
     };
   }
   return {
-    label: "Healthy",
-    helper: "Labor stays inside the healthy band.",
+    label: "dashboard.labor_state_healthy",
+    helper: "dashboard.labor_state_healthy_helper",
     tone: "bg-emerald-100 text-emerald-700",
     icon: CheckCircle2,
   };
@@ -189,6 +192,8 @@ function DashboardStatCard({
   tone,
   icon: Icon,
   delay,
+  noChangeLabel,
+  vsYesterdayLabel,
 }: {
   label: string;
   value: string;
@@ -197,6 +202,8 @@ function DashboardStatCard({
   tone: Tone;
   icon: typeof Coins;
   delay: number;
+  noChangeLabel: string;
+  vsYesterdayLabel: string;
 }) {
   const palette = toneClasses(tone);
   const isUp = (change ?? 0) >= 0;
@@ -223,7 +230,9 @@ function DashboardStatCard({
       <div className="mt-6 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1.5">
           {change === null ? null : isUp ? <ArrowUp className="size-3.5 text-emerald-600" /> : <ArrowDown className="size-3.5 text-rose-600" />}
-          <p className={cn("text-xs font-semibold", change === null ? "text-slate-500" : isUp ? "text-emerald-600" : "text-rose-600")}>{formatChangeText(change)}</p>
+          <p className={cn("text-xs font-semibold", change === null ? "text-slate-500" : isUp ? "text-emerald-600" : "text-rose-600")}>
+            {change === null ? noChangeLabel : `${formatChangeText(change)} ${vsYesterdayLabel}`}
+          </p>
         </div>
         <span className={cn("h-1.5 w-14 rounded-full", palette.line)} />
       </div>
@@ -237,12 +246,14 @@ function FocusTile({
   helper,
   tone,
   icon: Icon,
+  t: _t,
 }: {
   label: string;
   value: string;
   helper: string;
   tone: Tone;
   icon: typeof Gauge;
+  t: (key: string, params?: Record<string, string | number | null | undefined>) => string;
 }) {
   const palette = toneClasses(tone);
   return (
@@ -263,6 +274,7 @@ function FocusTile({
 
 export function DashboardPage() {
   const { token, me } = useAuth();
+  const { t } = useLanguage();
   const toast = useToast();
   const queryClient = useQueryClient();
   const [periodMode, setPeriodMode] = useState<PeriodMode>("weekly");
@@ -320,10 +332,22 @@ export function DashboardPage() {
       setReportPhotoName("");
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      toast.success("Report saved");
+      toast.success(t("report.saved"));
     },
     onError: (error) => {
-      toast.error("Failed to save report", error instanceof Error ? error.message : undefined);
+      toast.error(t("report.save_failed"), error instanceof Error ? error.message : undefined);
+    },
+  });
+
+  const deleteReportMutation = useMutation({
+    mutationFn: (reportId: string) => api.deleteRevenueReport(token!, reportId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      toast.success(t("dashboard.report_deleted"));
+    },
+    onError: (error) => {
+      toast.error(t("dashboard.report_delete_failed"), error instanceof Error ? error.message : undefined);
     },
   });
 
@@ -415,41 +439,46 @@ export function DashboardPage() {
   const laborStateData = laborState(laborCostPercent);
   const StatusIcon = laborStateData.icon;
   const topLocation = locationRevenue[0];
+  const allowReportDelete = canDeleteReports(me);
 
   return (
     <AppShell
-      title="Overview"
-      subtitle="Operational finance and reporting in one place."
+      title={t("dashboard.title")}
+      subtitle={t("dashboard.subtitle")}
       action={
         canViewPayroll(me) ? (
           <Button onClick={() => setPayrollOpen(true)} className="transition-all duration-200 hover:shadow-lg">
-            <CreditCard className="size-4" /> Payroll
+            <CreditCard className="size-4" /> {t("dashboard.payroll")}
           </Button>
         ) : undefined
       }
     >
       <div className="space-y-4 sm:space-y-5 lg:space-y-6">
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <DashboardStatCard label="Revenue today" value={formatMoneyShort(todayRevenue)} unit="PLN" change={revenueChange} tone="emerald" icon={Coins} delay={0} />
+          <DashboardStatCard label={t("dashboard.revenue_today")} value={formatMoneyShort(todayRevenue)} unit="PLN" change={revenueChange} tone="emerald" icon={Coins} delay={0} noChangeLabel={t("dashboard.no_comparison")} vsYesterdayLabel={t("dashboard.vs_yesterday")} />
           <DashboardStatCard
-            label="Labor cost today"
+            label={t("dashboard.labor_cost_today")}
             value={todayLaborPct === null ? "--" : todayLaborPct.toFixed(1)}
             unit={todayLaborPct === null ? undefined : "%"}
             change={laborPctChange}
             tone="rose"
             icon={TrendingUp}
             delay={90}
+            noChangeLabel={t("dashboard.no_comparison")}
+            vsYesterdayLabel={t("dashboard.vs_yesterday")}
           />
           <DashboardStatCard
-            label="Revenue / staff hour"
+            label={t("dashboard.revenue_per_staff_hour")}
             value={todayRevenuePerHour === null ? "--" : todayRevenuePerHour.toFixed(1)}
             unit={todayRevenuePerHour === null ? undefined : "PLN/h"}
             change={revenuePerHourChange}
             tone="blue"
             icon={Users2}
             delay={180}
+            noChangeLabel={t("dashboard.no_comparison")}
+            vsYesterdayLabel={t("dashboard.vs_yesterday")}
           />
-          <DashboardStatCard label="Confirmed hours" value={todayConfirmedHours.toFixed(1)} unit="h" change={hoursChange} tone="violet" icon={Clock3} delay={270} />
+          <DashboardStatCard label={t("dashboard.confirmed_hours")} value={todayConfirmedHours.toFixed(1)} unit="h" change={hoursChange} tone="violet" icon={Clock3} delay={270} noChangeLabel={t("dashboard.no_comparison")} vsYesterdayLabel={t("dashboard.vs_yesterday")} />
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_360px]">
@@ -457,9 +486,9 @@ export function DashboardPage() {
             <div className="border-b border-slate-200/80 bg-[linear-gradient(135deg,#f8fbff_0%,#ffffff_48%,#f3fff6_100%)] px-4 py-4 sm:px-5 sm:py-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Revenue analytics</p>
-                  <h2 className="mt-2 text-[1.6rem] font-bold tracking-[-0.06em] text-slate-950 sm:text-[1.95rem]">Overview for {period.label}</h2>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Use one range to compare revenue and labor, then jump straight into payroll or report capture.</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">{t("dashboard.revenue_analytics")}</p>
+                  <h2 className="mt-2 text-[1.6rem] font-bold tracking-[-0.06em] text-slate-950 sm:text-[1.95rem]">{t("dashboard.overview_for", { period: period.label })}</h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{t("dashboard.analytics_body")}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                   <div className="inline-flex items-center gap-1 rounded-[0.9rem] border border-slate-200 bg-white px-1 py-1 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
@@ -471,7 +500,7 @@ export function DashboardPage() {
                         periodMode === "weekly" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950",
                       )}
                     >
-                      Weekly
+                      {t("dashboard.weekly")}
                     </button>
                     <button
                       type="button"
@@ -481,7 +510,7 @@ export function DashboardPage() {
                         periodMode === "monthly" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950",
                       )}
                     >
-                      Monthly
+                      {t("dashboard.monthly")}
                     </button>
                   </div>
                   <div className="inline-flex items-center gap-2 rounded-[0.9rem] border border-slate-200 bg-white px-2 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
@@ -498,19 +527,19 @@ export function DashboardPage() {
 
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-[1rem] border border-blue-100 bg-white/90 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Total revenue</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{t("dashboard.total_revenue")}</p>
                   <p className="mt-2 text-2xl font-bold tracking-[-0.06em] text-emerald-700">{formatMoneyShort(totalRevenue)}</p>
-                  <p className="mt-1 text-xs font-semibold text-emerald-600">PLN in range</p>
+                  <p className="mt-1 text-xs font-semibold text-emerald-600">{t("dashboard.pln_in_range")}</p>
                 </div>
                 <div className="rounded-[1rem] border border-rose-100 bg-white/90 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Labor cost</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{t("dashboard.labor_cost")}</p>
                   <p className="mt-2 text-2xl font-bold tracking-[-0.06em] text-rose-700">{formatMoneyShort(totalLabor)}</p>
-                  <p className="mt-1 text-xs font-semibold text-rose-600">PLN booked from assignments</p>
+                  <p className="mt-1 text-xs font-semibold text-rose-600">{t("dashboard.pln_booked_assignments")}</p>
                 </div>
                 <div className="rounded-[1rem] border border-emerald-100 bg-white/90 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Revenue / staff hour</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{t("dashboard.revenue_per_staff_hour")}</p>
                   <p className="mt-2 text-2xl font-bold tracking-[-0.06em] text-blue-700">{revenuePerConfirmedHour === null ? "--" : revenuePerConfirmedHour.toFixed(1)}</p>
-                  <p className="mt-1 text-xs font-semibold text-blue-600">{revenuePerConfirmedHour === null ? "No confirmed hours yet" : "PLN per confirmed hour"}</p>
+                  <p className="mt-1 text-xs font-semibold text-blue-600">{revenuePerConfirmedHour === null ? t("dashboard.no_confirmed_hours_yet") : t("dashboard.pln_per_confirmed_hour")}</p>
                 </div>
               </div>
             </div>
@@ -518,12 +547,12 @@ export function DashboardPage() {
               <div className="flex h-[280px] flex-col rounded-[1.25rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-3 sm:h-[360px] sm:p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-lg font-bold tracking-[-0.04em] text-slate-950">Revenue trend</p>
-                    <p className="text-sm text-slate-500">Monthly performance versus labor cost.</p>
+                    <p className="text-lg font-bold tracking-[-0.04em] text-slate-950">{t("dashboard.revenue_trend")}</p>
+                    <p className="text-sm text-slate-500">{t("dashboard.revenue_trend_description")}</p>
                   </div>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="inline-flex items-center gap-2 text-slate-600"><span className="size-2.5 rounded-full bg-[#2563eb]" /> Revenue</span>
-                    <span className="inline-flex items-center gap-2 text-slate-600"><span className="size-2.5 rounded-full bg-[#ef4444]" /> Labor cost</span>
+                    <span className="inline-flex items-center gap-2 text-slate-600"><span className="size-2.5 rounded-full bg-[#2563eb]" /> {t("dashboard.revenue")}</span>
+                    <span className="inline-flex items-center gap-2 text-slate-600"><span className="size-2.5 rounded-full bg-[#ef4444]" /> {t("dashboard.labor_cost")}</span>
                   </div>
                 </div>
                 <div className="min-h-0 flex-1">
@@ -566,21 +595,21 @@ export function DashboardPage() {
           <div className="space-y-4">
             <Card className="animate-slide-in border border-slate-200/80 bg-white shadow-[0_22px_50px_rgba(15,23,42,0.06)]" style={{ animationDelay: "240ms" }}>
               <CardHeader className="pb-3">
-                <CardTitle className="text-xl tracking-[-0.04em]">Operations focus</CardTitle>
-                <CardDescription>Fast signals for labor pressure, payroll exposure, and pending review work.</CardDescription>
+                <CardTitle className="text-xl tracking-[-0.04em]">{t("dashboard.operations_focus")}</CardTitle>
+                <CardDescription>{t("dashboard.operations_focus_description")}</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                <FocusTile label="Labor cost" value={laborCostPercent === null ? "--" : `${laborCostPercent.toFixed(1)}%`} helper={laborStateData.helper} tone="rose" icon={Gauge} />
-                <FocusTile label="Pending timesheets" value={String(pendingTimesheets)} helper="Review queue waiting for approval or correction." tone="amber" icon={ReceiptText} />
-                <FocusTile label="Payroll in range" value={`${formatMoneyShort(totalPayroll)}`} helper="Projected from approved and corrected timesheets." tone="emerald" icon={CreditCard} />
-                <FocusTile label="Active locations" value={String(locationRevenue.length)} helper={topLocation ? `Top revenue location: ${topLocation.location_name}` : "No location totals in this range."} tone="blue" icon={MapPinned} />
+                <FocusTile label={t("dashboard.labor_cost")} value={laborCostPercent === null ? "--" : `${laborCostPercent.toFixed(1)}%`} helper={t(laborStateData.helper)} tone="rose" icon={Gauge} t={t} />
+                <FocusTile label={t("dashboard.pending_timesheets")} value={String(pendingTimesheets)} helper={t("dashboard.pending_timesheets_helper")} tone="amber" icon={ReceiptText} t={t} />
+                <FocusTile label={t("dashboard.payroll_in_range")} value={`${formatMoneyShort(totalPayroll)}`} helper={t("dashboard.payroll_in_range_helper")} tone="emerald" icon={CreditCard} t={t} />
+                <FocusTile label={t("dashboard.active_locations")} value={String(locationRevenue.length)} helper={topLocation ? t("dashboard.top_revenue_location", { name: topLocation.location_name }) : t("dashboard.no_location_totals")} tone="blue" icon={MapPinned} t={t} />
               </CardContent>
             </Card>
 
             <Card className="animate-slide-in border border-slate-200/80 bg-white shadow-[0_22px_50px_rgba(15,23,42,0.06)]" style={{ animationDelay: "320ms" }}>
               <CardHeader className="pb-3">
-                <CardTitle className="text-xl tracking-[-0.04em]">Revenue by location</CardTitle>
-                <CardDescription>Share of revenue across reporting locations in the selected range.</CardDescription>
+                <CardTitle className="text-xl tracking-[-0.04em]">{t("dashboard.revenue_by_location")}</CardTitle>
+                <CardDescription>{t("dashboard.revenue_by_location_description")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {locationRevenue.map((row, index) => {
@@ -590,7 +619,7 @@ export function DashboardPage() {
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-slate-900">{row.location_name}</p>
-                          <p className="text-xs text-slate-500">{((row.revenueNumber / Math.max(totalRevenue, 1)) * 100).toFixed(1)}% of total revenue</p>
+                          <p className="text-xs text-slate-500">{t("dashboard.percent_of_total_revenue", { percent: ((row.revenueNumber / Math.max(totalRevenue, 1)) * 100).toFixed(1) })}</p>
                         </div>
                         <p className="shrink-0 text-sm font-bold text-slate-900">{row.revenueNumber.toFixed(0)} PLN</p>
                       </div>
@@ -600,7 +629,7 @@ export function DashboardPage() {
                     </div>
                   );
                 })}
-                {!locationRevenue.length ? <p className="text-sm text-slate-500">No location revenue in this range.</p> : null}
+                {!locationRevenue.length ? <p className="text-sm text-slate-500">{t("dashboard.no_location_revenue")}</p> : null}
               </CardContent>
             </Card>
           </div>
@@ -610,11 +639,11 @@ export function DashboardPage() {
           <Card className="animate-slide-in border border-slate-200/80 bg-white shadow-[0_22px_50px_rgba(15,23,42,0.06)]" style={{ animationDelay: "400ms" }}>
             <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
               <div>
-                <CardTitle className="text-xl tracking-[-0.04em]">Recent reports</CardTitle>
-                <CardDescription>Latest revenue submissions saved by the team.</CardDescription>
+                <CardTitle className="text-xl tracking-[-0.04em]">{t("dashboard.recent_reports")}</CardTitle>
+                <CardDescription>{t("dashboard.recent_reports_description")}</CardDescription>
               </div>
               <Button size="sm" variant="secondary" onClick={() => setReportsHistoryOpen(true)} className="h-9 rounded-[0.85rem] px-3">
-                View all
+                {t("dashboard.view_all")}
               </Button>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -627,6 +656,18 @@ export function DashboardPage() {
                   <div className="flex items-center gap-2 shrink-0">
                     <p className="text-sm font-bold text-emerald-700">{item.revenue} PLN</p>
                     {item.photo_url ? <Camera className="size-4 text-slate-400" /> : null}
+                    {allowReportDelete ? (
+                      <button
+                        type="button"
+                        className="grid size-8 place-items-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                        onClick={() => {
+                          if (!window.confirm(t("dashboard.confirm_delete_report", { date: item.report_date }))) return;
+                          deleteReportMutation.mutate(item.id);
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ))}
@@ -637,18 +678,18 @@ export function DashboardPage() {
           <div className="space-y-4">
             <Card className="animate-slide-in overflow-hidden border border-slate-200/80 bg-white shadow-[0_22px_50px_rgba(15,23,42,0.06)]" style={{ animationDelay: "480ms" }}>
               <div className="border-b border-slate-200/80 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_56%,#ecfdf5_100%)] px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Daily report</p>
-                <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">Capture revenue without leaving the dashboard.</h3>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">{t("dashboard.daily_report")}</p>
+                <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">{t("dashboard.daily_report_heading")}</h3>
               </div>
               <CardContent className="space-y-3 p-4">
                 <Select options={locationOptions} value={report.location_id} onChange={(event) => setReport((current) => ({ ...current, location_id: event.target.value }))} />
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                   <Input type="date" value={report.report_date} onChange={(event) => setReport((current) => ({ ...current, report_date: event.target.value }))} className="h-11" />
-                  <Input type="number" min={0} placeholder="Revenue PLN" value={report.revenue} onChange={(event) => setReport((current) => ({ ...current, revenue: event.target.value }))} className="h-11" />
+                  <Input type="number" min={0} placeholder={t("report.revenue_placeholder")} value={report.revenue} onChange={(event) => setReport((current) => ({ ...current, revenue: event.target.value }))} className="h-11" />
                 </div>
                 <label className="inline-flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-[0.95rem] border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 transition hover:border-blue-300 hover:bg-blue-50/50">
                   <FileUp className="size-4 text-blue-600" />
-                  <span className="truncate">{reportPhotoName ? `Selected: ${reportPhotoName}` : "Attach photo evidence"}</span>
+                  <span className="truncate">{reportPhotoName ? t("report.selected_file", { name: reportPhotoName }) : t("dashboard.attach_photo_evidence")}</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -663,7 +704,7 @@ export function DashboardPage() {
                   />
                 </label>
                 <Button onClick={() => addReportMutation.mutate()} disabled={!report.location_id || !report.revenue || addReportMutation.isPending} className="w-full">
-                  Save report
+                  {t("report.save")}
                 </Button>
               </CardContent>
             </Card>
@@ -671,11 +712,11 @@ export function DashboardPage() {
             <Card className="animate-slide-in border border-slate-200/80 bg-white shadow-[0_22px_50px_rgba(15,23,42,0.06)]" style={{ animationDelay: "560ms" }}>
               <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
                 <div>
-                  <CardTitle className="text-xl tracking-[-0.04em]">Top performers</CardTitle>
-                  <CardDescription>Highest confirmed hours in the selected period.</CardDescription>
+                  <CardTitle className="text-xl tracking-[-0.04em]">{t("dashboard.top_performers")}</CardTitle>
+                  <CardDescription>{t("dashboard.top_performers_description")}</CardDescription>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => setWorkersLeaderboardOpen(true)} className="h-9 rounded-[0.85rem] px-3">
-                  View all
+                  {t("dashboard.view_all")}
                 </Button>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -694,11 +735,11 @@ export function DashboardPage() {
                     </div>
                   </div>
                 ))}
-                {!workersLeaderboard.length ? <p className="py-6 text-sm text-slate-500">No workers data.</p> : null}
+                {!workersLeaderboard.length ? <p className="py-6 text-sm text-slate-500">{t("dashboard.no_workers_data")}</p> : null}
                 {payrollMissingButHoursExist ? (
                   <div className="flex items-start gap-2 rounded-[1rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                     <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                    Confirmed hours exist, but payroll rows are temporarily unavailable.
+                    {t("dashboard.payroll_temporarily_unavailable")}
                   </div>
                 ) : null}
               </CardContent>
@@ -707,26 +748,27 @@ export function DashboardPage() {
         </section>
 
         {canViewPayroll(me) && payrollOpen ? (
+          <OverlayPortal>
           <div className="fixed inset-0 z-[1100] bg-slate-900/24 backdrop-blur-sm" role="dialog" aria-modal="true">
             <div className="h-full w-full p-0 sm:p-4 md:p-6">
               <div className="surface-elevated flex h-full w-full flex-col rounded-none sm:rounded-[1.6rem] shadow-[0_20px_60px_rgba(15,23,42,0.15)]">
                 <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-5">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-900">Employee Payroll</h2>
-                    <p className="text-sm text-slate-600">Confirmed timesheets ({period.label})</p>
+                    <h2 className="text-xl font-semibold text-slate-900">{t("dashboard.employee_payroll")}</h2>
+                    <p className="text-sm text-slate-600">{t("dashboard.confirmed_timesheets_period", { period: period.label })}</p>
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => setPayrollOpen(false)} className="transition-all duration-200">
-                    <X className="size-4" /> Close
+                    <X className="size-4" /> {t("common.close")}
                   </Button>
                 </div>
                 <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
                   <div className="hidden min-w-[860px] md:block">
                     <div className="grid grid-cols-[1.8fr_1fr_0.9fr_0.9fr_1fr] gap-2 border-b border-slate-200 px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">
-                      <p>Employee</p>
-                      <p>Position</p>
-                      <p className="text-right">Approved hours</p>
-                      <p className="text-right">Rate</p>
-                      <p className="text-right">Payroll</p>
+                      <p>{t("dashboard.employee")}</p>
+                      <p>{t("dashboard.position")}</p>
+                      <p className="text-right">{t("dashboard.approved_hours")}</p>
+                      <p className="text-right">{t("dashboard.rate")}</p>
+                      <p className="text-right">{t("dashboard.payroll")}</p>
                     </div>
                     {payrollRows.map((row) => (
                       <div key={row.user_id} className="grid grid-cols-[1.8fr_1fr_0.9fr_0.9fr_1fr] items-center gap-2 border-b border-slate-200 px-2 py-2.5 text-sm transition-all duration-200 hover:bg-slate-50">
@@ -735,15 +777,15 @@ export function DashboardPage() {
                           <p className="truncate text-xs text-slate-600">{row.role}</p>
                         </div>
                         <div>
-                          <Badge className="border-slate-200 bg-slate-50 text-slate-700">{row.staff_position ?? "Unassigned"}</Badge>
+                          <Badge className="border-slate-200 bg-slate-50 text-slate-700">{row.staff_position ?? t("dashboard.unassigned")}</Badge>
                         </div>
                         <p className="text-right font-semibold text-slate-900">{Number(row.approved_hours).toFixed(1)}h</p>
                         <p className="text-right text-slate-600">{Number(row.hourly_rate_default_pln).toFixed(2)} PLN/h</p>
                         <p className="text-right font-semibold text-emerald-700">{Number(row.payroll_pln).toFixed(2)} PLN</p>
                       </div>
                     ))}
-                    {payrollMissingButHoursExist ? <p className="px-2 py-6 text-sm text-amber-700">Confirmed hours exist, but payroll rows are temporarily unavailable.</p> : null}
-                    {!payrollRows.length && !payrollMissingButHoursExist ? <p className="px-2 py-6 text-sm text-slate-600">No confirmed timesheets in selected period.</p> : null}
+                    {payrollMissingButHoursExist ? <p className="px-2 py-6 text-sm text-amber-700">{t("dashboard.payroll_temporarily_unavailable")}</p> : null}
+                    {!payrollRows.length && !payrollMissingButHoursExist ? <p className="px-2 py-6 text-sm text-slate-600">{t("dashboard.no_confirmed_timesheets")}</p> : null}
                   </div>
                   <div className="space-y-3 md:hidden">
                     {payrollRows.map((row) => (
@@ -753,44 +795,46 @@ export function DashboardPage() {
                             <p className="truncate font-semibold text-slate-900">{row.full_name}</p>
                             <p className="mt-1 text-xs text-slate-600">{row.role}</p>
                           </div>
-                          <Badge className="border-slate-200 bg-slate-50 text-slate-700">{row.staff_position ?? "Unassigned"}</Badge>
+                          <Badge className="border-slate-200 bg-slate-50 text-slate-700">{row.staff_position ?? t("dashboard.unassigned")}</Badge>
                         </div>
                         <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
                           <div>
-                            <p className="text-[11px] uppercase tracking-[0.12em] text-slate-600">Hours</p>
+                            <p className="text-[11px] uppercase tracking-[0.12em] text-slate-600">{t("dashboard.hours")}</p>
                             <p className="mt-1 font-semibold text-slate-900">{Number(row.approved_hours).toFixed(1)}h</p>
                           </div>
                           <div>
-                            <p className="text-[11px] uppercase tracking-[0.12em] text-slate-600">Rate</p>
+                            <p className="text-[11px] uppercase tracking-[0.12em] text-slate-600">{t("dashboard.rate")}</p>
                             <p className="mt-1 text-slate-600">{Number(row.hourly_rate_default_pln).toFixed(2)} PLN/h</p>
                           </div>
                           <div>
-                            <p className="text-[11px] uppercase tracking-[0.12em] text-slate-600">Payroll</p>
+                            <p className="text-[11px] uppercase tracking-[0.12em] text-slate-600">{t("dashboard.payroll")}</p>
                             <p className="mt-1 font-semibold text-emerald-700">{Number(row.payroll_pln).toFixed(2)} PLN</p>
                           </div>
                         </div>
                       </div>
                     ))}
-                    {payrollMissingButHoursExist ? <p className="py-6 text-sm text-amber-700">Confirmed hours exist, but payroll rows are temporarily unavailable.</p> : null}
-                    {!payrollRows.length && !payrollMissingButHoursExist ? <p className="py-6 text-sm text-slate-600">No confirmed timesheets in selected period.</p> : null}
+                    {payrollMissingButHoursExist ? <p className="py-6 text-sm text-amber-700">{t("dashboard.payroll_temporarily_unavailable")}</p> : null}
+                    {!payrollRows.length && !payrollMissingButHoursExist ? <p className="py-6 text-sm text-slate-600">{t("dashboard.no_confirmed_timesheets")}</p> : null}
                   </div>
                 </div>
               </div>
             </div>
           </div>
+          </OverlayPortal>
         ) : null}
 
         {workersLeaderboardOpen ? (
+          <OverlayPortal>
           <div className="fixed inset-0 z-[1100] bg-slate-900/24 backdrop-blur-sm" role="dialog" aria-modal="true">
             <div className="h-full w-full p-0 sm:p-4 md:p-6">
               <div className="surface-elevated flex h-full w-full flex-col rounded-none sm:rounded-[1.6rem] shadow-[0_20px_60px_rgba(15,23,42,0.15)]">
                 <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-5">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-900">Top performers</h2>
-                    <p className="text-sm text-slate-600">By confirmed hours ({period.label})</p>
+                    <h2 className="text-xl font-semibold text-slate-900">{t("dashboard.top_performers")}</h2>
+                    <p className="text-sm text-slate-600">{t("dashboard.by_confirmed_hours", { period: period.label })}</p>
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => setWorkersLeaderboardOpen(false)} className="transition-all duration-200">
-                    <X className="size-4" /> Close
+                    <X className="size-4" /> {t("common.close")}
                   </Button>
                 </div>
                 <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
@@ -801,34 +845,36 @@ export function DashboardPage() {
                           <span className="text-lg font-bold text-slate-400 w-8 text-center">#{idx + 1}</span>
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-slate-900 truncate">{row.full_name}</p>
-                            <p className="text-xs text-slate-600">{row.staff_position ?? "Unassigned"}</p>
+                            <p className="text-xs text-slate-600">{row.staff_position ?? t("dashboard.unassigned")}</p>
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0">
                           <p className="text-lg font-bold text-emerald-700">{row.hoursNumber.toFixed(1)}</p>
-                          <p className="text-xs text-slate-600">hours</p>
+                          <p className="text-xs text-slate-600">{t("dashboard.hours")}</p>
                         </div>
                       </div>
                     ))}
-                    {!workersLeaderboard.length ? <p className="py-6 text-center text-sm text-slate-600">No workers data.</p> : null}
+                    {!workersLeaderboard.length ? <p className="py-6 text-center text-sm text-slate-600">{t("dashboard.no_workers_data")}</p> : null}
                   </div>
                 </div>
               </div>
             </div>
           </div>
+          </OverlayPortal>
         ) : null}
 
         {reportsHistoryOpen ? (
+          <OverlayPortal>
           <div className="fixed inset-0 z-[1100] bg-slate-900/24 backdrop-blur-sm" role="dialog" aria-modal="true">
             <div className="h-full w-full p-0 sm:p-4 md:p-6">
               <div className="surface-elevated flex h-full w-full flex-col rounded-none sm:rounded-[1.6rem] shadow-[0_20px_60px_rgba(15,23,42,0.15)]">
                 <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-5">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-900">Reports history</h2>
-                    <p className="text-sm text-slate-600">All revenue reports ({period.label})</p>
+                    <h2 className="text-xl font-semibold text-slate-900">{t("dashboard.reports_history")}</h2>
+                    <p className="text-sm text-slate-600">{t("dashboard.all_revenue_reports", { period: period.label })}</p>
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => setReportsHistoryOpen(false)} className="transition-all duration-200">
-                    <X className="size-4" /> Close
+                    <X className="size-4" /> {t("common.close")}
                   </Button>
                 </div>
                 <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
@@ -846,15 +892,28 @@ export function DashboardPage() {
                               <Eye className="size-4" />
                             </a>
                           ) : null}
+                          {allowReportDelete ? (
+                            <button
+                              type="button"
+                              className="grid size-8 place-items-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                              onClick={() => {
+                                if (!window.confirm(t("dashboard.confirm_delete_report", { date: item.report_date }))) return;
+                                deleteReportMutation.mutate(item.id);
+                              }}
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          ) : null}
                         </div>
                       </div>
                     ))}
-                    {!allReports.length ? <p className="py-6 text-center text-sm text-slate-600">No reports yet.</p> : null}
+                    {!allReports.length ? <p className="py-6 text-center text-sm text-slate-600">{t("dashboard.no_reports_yet")}</p> : null}
                   </div>
                 </div>
               </div>
             </div>
           </div>
+          </OverlayPortal>
         ) : null}
       </div>
     </AppShell>

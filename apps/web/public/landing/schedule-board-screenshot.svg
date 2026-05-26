@@ -1,0 +1,117 @@
+<svg width="1500" height="760" viewBox="0 0 1500 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="1" y="1" width="1498" height="758" rx="28" fill="#FEFFFF" stroke="#DEE7F2" stroke-width="2"/>
+  <rect x="78" y="28" width="1078" height="122" rx="0" fill="#EEF3FB"/>
+  <rect x="1156" y="28" width="266" height="122" fill="#FAFCFF"/>
+  <line x1="78" y1="150.5" x2="1422" y2="150.5" stroke="#DCE5F0"/>
+  <line x1="78" y1="214.5" x2="1422" y2="214.5" stroke="#DCE5F0"/>
+  <line x1="78" y1="278.5" x2="1422" y2="278.5" stroke="#DCE5F0"/>
+  <line x1="78" y1="342.5" x2="1422" y2="342.5" stroke="#DCE5F0"/>
+  <line x1="78" y1="406.5" x2="1422" y2="406.5" stroke="#DCE5F0"/>
+  <line x1="78" y1="470.5" x2="1422" y2="470.5" stroke="#DCE5F0"/>
+  <line x1="78" y1="534.5" x2="1422" y2="534.5" stroke="#DCE5F0"/>
+  <line x1="78" y1="598.5" x2="1422" y2="598.5" stroke="#DCE5F0"/>
+  <line x1="78" y1="662.5" x2="1422" y2="662.5" stroke="#DCE5F0"/>
+  <line x1="78" y1="726.5" x2="1422" y2="726.5" stroke="#DCE5F0"/>
+
+  <line x1="78.5" y1="150" x2="78.5" y2="726" stroke="#DCE5F0"/>
+  <line x1="166.5" y1="150" x2="166.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="255.5" y1="150" x2="255.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="344.5" y1="150" x2="344.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="432.5" y1="150" x2="432.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="521.5" y1="150" x2="521.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="610.5" y1="150" x2="610.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="698.5" y1="150" x2="698.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="787.5" y1="150" x2="787.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="876.5" y1="150" x2="876.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="964.5" y1="150" x2="964.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="1053.5" y1="150" x2="1053.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="1142.5" y1="150" x2="1142.5" y2="726" stroke="#DCE5F0"/>
+  <line x1="1230.5" y1="150" x2="1230.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="1319.5" y1="150" x2="1319.5" y2="726" stroke="#E4EBF4"/>
+  <line x1="1408.5" y1="150" x2="1408.5" y2="726" stroke="#E4EBF4"/>
+
+  <text x="105" y="73" fill="#5F7698" font-family="Manrope, Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="0.14em">PON</text>
+  <text x="106" y="124" fill="#10254A" font-family="Space Grotesk, Manrope, Arial, sans-serif" font-size="52" font-weight="700">25</text>
+  <circle cx="1119" cy="78" r="19" fill="#FEF9EE" stroke="#D89D1B" stroke-width="2"/>
+  <text x="1111" y="86" fill="#BF6B10" font-family="Manrope, Arial, sans-serif" font-size="26" font-weight="800">!</text>
+  <text x="1178" y="79" fill="#5F7698" font-family="Manrope, Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="0.14em">WT</text>
+  <text x="1178" y="124" fill="#10254A" font-family="Space Grotesk, Manrope, Arial, sans-serif" font-size="52" font-weight="700">26</text>
+
+  <g fill="#667B9C" font-family="Manrope, Arial, sans-serif" font-size="16" font-weight="700">
+    <text x="16" y="182">10:00</text>
+    <text x="16" y="246">11:00</text>
+    <text x="16" y="310">12:00</text>
+    <text x="16" y="374">13:00</text>
+    <text x="16" y="438">14:00</text>
+    <text x="16" y="502">15:00</text>
+    <text x="16" y="566">16:00</text>
+    <text x="16" y="630">17:00</text>
+    <text x="16" y="694">18:00</text>
+  </g>
+
+  <g font-family="Manrope, Arial, sans-serif" font-size="16" font-weight="700" fill="#1E2D45">
+    <rect x="166" y="150" width="88" height="384" fill="#FBE9C7" stroke="#F0BE64"/>
+    <text x="178" y="182">Tomek</text><text x="178" y="246">Tomek</text><text x="178" y="310">Tomek</text><text x="178" y="374">Tomek</text><text x="178" y="438">Tomek</text><text x="178" y="502">Tomek</text><text x="178" y="566">Tomek</text><text x="178" y="630">Tomek</text><text x="178" y="694">Tomek</text>
+
+    <rect x="255" y="150" width="88" height="384" fill="#FBE9C7" stroke="#F0BE64"/>
+    <text x="267" y="182">Kamil</text><text x="267" y="246">Kamil</text><text x="267" y="310">Kamil</text><text x="267" y="374">Kamil</text><text x="267" y="438">Kamil</text><text x="267" y="502">Kamil</text><text x="267" y="566">Kamil</text><text x="267" y="630">Kamil</text><text x="267" y="694">Kamil</text>
+
+    <rect x="344" y="150" width="88" height="384" fill="#FBE9C7" stroke="#F0BE64"/>
+    <text x="365" y="182">Ola</text><text x="365" y="246">Ola</text><text x="365" y="310">Ola</text><text x="365" y="374">Ola</text><text x="365" y="438">Ola</text><text x="365" y="502">Ola</text><text x="365" y="566">Ola</text><text x="365" y="630">Ola</text><text x="365" y="694">Ola</text>
+
+    <rect x="432" y="342" width="88" height="384" fill="#FBE9C7" stroke="#F0BE64"/>
+    <text x="438" y="374">Michal</text><text x="438" y="438">Michal</text><text x="438" y="502">Michal</text><text x="438" y="566">Michal</text><text x="438" y="630">Michal</text><text x="438" y="694">Michal</text>
+
+    <rect x="521" y="342" width="88" height="384" fill="#FBE9C7" stroke="#F0BE64"/>
+    <text x="528" y="374">Ewa</text><text x="528" y="438">Ewa</text><text x="528" y="502">Ewa</text><text x="528" y="566">Ewa</text><text x="528" y="630">Ewa</text><text x="528" y="694">Ewa</text>
+
+    <rect x="610" y="342" width="88" height="384" fill="#FBE9C7" stroke="#F0BE64"/>
+    <text x="617" y="374">Julia</text><text x="617" y="438">Julia</text><text x="617" y="502">Julia</text><text x="617" y="566">Julia</text><text x="617" y="630">Julia</text><text x="617" y="694">Julia</text>
+
+    <rect x="699" y="214" width="88" height="352" fill="#D6E5FB" stroke="#8CB6FF"/>
+    <text x="708" y="246">Sara</text><text x="708" y="270">Bartek</text><text x="708" y="310">Sara</text><text x="708" y="334">Bartek</text><text x="708" y="374">Sara</text><text x="708" y="398">Bartek</text><text x="708" y="438">Sara</text><text x="708" y="462">Bartek</text><text x="708" y="502">Sara</text><text x="708" y="526">Bartek</text><text x="708" y="566">Sara</text><text x="708" y="590">Bartek</text>
+
+    <rect x="788" y="214" width="88" height="352" fill="#D6E5FB" stroke="#8CB6FF"/>
+    <text x="798" y="246">Lena</text><text x="798" y="270">Nina</text><text x="798" y="310">Lena</text><text x="798" y="334">Nina</text><text x="798" y="374">Lena</text><text x="798" y="398">Nina</text><text x="798" y="438">Lena</text><text x="798" y="462">Nina</text><text x="798" y="502">Lena</text><text x="798" y="526">Nina</text><text x="798" y="566">Lena</text><text x="798" y="590">Nina</text>
+
+    <rect x="877" y="214" width="88" height="352" fill="#D6E5FB" stroke="#8CB6FF"/>
+    <text x="887" y="246">Igor</text><text x="887" y="270">Paulina</text><text x="887" y="310">Igor</text><text x="887" y="334">Paulina</text><text x="887" y="374">Igor</text><text x="887" y="398">Paulina</text><text x="887" y="438">Igor</text><text x="887" y="462">Paulina</text><text x="887" y="502">Igor</text><text x="887" y="526">Paulina</text><text x="887" y="566">Igor</text><text x="887" y="590">Paulina</text>
+
+    <rect x="965" y="150" width="88" height="384" fill="#CFEDE7" stroke="#82D7C6"/>
+    <text x="973" y="182">Marta</text><text x="973" y="246">Marta</text><text x="973" y="310">Marta</text><text x="973" y="374">Marta</text><text x="973" y="438">Marta</text><text x="973" y="502">Marta</text><text x="973" y="566">Marta</text><text x="973" y="630">Marta</text><text x="973" y="694">Marta</text>
+
+    <rect x="1054" y="150" width="88" height="384" fill="#CFEDE7" stroke="#82D7C6"/>
+    <text x="1063" y="182">Dawid</text><text x="1063" y="246">Dawid</text><text x="1063" y="310">Dawid</text><text x="1063" y="374">Dawid</text><text x="1063" y="438">Dawid</text><text x="1063" y="502">Dawid</text><text x="1063" y="566">Dawid</text><text x="1063" y="630">Dawid</text><text x="1063" y="694">Dawid</text>
+
+    <rect x="1143" y="150" width="88" height="384" fill="#CFEDE7" stroke="#82D7C6"/>
+    <text x="1152" y="182">Anna</text><text x="1152" y="246">Anna</text><text x="1152" y="310">Anna</text><text x="1152" y="374">Anna</text><text x="1152" y="438">Anna</text><text x="1152" y="502">Anna</text><text x="1152" y="566">Anna</text><text x="1152" y="630">Anna</text><text x="1152" y="694">Anna</text>
+
+    <rect x="1231" y="150" width="88" height="384" fill="#FBE9C7" stroke="#F0BE64"/>
+    <text x="1240" y="182">Ewa</text><text x="1240" y="246">Ewa</text><text x="1240" y="310">Ewa</text><text x="1240" y="374">Ewa</text><text x="1240" y="438">Ewa</text><text x="1240" y="502">Ewa</text><text x="1240" y="566">Ewa</text><text x="1240" y="630">Ewa</text><text x="1240" y="694">Ewa</text>
+
+    <rect x="1320" y="150" width="88" height="384" fill="#FBE9C7" stroke="#F0BE64"/>
+    <text x="1327" y="182">Tomek</text><text x="1327" y="246">Tomek</text><text x="1327" y="310">Tomek</text><text x="1327" y="374">Tomek</text><text x="1327" y="438">Tomek</text><text x="1327" y="502">Tomek</text><text x="1327" y="566">Tomek</text><text x="1327" y="630">Tomek</text><text x="1327" y="694">Tomek</text>
+  </g>
+
+  <rect x="58" y="548" width="328" height="170" rx="22" fill="white" stroke="#DEE7F2" stroke-width="2"/>
+  <rect x="401" y="548" width="328" height="170" rx="22" fill="white" stroke="#DEE7F2" stroke-width="2"/>
+  <rect x="744" y="548" width="328" height="170" rx="22" fill="white" stroke="#DEE7F2" stroke-width="2"/>
+  <rect x="1087" y="548" width="328" height="170" rx="22" fill="white" stroke="#DEE7F2" stroke-width="2"/>
+  <g font-family="Manrope, Arial, sans-serif">
+    <text x="78" y="585" fill="#5F7698" font-size="14" font-weight="800" letter-spacing="0.12em">PRZYCHÓD DZISIAJ</text>
+    <text x="78" y="633" fill="#13243E" font-size="28" font-weight="800">12450 PLN</text>
+    <text x="78" y="676" fill="#6E7F99" font-size="16" font-weight="600">vs wczoraj +10%</text>
+
+    <text x="421" y="585" fill="#5F7698" font-size="14" font-weight="800" letter-spacing="0.12em">KOSZT PRACY</text>
+    <text x="421" y="633" fill="#13243E" font-size="28" font-weight="800">28,6%</text>
+    <text x="421" y="676" fill="#6E7F99" font-size="16" font-weight="600">3 560 PLN</text>
+
+    <text x="764" y="585" fill="#5F7698" font-size="14" font-weight="800" letter-spacing="0.12em">ŚR. PRZYCHÓD NA H</text>
+    <text x="764" y="633" fill="#13243E" font-size="28" font-weight="800">156 PLN</text>
+    <text x="764" y="676" fill="#6E7F99" font-size="16" font-weight="600">80,0 h</text>
+
+    <text x="1107" y="585" fill="#5F7698" font-size="14" font-weight="800" letter-spacing="0.12em">PROŚBY O ZMIANY</text>
+    <text x="1107" y="633" fill="#13243E" font-size="28" font-weight="800">5</text>
+    <text x="1107" y="676" fill="#6E7F99" font-size="16" font-weight="600">Do akceptacji</text>
+  </g>
+</svg>

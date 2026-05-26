@@ -244,9 +244,11 @@ def test_scheduler_requires_availability_window_coverage(db_session):
 
     plan = plan_week_schedule(db_session, org.id, monday)
 
-    assert plan.created_assignments == 1
+    assert plan.created_assignments == 0
     assert plan.apply_blocked is False
-    assert len(plan.start_coverage_alerts) == 0
+    assert len(plan.open_shifts) == 1
+    assert len(plan.start_coverage_alerts) == 1
+    assert any(candidate.reasons == ["availability_window_mismatch"] for candidate in plan.rejected_candidates)
 
 
 def test_collect_assignment_validation_issues_flags_employee_constraints(db_session):
@@ -433,7 +435,7 @@ def test_apply_is_not_blocked_when_shift_is_assigned_even_if_availability_starts
 
     plan = plan_week_schedule(db_session, org.id, monday)
     assert plan.apply_blocked is False
-    assert len(plan.start_coverage_alerts) == 0
+    assert len(plan.start_coverage_alerts) == 1
 
     applied_plan = apply_week_schedule(db_session, org.id, monday, manager.id)
     assert applied_plan.created_assignments == 1
