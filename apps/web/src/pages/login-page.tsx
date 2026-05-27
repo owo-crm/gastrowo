@@ -15,6 +15,12 @@ import { cn } from "@/lib/utils";
 type Persona = "owner" | "worker";
 type AuthMode = "onboarding" | "signin";
 type SourceOption = "Google" | "Instagram" | "TikTok" | "Recommendation" | "Friends" | "Other";
+type AuthFieldError = {
+  email?: string;
+  password?: string;
+  code?: string;
+  general?: string;
+};
 
 const sourceOptions: SourceOption[] = ["Google", "Instagram", "TikTok", "Recommendation", "Friends", "Other"];
 
@@ -58,6 +64,7 @@ export function LoginPage() {
   const [passwordLogin, setPasswordLogin] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<AuthFieldError>({});
   const sendInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -83,7 +90,42 @@ export function LoginPage() {
     setSource("");
     setLoginPassword("");
     setPasswordLogin(false);
+    setFieldErrors({});
   };
+
+  const clearFieldError = (field: keyof AuthFieldError) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      return { ...current, [field]: undefined };
+    });
+  };
+
+  const setInlineError = (field: keyof AuthFieldError, message: string) => {
+    setFieldErrors({ [field]: message });
+  };
+
+  const mapAuthError = (error: unknown): { field: keyof AuthFieldError; message: string } => {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "NETWORK_ERROR" || message === "Failed to fetch") {
+      return { field: "general", message: t("login.error.network") };
+    }
+    if (message === "Account with this email was not found") {
+      return { field: "email", message: t("login.error.email_not_found") };
+    }
+    if (message === "Invalid password") {
+      return { field: "password", message: t("login.error.invalid_password") };
+    }
+    if (message === "Email already exists") {
+      return { field: "email", message: t("login.error.email_exists") };
+    }
+    if (message === "Invalid code" || message === "Code expired" || message === "Code already used") {
+      return { field: "code", message: t("login.error.invalid_code") };
+    }
+    return { field: "general", message: message || t("login.error.inline_fallback") };
+  };
+
+  const renderInlineError = (field: keyof AuthFieldError) =>
+    fieldErrors[field] ? <p className="text-sm font-medium text-[var(--color-danger)]">{fieldErrors[field]}</p> : null;
 
   const switchToSignin = () => {
     resetTransientState();
@@ -104,6 +146,7 @@ export function LoginPage() {
     sendInFlightRef.current = true;
     setIsSubmitting(true);
     try {
+      setFieldErrors({});
       setOtpCode("");
       const response = await sendOtp({
         email: effectiveEmail,
@@ -114,7 +157,8 @@ export function LoginPage() {
       setDebugCode(response.debug_code ?? null);
       toast.success(t("login.code_sent"), t("login.code_sent_body", { email: effectiveEmail }));
     } catch (error) {
-      toast.error(t("login.send_failed"), error instanceof Error ? error.message : undefined);
+      const mapped = mapAuthError(error);
+      setInlineError(mapped.field, mapped.message);
     } finally {
       sendInFlightRef.current = false;
       setIsSubmitting(false);
@@ -124,6 +168,7 @@ export function LoginPage() {
   const handleVerifyOnboardingCode = async () => {
     setIsSubmitting(true);
     try {
+      setFieldErrors({});
       const response = await verifyOtp({
         email: effectiveEmail,
         code: otpCode,
@@ -140,7 +185,8 @@ export function LoginPage() {
       setVerificationToken(response.verification_token);
       setStep(3);
     } catch (error) {
-      toast.error(t("login.verify_failed"), error instanceof Error ? error.message : undefined);
+      const mapped = mapAuthError(error);
+      setInlineError(mapped.field, mapped.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -184,10 +230,12 @@ export function LoginPage() {
   const handleVerifyLoginCode = async () => {
     setIsSubmitting(true);
     try {
+      setFieldErrors({});
       await verifyOtp({ email: effectiveEmail, code: otpCode, purpose: "login" });
       toast.success(t("login.sign_in_success"));
     } catch (error) {
-      toast.error(t("login.sign_in_failed"), error instanceof Error ? error.message : undefined);
+      const mapped = mapAuthError(error);
+      setInlineError(mapped.field, mapped.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -196,10 +244,12 @@ export function LoginPage() {
   const handlePasswordLogin = async () => {
     setIsSubmitting(true);
     try {
+      setFieldErrors({});
       await loginWithPassword(effectiveEmail, loginPassword);
       toast.success(t("login.sign_in_success"));
     } catch (error) {
-      toast.error(t("login.password_sign_in_failed"), error instanceof Error ? error.message : undefined);
+      const mapped = mapAuthError(error);
+      setInlineError(mapped.field, mapped.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -208,13 +258,15 @@ export function LoginPage() {
   const handleInviteJoin = async () => {
     setIsSubmitting(true);
     try {
+      setFieldErrors({});
       await verifyInviteJoin({ email: effectiveEmail, code: otpCode, invite_token: inviteToken });
       toast.success(t("login.business_joined"));
       searchParams.delete("token");
       searchParams.delete("email");
       setSearchParams(searchParams, { replace: true });
     } catch (error) {
-      toast.error(t("login.invite_verify_failed"), error instanceof Error ? error.message : undefined);
+      const mapped = mapAuthError(error);
+      setInlineError(mapped.field, mapped.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -231,6 +283,7 @@ export function LoginPage() {
         <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.email")}</label>
         <Input value={effectiveEmail} disabled />
       </div>
+      {renderInlineError("email")}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Button type="button" onClick={() => handleSendCode("invite_join")} disabled={isSubmitting}>
           <Mail className="size-4" /> {t("login.send_code")}
@@ -241,8 +294,19 @@ export function LoginPage() {
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.code_label")}</label>
-            <Input value={otpCode} onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder={t("login.code_placeholder")} />
+            <Input
+              value={otpCode}
+              onChange={(event) => {
+                clearFieldError("code");
+                clearFieldError("general");
+                setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+              }}
+              inputMode="numeric"
+              placeholder={t("login.code_placeholder")}
+            />
           </div>
+          {renderInlineError("code")}
+          {renderInlineError("general")}
           <Button type="button" className="w-full" onClick={handleInviteJoin} disabled={isSubmitting || otpCode.length !== 6}>
             {t("login.join_business")}
           </Button>
@@ -259,14 +323,35 @@ export function LoginPage() {
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.email")}</label>
-        <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("login.email_placeholder")} />
+        <Input
+          type="email"
+          value={email}
+          onChange={(event) => {
+            clearFieldError("email");
+            clearFieldError("general");
+            setEmail(event.target.value);
+          }}
+          placeholder={t("login.email_placeholder")}
+        />
       </div>
+      {renderInlineError("email")}
       {passwordLogin ? (
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.password")}</label>
-            <Input type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} placeholder={t("login.password_placeholder")} />
+            <Input
+              type="password"
+              value={loginPassword}
+              onChange={(event) => {
+                clearFieldError("password");
+                clearFieldError("general");
+                setLoginPassword(event.target.value);
+              }}
+              placeholder={t("login.password_placeholder")}
+            />
           </div>
+          {renderInlineError("password")}
+          {renderInlineError("general")}
           <Button type="button" className="w-full" onClick={handlePasswordLogin} disabled={isSubmitting || !effectiveEmail || !loginPassword}>
             {t("login.signin_with_password")}
           </Button>
@@ -286,8 +371,19 @@ export function LoginPage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.code_label")}</label>
-                <Input value={otpCode} onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder={t("login.code_placeholder")} />
+                <Input
+                  value={otpCode}
+                  onChange={(event) => {
+                    clearFieldError("code");
+                    clearFieldError("general");
+                    setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+                  }}
+                  inputMode="numeric"
+                  placeholder={t("login.code_placeholder")}
+                />
               </div>
+              {renderInlineError("code")}
+              {renderInlineError("general")}
               <Button type="button" className="w-full" onClick={handleVerifyLoginCode} disabled={isSubmitting || otpCode.length !== 6}>
                 {t("login.sign_in")}
               </Button>
@@ -376,8 +472,18 @@ export function LoginPage() {
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.email")}</label>
-            <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("login.email_placeholder")} />
+            <Input
+              type="email"
+              value={email}
+              onChange={(event) => {
+                clearFieldError("email");
+                clearFieldError("general");
+                setEmail(event.target.value);
+              }}
+              placeholder={t("login.email_placeholder")}
+            />
           </div>
+          {renderInlineError("email")}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button type="button" onClick={() => handleSendCode(persona === "owner" ? "owner_signup" : "worker_signup")} disabled={isSubmitting || !effectiveEmail}>
               <Mail className="size-4" /> {t("login.send_code")}
@@ -388,8 +494,19 @@ export function LoginPage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.code_label")}</label>
-                <Input value={otpCode} onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" placeholder={t("login.code_placeholder")} />
+                <Input
+                  value={otpCode}
+                  onChange={(event) => {
+                    clearFieldError("code");
+                    clearFieldError("general");
+                    setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+                  }}
+                  inputMode="numeric"
+                  placeholder={t("login.code_placeholder")}
+                />
               </div>
+              {renderInlineError("code")}
+              {renderInlineError("general")}
               <Button type="button" className="w-full" onClick={handleVerifyOnboardingCode} disabled={isSubmitting || otpCode.length !== 6}>
                 {t("login.verify_code")}
               </Button>

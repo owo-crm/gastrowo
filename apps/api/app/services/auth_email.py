@@ -4,6 +4,7 @@ import json
 import logging
 
 import requests
+from fastapi import HTTPException
 
 from app.core.config import settings
 
@@ -106,7 +107,7 @@ def send_otp_email(*, email: str, code: str, title: str, subtitle: str) -> None:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "from": "noreply@info.owocrm.com",
+                    "from": settings.resend_from_email,
                     "to": email,
                     "subject": title,
                     "html": html,
@@ -116,6 +117,10 @@ def send_otp_email(*, email: str, code: str, title: str, subtitle: str) -> None:
             logger.info("OTP EMAIL SENT -> %s | code=%s | response=%s", email, code, response.json())
         except Exception as exc:
             logger.error("Failed to send OTP email to %s: %s", email, exc, exc_info=True)
+            provider_body = None
+            if isinstance(exc, requests.HTTPError) and exc.response is not None:
+                provider_body = exc.response.text
+            raise HTTPException(status_code=502, detail=f"Failed to send verification email{f': {provider_body}' if provider_body else ''}") from exc
     else:
         logger.info("DEV OTP EMAIL -> %s | code=%s | html=%s", email, code, html)
 
@@ -135,7 +140,7 @@ def send_invite_email(*, email: str, business_name: str, join_link: str) -> None
                     "Content-Type": "application/json",
                 },
                 json={
-                    "from": "noreply@info.owocrm.com",
+                    "from": settings.resend_from_email,
                     "to": email,
                     "subject": f"You were invited to join {business_name}",
                     "html": html,
@@ -145,5 +150,9 @@ def send_invite_email(*, email: str, business_name: str, join_link: str) -> None
             logger.info("INVITE EMAIL SENT -> %s | business=%s | response=%s", email, business_name, response.json())
         except Exception as exc:
             logger.error("Failed to send invite email to %s: %s", email, exc, exc_info=True)
+            provider_body = None
+            if isinstance(exc, requests.HTTPError) and exc.response is not None:
+                provider_body = exc.response.text
+            raise HTTPException(status_code=502, detail=f"Failed to send invite email{f': {provider_body}' if provider_body else ''}") from exc
     else:
         logger.info("DEV INVITE EMAIL -> %s | join_link=%s | html=%s", email, join_link, html)

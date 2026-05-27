@@ -149,7 +149,7 @@ def test_scheduler_ranks_by_priority_then_assigned_hours_and_computes_labor_cost
     assert plan.labor_cost_summary.total_pln == Decimal("280.00")
 
 
-def test_scheduler_can_fallback_beyond_desired_hours_when_no_other_choice(db_session):
+def test_scheduler_leaves_shift_open_when_only_candidate_exceeds_desired_hours(db_session):
     org = Organization(name="Desired Org")
     manager = User(email="mgr@desired.local", full_name="Manager", password_hash="x")
     staff = User(email="staff@desired.local", full_name="Staff", password_hash="x")
@@ -193,9 +193,10 @@ def test_scheduler_can_fallback_beyond_desired_hours_when_no_other_choice(db_ses
 
     plan = plan_week_schedule(db_session, org.id, monday)
 
-    assert plan.created_assignments == 1
-    assert plan.assignments[0].user_id == staff.id
-    assert any("fallback" in warning for warning in plan.warnings)
+    assert plan.created_assignments == 0
+    assert len(plan.open_shifts) == 1
+    assert plan.open_shifts[0].unfilled_count == 1
+    assert any(candidate.reasons == ["desired_hours_cap_exceeded"] for candidate in plan.rejected_candidates)
 
 
 def test_scheduler_requires_availability_window_coverage(db_session):

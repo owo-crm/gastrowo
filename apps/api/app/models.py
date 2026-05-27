@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import Enum
+import hashlib
+import secrets
 import uuid
 
 from sqlalchemy import (
@@ -73,8 +75,46 @@ class OtpPurposeEnum(str, Enum):
     INVITE_JOIN = "invite_join"
 
 
+class NotificationTypeEnum(str, Enum):
+    GENERAL = "general"
+    SCHEDULE = "schedule"
+    TASK = "task"
+    REPORT = "report"
+    SHIFT_REQUEST = "shift_request"
+    TIMESHEET = "timesheet"
+    TEAM = "team"
+    BILLING = "billing"
+
+
+class SubscriptionPlanEnum(str, Enum):
+    FREE = "free"
+    PRO = "pro"
+    BUSINESS = "business"
+    ENTERPRISE = "enterprise"
+
+
+class SubscriptionStatusEnum(str, Enum):
+    TRIALING = "trialing"
+    ACTIVE = "active"
+    PAST_DUE = "past_due"
+    CANCELED = "canceled"
+    EXPIRED = "expired"
+
+
+def enum_values(enum_cls: type[Enum]) -> list[str]:
+    return [str(item.value) for item in enum_cls]
+
+
 def generate_legacy_public_uid() -> str:
     return f"WD{uuid.uuid4().hex[:10].upper()}"
+
+
+def generate_auth_session_token() -> str:
+    return secrets.token_urlsafe(48)
+
+
+def hash_auth_session_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 class User(Base):
@@ -106,6 +146,33 @@ class Organization(Base):
     manager_can_access_notes: Mapped[bool] = mapped_column(Boolean, default=True)
     manager_can_access_inventory: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class OrganizationSubscription(Base):
+    __tablename__ = "organization_subscriptions"
+    __table_args__ = (UniqueConstraint("organization_id", name="uq_org_subscription_organization"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    plan: Mapped[SubscriptionPlanEnum] = mapped_column(
+        SqlEnum(SubscriptionPlanEnum, values_callable=enum_values, native_enum=False),
+        default=SubscriptionPlanEnum.FREE,
+    )
+    status: Mapped[SubscriptionStatusEnum] = mapped_column(
+        SqlEnum(SubscriptionStatusEnum, values_callable=enum_values, native_enum=False),
+        default=SubscriptionStatusEnum.ACTIVE,
+    )
+    billing_cycle: Mapped[str] = mapped_column(String(16), default="monthly")
+    trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    current_period_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
 
 
 class OrganizationMembership(Base):
@@ -166,6 +233,8 @@ class AvailabilityWeek(Base):
     week_start: Mapped[datetime.date] = mapped_column(Date, index=True)
     desired_hours: Mapped[int] = mapped_column(Integer, default=40)
     submitted_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     locked_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
@@ -359,9 +428,26 @@ class InAppNotification(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    type: Mapped[NotificationTypeEnum] = mapped_column(SqlEnum(NotificationTypeEnum), default=NotificationTypeEnum.GENERAL, index=True)
     title: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(Text)
+    action_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    entity_kind: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    entity_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    label: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 

@@ -1,6 +1,6 @@
-import { Boxes, CalendarDays, FileText, FileUp, House, ListTodo, UserCircle2, Users, type LucideIcon } from "lucide-react";
+import { CalendarDays, CreditCard, FileText, FileUp, House, ListTodo, Users, type LucideIcon } from "lucide-react";
 
-import { canAccessInventory, canAccessNotes, canAccessReport, canManageTeam, canViewOverview } from "@/lib/access";
+import { canAccessNotes, canAccessReport, canManageTeam, canViewOverview } from "@/lib/access";
 import type { MeResponse } from "@/lib/types";
 
 export type NavItem = {
@@ -12,19 +12,24 @@ export type NavItem = {
 export function getNavItems(me?: MeResponse | null): NavItem[] {
   const workerBase: NavItem[] = [
     { to: "/schedule", key: "schedule", icon: CalendarDays },
+    { to: "/payroll", key: "payroll", icon: CreditCard },
     { to: "/tasks", key: "tasks", icon: ListTodo },
   ];
-  const managerBase: NavItem[] = [{ to: "/schedule", key: "schedule", icon: CalendarDays }, { to: "/tasks", key: "tasks", icon: ListTodo }];
+  const managerBase: NavItem[] = [
+    { to: "/schedule", key: "schedule", icon: CalendarDays },
+    { to: "/payroll", key: "payroll", icon: CreditCard },
+    { to: "/tasks", key: "tasks", icon: ListTodo },
+  ];
 
   if (me?.role === "ADMIN") {
     return [
       { to: "/overview", key: "overview", icon: House },
+      { to: "/report", key: "report", icon: FileUp },
       { to: "/schedule", key: "schedule", icon: CalendarDays },
+      { to: "/payroll", key: "payroll", icon: CreditCard },
       { to: "/tasks", key: "tasks", icon: ListTodo },
       { to: "/team", key: "team", icon: Users },
       { to: "/notes", key: "notes", icon: FileText },
-      { to: "/inventory", key: "inventory", icon: Boxes },
-      { to: "/profile", key: "profile", icon: UserCircle2 },
     ];
   }
 
@@ -34,13 +39,10 @@ export function getNavItems(me?: MeResponse | null): NavItem[] {
     items.push({ to: "/report", key: "report", icon: FileUp }, ...managerBase);
     if (canManageTeam(me)) items.push({ to: "/team", key: "team", icon: Users });
     if (canAccessNotes(me)) items.push({ to: "/notes", key: "notes", icon: FileText });
-    if (canAccessInventory(me)) items.push({ to: "/inventory", key: "inventory", icon: Boxes });
-    items.push({ to: "/profile", key: "profile", icon: UserCircle2 });
     return items;
   }
 
   const items = [...workerBase];
   if (canAccessReport(me)) items.push({ to: "/report", key: "report", icon: FileUp });
-  items.push({ to: "/profile", key: "profile", icon: UserCircle2 });
   return items;
 }

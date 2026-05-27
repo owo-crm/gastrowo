@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Building2, CalendarDays, Coins, MailPlus, MapPin, Pencil, Plus, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Building2, CalendarDays, Coins, MailPlus, MapPin, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { WorkerAvatar } from "@/components/worker-avatar";
@@ -205,6 +205,7 @@ export function TeamPage() {
   const [deletePopupOpen, setDeletePopupOpen] = useState(false);
   const [deleteText, setDeleteText] = useState("");
   const [linkEmail, setLinkEmail] = useState("");
+  const [memberRemovalOpen, setMemberRemovalOpen] = useState(false);
   const [selectedTemplateDay, setSelectedTemplateDay] = useState("0");
   const [templateDrafts, setTemplateDrafts] = useState<
     Record<
@@ -275,6 +276,12 @@ export function TeamPage() {
     enabled: Boolean(token) && canEditWorkers && Boolean(workerSetupUserId),
     retry: false,
     refetchOnWindowFocus: false,
+  });
+  const memberRemovalImpactQuery = useQuery({
+    queryKey: ["member-removal-impact", workerSetupUserId],
+    queryFn: () => api.getMemberRemovalImpact(token!, workerSetupUserId!),
+    enabled: Boolean(token) && Boolean(workerSetupUserId) && memberRemovalOpen,
+    retry: false,
   });
   const weekShiftsQuery = useQuery({
     queryKey: ["team-week-shifts", currentWeekStart],
@@ -366,6 +373,7 @@ export function TeamPage() {
   useEffect(() => {
     if (!workerSetupUserId) {
       setIsEditingWorkerSetup(false);
+      setMemberRemovalOpen(false);
     }
   }, [workerSetupUserId]);
 
@@ -484,6 +492,22 @@ export function TeamPage() {
     },
     onError: (error) => {
       toast.error(t("team.worker_setup_save_failed"), error instanceof Error ? error.message : undefined);
+    },
+  });
+  const removeMemberMutation = useMutation({
+    mutationFn: () => api.removeMember(token!, workerSetupUserId!),
+    onSuccess: (data) => {
+      toast.success("Member removed", `${data.full_name} lost workspace access.`);
+      setMemberRemovalOpen(false);
+      setWorkerSetupUserId(null);
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
+      void queryClient.invalidateQueries({ queryKey: ["worker-setup"] });
+      void queryClient.invalidateQueries({ queryKey: ["location-members"] });
+      void queryClient.invalidateQueries({ queryKey: ["subscription"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+    onError: (error) => {
+      toast.error("Failed to remove member", error instanceof Error ? error.message : undefined);
     },
   });
 
@@ -974,6 +998,17 @@ export function TeamPage() {
                     {isEditingWorkerSetup ? t("common.cancel") : t("common.edit")}
                   </Button>
                 ) : null}
+                {canEditWorkers && workerSetupQuery.data ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="min-h-9 rounded-full border border-rose-200 bg-white px-3 text-rose-700 shadow-none hover:bg-rose-50 hover:text-rose-800"
+                    onClick={() => setMemberRemovalOpen((current) => !current)}
+                  >
+                    <Trash2 className="size-4" />
+                    Remove
+                  </Button>
+                ) : null}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -996,7 +1031,47 @@ export function TeamPage() {
               </div>
             ) : workerSetupQuery.data ? (
               <div className="mobile-sheet-scroll px-4 py-4 lg:px-0">
-              <div className="space-y-3">
+                <div className="space-y-3">
+                {memberRemovalOpen ? (
+                  <div className="rounded-[1.1rem] border border-rose-200 bg-rose-50/70 p-4">
+                    {memberRemovalImpactQuery.isLoading ? (
+                      <p className="text-sm text-rose-700">Checking impact...</p>
+                    ) : memberRemovalImpactQuery.data ? (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm font-semibold text-[var(--color-heading)]">Remove from workspace</p>
+                          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                            Future shifts: {memberRemovalImpactQuery.data.future_assignments_count}, pending requests:{" "}
+                            {memberRemovalImpactQuery.data.pending_shift_requests_count}, assigned locations: {memberRemovalImpactQuery.data.location_count}.
+                          </p>
+                          {memberRemovalImpactQuery.data.blocking_reason ? (
+                            <p className="mt-2 text-sm font-medium text-rose-700">{memberRemovalImpactQuery.data.blocking_reason}</p>
+                          ) : (
+                            <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+                              Historical records stay intact. Future assignments and pending requests will be cleared automatically.
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            disabled={!memberRemovalImpactQuery.data.can_remove || removeMemberMutation.isPending}
+                            onClick={() => removeMemberMutation.mutate()}
+                          >
+                            <Trash2 className="size-4" />
+                            Confirm removal
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setMemberRemovalOpen(false)}>
+                            {t("common.cancel")}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-rose-700">{(memberRemovalImpactQuery.error as Error | undefined)?.message ?? "Failed to load impact."}</p>
+                    )}
+                  </div>
+                ) : null}
                 <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{t("team.worker_label")}</p>
@@ -1351,8 +1426,8 @@ export function TeamPage() {
 
                     <div className="space-y-3 xl:border-l xl:border-[var(--color-divider)] xl:pl-4">
                       <div>
-                        <p className="text-sm font-semibold text-[var(--color-heading)]">Template builder</p>
-                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">Create named templates with position and unified shift windows.</p>
+                        <p className="text-sm font-semibold text-[var(--color-heading)]">{t("team.template_blueprint_title")}</p>
+                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t("team.template_blueprint_description")}</p>
                       </div>
                       <div>
                         <div className="h-1.5 rounded-full bg-slate-100">
@@ -1393,7 +1468,7 @@ export function TeamPage() {
                             }}
                           >
                             <CalendarDays className="size-4" />
-                            {showTemplateComposer ? t("common.cancel") : "Create template"}
+                            {showTemplateComposer ? t("common.cancel") : t("team.create_template_button")}
                           </Button>
                           <Button
                             variant="ghost"
@@ -1547,7 +1622,7 @@ export function TeamPage() {
                           }}
                           disabled={createTemplateMutation.isPending || !templateInputValid}
                         >
-                          <CalendarDays className="size-4" /> Create template
+                          <CalendarDays className="size-4" /> {t("team.create_template_button")}
                         </Button>
                       </div>
                     </div>

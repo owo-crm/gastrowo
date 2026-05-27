@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, select
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -13,16 +13,22 @@ from app.core.envelope import ok
 from app.core.security import create_access_token, decode_token, hash_password, verify_password
 from app.db import get_db
 from app.models import (
+    AuthSession,
     InAppNotification,
     InviteToken,
     Location,
     LocationMembership,
     Organization,
     OrganizationMembership,
+    OrganizationSubscription,
     OtpChallenge,
     OtpPurposeEnum,
     RoleEnum,
+    SubscriptionPlanEnum,
+    SubscriptionStatusEnum,
     User,
+    generate_auth_session_token,
+    hash_auth_session_token,
 )
 from app.schemas import (
     InviteJoinVerifyRequest,
@@ -35,6 +41,8 @@ from app.schemas import (
     OtpVerifyResponse,
     OrganizationSettingsOut,
     OwnerOnboardingCompleteRequest,
+    SessionBootstrapResponse,
+    SubscriptionSummaryOut,
 )
 from app.services.auth_email import send_otp_email
 
@@ -74,6 +82,105 @@ def _issue_auth_payload(user: User, memberships: list[OrganizationMembership]) -
         "role": active_membership.role if active_membership else None,
         "status": "linked" if memberships else "pending_link",
     }
+
+
+def _build_subscription_summary(db: Session, organization_id: UUID | None) -> SubscriptionSummaryOut | None:
+    if organization_id is None:
+        return None
+    subscription = db.scalar(select(OrganizationSubscription).where(OrganizationSubscription.organization_id == organization_id))
+    if subscription is None:
+        subscription = OrganizationSubscription(
+            organization_id=organization_id,
+            plan=SubscriptionPlanEnum.FREE,
+            status=SubscriptionStatusEnum.ACTIVE,
+            billing_cycle="monthly",
+        )
+        db.add(subscription)
+        db.flush()
+
+    active_members_count = db.scalar(
+        select(func.count()).select_from(OrganizationMembership).where(OrganizationMembership.organization_id == organization_id)
+    ) or 0
+    active_locations_count = db.scalar(
+        select(func.count()).select_from(Location).where(Location.organization_id == organization_id)
+    ) or 0
+
+    member_cap = None
+    location_cap = None
+    if subscription.plan == SubscriptionPlanEnum.FREE:
+        member_cap = 5
+        location_cap = 1
+    elif subscription.plan == SubscriptionPlanEnum.PRO:
+        member_cap = 25
+    elif subscription.plan == SubscriptionPlanEnum.BUSINESS:
+        location_cap = 5
+
+    soft_limit_reached = bool(
+        (member_cap is not None and active_members_count >= member_cap)
+        or (location_cap is not None and active_locations_count >= location_cap)
+    )
+    return SubscriptionSummaryOut(
+        plan=subscription.plan,
+        status=subscription.status,
+        billing_cycle=subscription.billing_cycle,
+        trial_ends_at=subscription.trial_ends_at,
+        current_period_ends_at=subscription.current_period_ends_at,
+        active_members_count=active_members_count,
+        active_locations_count=active_locations_count,
+        member_cap=member_cap,
+        location_cap=location_cap,
+        soft_limit_reached=soft_limit_reached,
+    )
+
+
+def _set_auth_session_cookie(response: Response, session_token: str) -> None:
+    response.set_cookie(
+        key=settings.auth_session_cookie_name,
+        value=session_token,
+        max_age=settings.auth_session_ttl_days * 24 * 60 * 60,
+        httponly=True,
+        samesite="lax",
+        secure=settings.auth_session_secure_cookie,
+        path="/",
+    )
+
+
+def _clear_auth_session_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=settings.auth_session_cookie_name,
+        httponly=True,
+        samesite="lax",
+        secure=settings.auth_session_secure_cookie,
+        path="/",
+    )
+
+
+def _create_remembered_session(db: Session, response: Response, user: User, memberships: list[OrganizationMembership]) -> None:
+    active_membership = memberships[0] if memberships else None
+    session_token = generate_auth_session_token()
+    db.add(
+        AuthSession(
+            user_id=user.id,
+            organization_id=active_membership.organization_id if active_membership else None,
+            token_hash=hash_auth_session_token(session_token),
+            expires_at=utc_now() + timedelta(days=settings.auth_session_ttl_days),
+        )
+    )
+    db.flush()
+    _set_auth_session_cookie(response, session_token)
+
+
+def _get_session_from_cookie(db: Session, session_token: str | None) -> AuthSession | None:
+    if not session_token:
+        return None
+    session = db.scalar(select(AuthSession).where(AuthSession.token_hash == hash_auth_session_token(session_token)))
+    if session is None:
+        return None
+    if utc_value(session.expires_at) < utc_now():
+        db.delete(session)
+        db.commit()
+        return None
+    return session
 
 
 def _ensure_single_business_rule(db: Session, user_id: UUID, organization_id: UUID | None = None) -> None:
@@ -202,7 +309,7 @@ def send_otp(payload: OtpSendRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/otp/verify")
-def verify_otp(payload: OtpVerifyRequest, db: Session = Depends(get_db)):
+def verify_otp(payload: OtpVerifyRequest, response: Response, db: Session = Depends(get_db)):
     email = payload.email.lower()
     _consume_otp(db, email=email, purpose=payload.purpose, code=payload.code, invite_token=payload.invite_token)
 
@@ -211,6 +318,8 @@ def verify_otp(payload: OtpVerifyRequest, db: Session = Depends(get_db)):
         if user is None:
             raise HTTPException(status_code=404, detail="Account with this email was not found")
         memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)).all()
+        _create_remembered_session(db, response, user, memberships)
+        db.commit()
         return ok(_issue_auth_payload(user, memberships))
 
     if payload.purpose == OtpPurposeEnum.WORKER_SIGNUP:
@@ -223,6 +332,8 @@ def verify_otp(payload: OtpVerifyRequest, db: Session = Depends(get_db)):
         db.add(user)
         db.commit()
         db.refresh(user)
+        _create_remembered_session(db, response, user, [])
+        db.commit()
         return ok(_issue_auth_payload(user, []))
 
     if payload.purpose == OtpPurposeEnum.OWNER_SIGNUP:
@@ -242,7 +353,7 @@ def verify_otp(payload: OtpVerifyRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/onboarding/owner/complete")
-def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, db: Session = Depends(get_db)):
+def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, response: Response, db: Session = Depends(get_db)):
     try:
         token_payload = decode_token(payload.verification_token)
         subject = str(token_payload.get("sub", ""))
@@ -278,6 +389,17 @@ def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, db: Sessi
     db.add_all([membership, location])
     db.flush()
     db.add(LocationMembership(location_id=location.id, user_id=user.id))
+    db.add(
+        OrganizationSubscription(
+            organization_id=org.id,
+            plan=SubscriptionPlanEnum.PRO,
+            status=SubscriptionStatusEnum.TRIALING,
+            billing_cycle="monthly",
+            trial_ends_at=utc_now() + timedelta(days=30),
+            current_period_ends_at=utc_now() + timedelta(days=30),
+        )
+    )
+    _create_remembered_session(db, response, user, [membership])
     db.commit()
     db.refresh(user)
     return ok(_issue_auth_payload(user, [membership]))
@@ -285,19 +407,23 @@ def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, db: Sessi
 
 @router.post("/login")
 @router.post("/login/password")
-def login_with_password(payload: LoginRequest, db: Session = Depends(get_db)):
+def login_with_password(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == payload.email.lower()))
-    if user is None or not user.password_hash or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if user is None:
+        raise HTTPException(status_code=404, detail="Account with this email was not found")
+    if not user.password_hash or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid password")
 
     memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)).all()
     if not memberships or memberships[0].role != RoleEnum.ADMIN:
         raise HTTPException(status_code=403, detail="Password login is available only for owners")
+    _create_remembered_session(db, response, user, memberships)
+    db.commit()
     return ok(_issue_auth_payload(user, memberships))
 
 
 @router.post("/invites/join/verify")
-def verify_invite_join(payload: InviteJoinVerifyRequest, db: Session = Depends(get_db)):
+def verify_invite_join(payload: InviteJoinVerifyRequest, response: Response, db: Session = Depends(get_db)):
     email = payload.email.lower()
     invite = db.scalar(select(InviteToken).where(InviteToken.token == payload.invite_token))
     if invite is None:
@@ -348,13 +474,53 @@ def verify_invite_join(payload: InviteJoinVerifyRequest, db: Session = Depends(g
         InAppNotification(
             organization_id=organization_id,
             user_id=invited_by,
+            type=NotificationTypeEnum.TEAM,
             title="Invite accepted",
             body=f"{user.full_name} joined your business",
+            action_url="/team",
+            entity_kind="user",
+            entity_id=str(user.id),
         )
     )
+    _create_remembered_session(db, response, user, [membership])
     db.commit()
     db.refresh(user)
     return ok(_issue_auth_payload(user, [membership]))
+
+
+@router.get("/session")
+def bootstrap_session(
+    response: Response,
+    session_token: str | None = Cookie(default=None, alias=settings.auth_session_cookie_name),
+    db: Session = Depends(get_db),
+):
+    session = _get_session_from_cookie(db, session_token)
+    if session is None:
+        _clear_auth_session_cookie(response)
+        raise HTTPException(status_code=401, detail="No remembered session")
+    user = db.get(User, session.user_id)
+    if user is None:
+        _clear_auth_session_cookie(response)
+        raise HTTPException(status_code=401, detail="User not found")
+    memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)).all()
+    session.last_seen_at = utc_now()
+    session.expires_at = utc_now() + timedelta(days=settings.auth_session_ttl_days)
+    db.commit()
+    return ok(SessionBootstrapResponse(**_issue_auth_payload(user, memberships)).model_dump(mode="json"))
+
+
+@router.post("/logout")
+def logout(
+    response: Response,
+    session_token: str | None = Cookie(default=None, alias=settings.auth_session_cookie_name),
+    db: Session = Depends(get_db),
+):
+    session = _get_session_from_cookie(db, session_token)
+    if session is not None:
+        db.delete(session)
+        db.commit()
+    _clear_auth_session_cookie(response)
+    return ok({"logged_out": True})
 
 
 @router.get("/me")
@@ -391,5 +557,7 @@ def me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
         is_linked=bool(memberships),
         memberships=[MembershipOut.model_validate(item) for item in memberships],
         organization_settings=_settings_out(organization),
+        subscription=_build_subscription_summary(db, active_membership.organization_id if active_membership else None),
     )
     return ok(payload_out.model_dump(mode="json"))
+    NotificationTypeEnum,

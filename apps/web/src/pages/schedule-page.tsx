@@ -46,8 +46,8 @@ import { formatTime, getMonday } from "@/lib/date";
 
 import type {
   AvailabilityPreferenceSlot,
+  LocationMember,
   SchedulePreview,
-  SchedulePreviewCalendar,
   Shift,
   ShiftRequest,
   StaffCalendarDay,
@@ -225,18 +225,12 @@ function getTimesheetDelta(shift: Shift | null, entry: TimesheetEntry): string {
   return formatDurationDelta(reportedMinutes - plannedMinutes);
 }
 
-function parseInlineTimeRange(value: string): { start: string; end: string } | null {
-  const cleaned = value.trim();
-  const match = /^([01]\d|2[0-3]):([0-5]\d)\s*-\s*([01]\d|2[0-3]):([0-5]\d)$/.exec(cleaned);
-  if (!match) return null;
-  return { start: `${match[1]}:${match[2]}:00`, end: `${match[3]}:${match[4]}:00` };
-}
-
 type ShiftBlockProps = {
   timeRangeLabel: string;
   positionLabel?: string | null;
   captionLabel?: string | null;
   peopleLabel?: string | null;
+  highlighted?: boolean;
   fitContent?: boolean;
   editable: boolean;
   isEditing: boolean;
@@ -459,10 +453,10 @@ function MobileDaySelector({ weekDays, selectedDayIndex, onSelect, warningEntrie
                     setOpenWarningDay(null);
                     onSelect(index);
                   }}
-                  className={`min-w-[84px] rounded-[1.15rem] px-4 py-2.5 text-center transition ${warningEntries.length ? "pr-10" : ""} ${isActive ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-[inset_0_0_0_1px_rgba(47,111,237,0.12)]" : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"}`}
+                  className={`min-w-[96px] rounded-[1.15rem] px-4 py-3 text-center transition ${warningEntries.length ? "pr-10" : ""} ${isActive ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-[inset_0_0_0_1px_rgba(47,111,237,0.12)]" : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"}`}
                 >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em]">{day.title}</p>
-                  <p className="mt-1 text-sm font-medium">{day.caption}</p>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em]">{day.title}</p>
+                  <p className="mt-1 text-base font-semibold">{day.caption}</p>
                 </button>
                 {warningEntries.length && t ? (
                   <div className="absolute right-2 top-2">
@@ -494,21 +488,21 @@ type WeekRangeNavigatorProps = {
 function WeekRangeNavigator({ label, onPrevious, onNext, className }: WeekRangeNavigatorProps) {
   return (
     <div className={className}>
-      <div className="flex items-center justify-between rounded-[1.75rem] border border-[var(--color-divider)] bg-white px-4 py-3 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+      <div className="inline-flex w-full items-center gap-2 rounded-[0.9rem] border border-slate-200 bg-white px-2 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
         <button
           type="button"
           onClick={onPrevious}
-          className="grid size-10 place-items-center rounded-full border border-[var(--color-divider)] bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950"
+          className="grid size-8 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
         >
           <ChevronLeft className="size-4" />
         </button>
-        <div className="min-w-[148px] px-2 text-center text-lg font-semibold tracking-[-0.03em] text-[var(--color-heading)]">
+        <div className="min-w-[110px] flex-1 px-2 text-center text-sm font-semibold text-slate-900 sm:min-w-[150px]">
           {label}
         </div>
         <button
           type="button"
           onClick={onNext}
-          className="grid size-10 place-items-center rounded-full border border-[var(--color-divider)] bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950"
+          className="grid size-8 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
         >
           <ChevronRight className="size-4" />
         </button>
@@ -522,6 +516,7 @@ function ShiftBlock({
   positionLabel,
   captionLabel,
   peopleLabel,
+  highlighted = false,
   fitContent = false,
   editable,
   isEditing,
@@ -548,7 +543,11 @@ function ShiftBlock({
             }
           : undefined
       }
-      className={`relative ${fitContent ? "inline-flex w-fit max-w-full" : "flex w-full"} min-h-[54px] flex-col justify-between border-l-[3px] px-2 py-1.5 ${isEditing ? "bg-[var(--color-accent)] ring-1 ring-[rgba(47,111,237,0.20)]" : ""}`}
+      className={`relative ${fitContent ? "inline-flex w-fit max-w-full" : "flex w-full"} min-h-[54px] flex-col justify-between border-l-[3px] px-2 py-1.5 ${
+        highlighted
+          ? "rounded-[0.9rem] border border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-200"
+          : ""
+      } ${isEditing ? "bg-[var(--color-accent)] ring-1 ring-[rgba(47,111,237,0.20)]" : ""}`}
       draggable={false}
       style={{ borderLeftColor: tone.accent }}
     >
@@ -838,6 +837,126 @@ function AppliedShiftCard({
   );
 }
 
+function PreviewEditableShiftCard({
+  entry,
+  onEdit,
+  onDelete,
+}: {
+  entry: PreviewEditableEntry;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const tone = positionTone(entry.positionLabel);
+
+  return (
+    <div
+      className="rounded-[1rem] border border-[var(--color-divider)] px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+      style={{
+        boxShadow: `inset 4px 0 0 ${tone.accent}`,
+        backgroundColor: hexToRgba(tone.accent, 0.11),
+      }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-lg font-semibold text-[var(--color-heading)]">
+            {formatTime(entry.startTime)}-{formatTime(entry.endTime)}
+          </p>
+          <p className={`mt-2 text-sm font-semibold ${tone.text}`}>{entry.positionLabel}</p>
+          <p className="mt-2 text-sm leading-5 text-[var(--color-heading)]">{entry.assigned_user_name}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button size="sm" variant="secondary" className="h-8 px-2.5" onClick={onEdit}>
+            <Pencil className="size-4" />
+          </Button>
+          <Button size="sm" variant="secondary" className="h-8 px-2.5 text-[var(--color-danger)] hover:text-[var(--color-danger)]" onClick={onDelete}>
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PreviewCardsBoard({
+  weekDays,
+  entriesByDate,
+  warningEntriesByDate,
+  todayIso,
+  t,
+  onCreate,
+  onEdit,
+  onDelete,
+}: {
+  weekDays: Array<{ iso: string; title: string; caption: string }>;
+  entriesByDate: Record<string, PreviewEditableEntry[]>;
+  warningEntriesByDate: Record<string, DayWarningEntry[]>;
+  todayIso: string;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  onCreate: (dayIso: string) => void;
+  onEdit: (entry: PreviewEditableEntry) => void;
+  onDelete: (entry: PreviewEditableEntry) => void;
+}) {
+  const [openWarningDay, setOpenWarningDay] = useState<string | null>(null);
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      {weekDays.map((day) => {
+        const entries = entriesByDate[day.iso] ?? [];
+        const warningEntries = warningEntriesByDate[day.iso] ?? [];
+        const isWarningOpen = openWarningDay === day.iso;
+
+        return (
+          <div
+            key={`preview-cards-${day.iso}`}
+            className={`rounded-[1.2rem] border border-[var(--color-divider)] p-3 ${
+              day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"
+            }`}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--color-heading)]">{day.title}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">{day.caption}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-[var(--color-surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-text-muted)]">
+                  {entries.length}
+                </span>
+                <DayWarningPopover
+                  warningEntries={warningEntries}
+                  isOpen={isWarningOpen}
+                  onToggle={() => setOpenWarningDay(isWarningOpen ? null : day.iso)}
+                  t={t}
+                  buttonClassName="inline-flex size-6 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100"
+                />
+                <Button size="sm" variant="secondary" className="h-8 px-2.5" onClick={() => onCreate(day.iso)}>
+                  <Plus className="size-4" />
+                </Button>
+              </div>
+            </div>
+
+            {entries.length ? (
+              <div className="space-y-3">
+                {entries.map((entry) => (
+                  <PreviewEditableShiftCard
+                    key={`preview-entry-${entry.overrideId}`}
+                    entry={entry}
+                    onEdit={() => onEdit(entry)}
+                    onDelete={() => onDelete(entry)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                {t("schedule.no_shifts_this_day")}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function AppliedCardsBoard({
   weekDays,
   entriesByDate,
@@ -1092,14 +1211,25 @@ type RequestDraft = {
 
 };
 
-
-
-type PreviewShiftDraft = {
+type PreviewEditableEntry = {
+  overrideId: string;
+  date: string;
+  day_of_week: number;
+  location_id: string;
   startTime: string;
   endTime: string;
+  required_role: "ADMIN" | "MANAGER" | "STAFF";
+  staff_position?: string | null;
+  assigned_user_id: string;
+  assigned_user_name: string;
+  positionLabel: string;
 };
 
-type MobilePreviewCreateState = {
+type PreviewEditorModalState = {
+  mode: "create" | "edit";
+  dayIso: string;
+  dayIndex: number;
+  overrideId?: string;
   userId: string;
   startTime: string;
   endTime: string;
@@ -1220,13 +1350,9 @@ export function SchedulePage() {
 
   const [previewData, setPreviewData] = useState<SchedulePreview | null>(null);
   const [scheduleStage, setScheduleStage] = useState<"idle" | "preview" | "applied">("idle");
-  const [previewDrafts, setPreviewDrafts] = useState<Record<string, PreviewShiftDraft>>({});
-  const [editingShiftKey, setEditingShiftKey] = useState<string | null>(null);
-  const [editingValue, setEditingValue] = useState("");
-  const [openPreviewWarningDay, setOpenPreviewWarningDay] = useState<string | null>(null);
   const [bulkDay, setBulkDay] = useState("0");
   const [mobileAppliedView, setMobileAppliedView] = useState<AppliedReadOnlyViewMode>("cards");
-  const [mobilePreviewCreateState, setMobilePreviewCreateState] = useState<MobilePreviewCreateState | null>(null);
+  const [previewEditorModal, setPreviewEditorModal] = useState<PreviewEditorModalState | null>(null);
   const [timesheetModal, setTimesheetModal] = useState<TimesheetModalState | null>(null);
   const [timesheetForm, setTimesheetForm] = useState<TimesheetFormState>({ arrived_at: "11:00", left_at: "22:00", note: "" });
   const [reviewModal, setReviewModal] = useState<ReviewModalState | null>(null);
@@ -1360,16 +1486,6 @@ export function SchedulePage() {
 
   });
 
-  const previewCalendarQuery = useQuery({
-
-    queryKey: ["preview-calendar", weekStart, locationFilter],
-
-    queryFn: () => api.getPreviewCalendar(token!, weekStart, locationFilter || undefined),
-
-    enabled: Boolean(token) && isManagerView && Boolean(locationFilter),
-    placeholderData: (previous) => previous,
-
-  });
   const weeklyOverridesQuery = useQuery({
     queryKey: ["weekly-overrides", weekStart],
     queryFn: () => api.listWeeklyOverrides(token!, weekStart),
@@ -1466,56 +1582,27 @@ export function SchedulePage() {
   useEffect(() => {
     setScheduleStage("idle");
     setPreviewData(null);
-    setPreviewDrafts({});
-    setEditingShiftKey(null);
-    setEditingValue("");
+    setPreviewEditorModal(null);
   }, [weekStart, locationFilter]);
 
-  useEffect(() => {
-    if (scheduleStage !== "preview" || !previewCalendarQuery.data) {
-      return;
-    }
-    const nextDrafts: Record<string, PreviewShiftDraft> = {};
-    for (const row of previewCalendarQuery.data.rows) {
-      for (const day of weekDays) {
-        for (const cell of row.days[day.iso] ?? []) {
-          nextDrafts[cell.shift_key] = {
-            startTime: cell.start_time.slice(0, 5),
-            endTime: cell.end_time.slice(0, 5),
-          };
-        }
-      }
-    }
-    setPreviewDrafts(nextDrafts);
-  }, [scheduleStage, previewCalendarQuery.data, weekDays]);
-
-  const syncAppliedWeekToOverrides = async () => {
+  const freezeAppliedWeekForPreview = async () => {
     if (!token) {
       throw new Error("Missing auth token.");
     }
     if (!locationFilter) {
       throw new Error("Select a location before editing.");
     }
+    await api.freezeAppliedPreview(token, weekStart, locationFilter);
+  };
 
-    const appliedLocationShifts = (shiftsQuery.data ?? []).filter((shift) => shift.location_id === locationFilter);
-    const existingOverrides = await api.listWeeklyOverrides(token, weekStart);
-    const preservedOverrides = existingOverrides.filter((item) => item.location_id !== locationFilter);
-    const appliedOverrides = appliedLocationShifts.map((shift) => ({
-      id: shift.id,
-      week_start: weekStart,
-      location_id: shift.location_id,
-      day_of_week: parseIsoDate(shift.date).getDay() === 0 ? 6 : parseIsoDate(shift.date).getDay() - 1,
-      start_time: shift.start_time,
-      end_time: shift.end_time,
-      required_role: shift.required_role,
-      staff_position: shift.staff_position ?? null,
-      required_count: shift.required_count,
-      assigned_user_id: shift.required_count === 1 && shift.assignments.length === 1 ? shift.assignments[0].user_id : null,
-      source_template_id: null,
-      is_deleted: false,
-    }));
-
-    await api.putWeeklyOverrides(token, weekStart, [...preservedOverrides, ...appliedOverrides]);
+  const materializePreviewForEditing = async () => {
+    if (!token) {
+      throw new Error("Missing auth token.");
+    }
+    if (!locationFilter) {
+      throw new Error("Select a location before generating.");
+    }
+    await api.materializePreview(token, { week_start: weekStart, location_id: locationFilter });
   };
 
 
@@ -1528,20 +1615,22 @@ export function SchedulePage() {
       mode?: "generate" | "regenerate" | "edit-from-applied";
     } = {}) => {
       if (mode === "edit-from-applied") {
-        await syncAppliedWeekToOverrides();
-      } else if (resetOverrides && locationFilter) {
+        await freezeAppliedWeekForPreview();
+        return { preview: null, mode };
+      }
+      if (resetOverrides && locationFilter) {
         const existingOverrides = await api.listWeeklyOverrides(token!, weekStart);
         const remainingOverrides = existingOverrides.filter((item) => item.location_id !== locationFilter);
         await api.putWeeklyOverrides(token!, weekStart, remainingOverrides);
       }
       const preview = await api.previewSchedule(token!, weekStart, locationFilter || undefined);
+      await materializePreviewForEditing();
       return { preview, mode };
     },
     onSuccess: async ({ preview, mode }) => {
       setPreviewData(preview);
-      setEditingShiftKey(null);
-      setEditingValue("");
-      await Promise.all([previewCalendarQuery.refetch(), weeklyOverridesQuery.refetch()]);
+      setPreviewEditorModal(null);
+      await weeklyOverridesQuery.refetch();
       setScheduleStage("preview");
       if (mode === "edit-from-applied") {
         toast.info(t("schedule.edit_mode_enabled"), t("schedule.edit_mode_loaded"));
@@ -1559,16 +1648,13 @@ export function SchedulePage() {
     onSuccess: (data) => {
       setPreviewData(data);
       setScheduleStage("applied");
-      setEditingShiftKey(null);
-      setEditingValue("");
+      setPreviewEditorModal(null);
       toast.success(t("schedule.applied"), t("schedule.applied_body"));
       void queryClient.invalidateQueries({ queryKey: ["shifts", weekStart] });
       void queryClient.invalidateQueries({ queryKey: ["staffShifts"] });
 
       void queryClient.invalidateQueries({ queryKey: ["availability", weekStart] });
       void queryClient.invalidateQueries({ queryKey: ["weekly-overrides", weekStart] });
-
-      void previewCalendarQuery.refetch();
 
     },
     onError: (error) => {
@@ -1611,16 +1697,8 @@ export function SchedulePage() {
       }),
 
     onSuccess: async () => {
-      await Promise.all([previewCalendarQuery.refetch(), weeklyOverridesQuery.refetch()]);
-      void queryClient.invalidateQueries({ queryKey: ["preview-calendar", weekStart] });
+      await weeklyOverridesQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: ["weekly-overrides", weekStart] });
-      try {
-        const refreshedPreview = await api.previewSchedule(token!, weekStart, locationFilter || undefined);
-        setPreviewData(refreshedPreview);
-      } catch (error) {
-        toast.error(t("schedule.preview_refresh_failed"), error instanceof Error ? error.message : undefined);
-        return;
-      }
       toast.success(t("schedule.preview_updated"));
     },
 
@@ -1628,26 +1706,14 @@ export function SchedulePage() {
 
   const bulkClearDayMutation = useMutation({
     mutationFn: async ({ dayIndex }: { dayIndex?: number } = {}) => {
-      if (!previewCalendarQuery.data || !locationFilter) return 0;
+      if (!locationFilter) return 0;
       const effectiveDayIndex = dayIndex ?? Number(bulkDay);
-      const targetDayIso = weekDays[effectiveDayIndex]?.iso;
-      if (!targetDayIso) return 0;
-      const shiftKeys = new Set<string>();
-      for (const row of previewCalendarQuery.data.rows) {
-        for (const cell of row.days[targetDayIso] ?? []) {
-          if (cell.location_id !== locationFilter) continue;
-          shiftKeys.add(cell.shift_key);
-        }
-      }
-      for (const cell of previewCalendarQuery.data.open_shifts_by_day[targetDayIso] ?? []) {
-        if (cell.location_id !== locationFilter) continue;
-        shiftKeys.add(cell.shift_key);
-      }
-      const payloads = Array.from(shiftKeys).map((shiftKey) =>
+      const dayOverrides = previewOverridesForLocation.filter((item) => item.day_of_week === effectiveDayIndex);
+      const payloads = dayOverrides.map((item) =>
         api.patchPreviewEdit(token!, {
           week_start: weekStart,
           action: "delete",
-          shift_key: shiftKey,
+          shift_key: `override:${item.id}`,
         }),
       );
       await Promise.all(payloads);
@@ -1656,16 +1722,8 @@ export function SchedulePage() {
     onSuccess: async (result) => {
       const deletedCount = typeof result === "number" ? result : result.deletedCount;
       const clearedDayIndex = typeof result === "number" ? Number(bulkDay) : result.dayIndex;
-      await Promise.all([previewCalendarQuery.refetch(), weeklyOverridesQuery.refetch()]);
-      void queryClient.invalidateQueries({ queryKey: ["preview-calendar", weekStart] });
+      await weeklyOverridesQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: ["weekly-overrides", weekStart] });
-      try {
-        const refreshedPreview = await api.previewSchedule(token!, weekStart, locationFilter || undefined);
-        setPreviewData(refreshedPreview);
-      } catch (error) {
-          toast.error(t("schedule.preview_refresh_failed"), error instanceof Error ? error.message : undefined);
-        return;
-      }
       toast.info(
         deletedCount
           ? t("schedule.day_cleared", { count: deletedCount, day: dayOptions[clearedDayIndex]?.label ?? t("schedule.selected_day") })
@@ -1835,41 +1893,6 @@ export function SchedulePage() {
   }, [locationMembersQuery.data]);
   const conflictingShiftIds = useMemo(() => findConflictingShiftIds(shiftsQuery.data ?? []), [shiftsQuery.data]);
 
-  const mergedPreviewCellsByUserDay = useMemo(() => {
-    const map: Record<string, Record<string, SchedulePreviewCalendar["rows"][number]["days"][string]>> = {};
-
-    for (const row of previewCalendarQuery.data?.rows ?? []) {
-      if (!map[row.user_id]) map[row.user_id] = {};
-      for (const day of weekDays) {
-        map[row.user_id][day.iso] = (row.days[day.iso] ?? []).filter((item) => item.location_id === locationFilter);
-      }
-    }
-
-    for (const byDay of Object.values(map)) {
-      for (const dayIso of Object.keys(byDay)) {
-        byDay[dayIso] = [...byDay[dayIso]].sort((a, b) => {
-          const byPosition = getPositionSortKey(a.staff_position ?? a.required_role) - getPositionSortKey(b.staff_position ?? b.required_role);
-          if (byPosition !== 0) return byPosition;
-          return a.start_time.localeCompare(b.start_time);
-        });
-      }
-    }
-
-    return map;
-  }, [locationFilter, previewCalendarQuery.data?.rows, weekDays]);
-
-  const previewHoursByUser = useMemo(() => {
-    const totals: Record<string, number> = {};
-    for (const [userId, byDay] of Object.entries(mergedPreviewCellsByUserDay)) {
-      for (const cells of Object.values(byDay)) {
-        for (const cell of cells) {
-          totals[userId] = (totals[userId] ?? 0) + shiftHours(cell.start_time, cell.end_time);
-        }
-      }
-    }
-    return totals;
-  }, [mergedPreviewCellsByUserDay]);
-
   const sortedLocationMembers = useMemo(() => {
     return (locationMembersQuery.data ?? [])
       .sort((a, b) => {
@@ -1879,129 +1902,89 @@ export function SchedulePage() {
       });
   }, [locationMembersQuery.data]);
 
-  const mobilePreviewAssignableOptions = useMemo(
+  const previewOverridesForLocation = useMemo(
     () =>
-      sortedLocationMembers
-        .filter((member) => member.role !== "ADMIN")
-        .map((member) => ({
-          value: member.id,
-          label: `${member.full_name} • ${member.staff_position ?? member.role}`,
-        })),
-    [sortedLocationMembers],
+      (weeklyOverridesQuery.data ?? []).filter(
+        (item) => item.location_id === locationFilter && !item.is_deleted,
+      ),
+    [locationFilter, weeklyOverridesQuery.data],
   );
 
-  const previewRejectedReasonCountsByShiftKey = useMemo(() => {
-    const map: Record<string, Record<string, number>> = {};
-
-    for (const candidate of previewData?.rejected_candidates ?? []) {
-      if (locationFilter && candidate.location_id !== locationFilter) continue;
-      const bucket = map[candidate.shift_key] ?? {};
-      for (const reason of candidate.reasons) {
-        bucket[reason] = (bucket[reason] ?? 0) + 1;
-      }
-      map[candidate.shift_key] = bucket;
+  const previewEntriesByDate = useMemo(() => {
+    const map: Record<string, PreviewEditableEntry[]> = Object.fromEntries(weekDays.map((day) => [day.iso, []]));
+    for (const item of previewOverridesForLocation) {
+      if (!item.assigned_user_id) continue;
+      const dayIso = weekDays[item.day_of_week]?.iso;
+      if (!dayIso) continue;
+      const positionLabel = item.staff_position ?? item.required_role;
+      map[dayIso].push({
+        overrideId: item.id,
+        date: dayIso,
+        day_of_week: item.day_of_week,
+        location_id: item.location_id,
+        startTime: item.start_time,
+        endTime: item.end_time,
+        required_role: item.required_role,
+        staff_position: item.staff_position ?? null,
+        assigned_user_id: item.assigned_user_id,
+        assigned_user_name: memberNameById[item.assigned_user_id] ?? t("schedule.assigned_label"),
+        positionLabel,
+      });
     }
-
-    return map;
-  }, [locationFilter, previewData?.rejected_candidates]);
-
-  const previewStartCoverageByShiftKey = useMemo(() => {
-    const map: Record<string, SchedulePreview["start_coverage_alerts"][number]> = {};
-
-    for (const alert of previewData?.start_coverage_alerts ?? []) {
-      if (locationFilter && alert.location_id !== locationFilter) continue;
-      map[alert.shift_key] = alert;
-    }
-
-    return map;
-  }, [locationFilter, previewData?.start_coverage_alerts]);
-
-  const previewCardsByDate = useMemo(() => {
-    const map: Record<string, SchedulePreviewCalendar["rows"][number]["days"][string]> = {};
 
     for (const day of weekDays) {
-      const byShiftKey = new Map<string, SchedulePreviewCalendar["rows"][number]["days"][string][number]>();
-
-      for (const row of previewCalendarQuery.data?.rows ?? []) {
-        for (const cell of row.days[day.iso] ?? []) {
-          if (cell.location_id !== locationFilter) continue;
-          const existing = byShiftKey.get(cell.shift_key);
-          if (!existing || cell.assigned_users.length > existing.assigned_users.length || cell.missing_count > existing.missing_count) {
-            byShiftKey.set(cell.shift_key, cell);
-          }
-        }
-      }
-
-      for (const cell of previewCalendarQuery.data?.open_shifts_by_day[day.iso] ?? []) {
-        if (cell.location_id !== locationFilter) continue;
-        const existing = byShiftKey.get(cell.shift_key);
-        if (!existing) {
-          byShiftKey.set(cell.shift_key, cell);
-          continue;
-        }
-        if (cell.missing_count > existing.missing_count) {
-          byShiftKey.set(cell.shift_key, { ...existing, missing_count: cell.missing_count });
-        }
-      }
-
-      map[day.iso] = Array.from(byShiftKey.values()).sort((a, b) => {
-        const byPosition = getPositionSortKey(a.staff_position ?? a.required_role) - getPositionSortKey(b.staff_position ?? b.required_role);
+      map[day.iso] = map[day.iso].sort((a, b) => {
+        const byPosition = getPositionSortKey(a.positionLabel) - getPositionSortKey(b.positionLabel);
         if (byPosition !== 0) return byPosition;
-        return a.start_time.localeCompare(b.start_time);
+        return a.startTime.localeCompare(b.startTime);
       });
     }
 
     return map;
-  }, [locationFilter, previewCalendarQuery.data?.open_shifts_by_day, previewCalendarQuery.data?.rows, weekDays]);
+  }, [memberNameById, previewOverridesForLocation, t, weekDays]);
+
+  const previewHoursByUser = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const entries of Object.values(previewEntriesByDate)) {
+      for (const entry of entries) {
+        totals[entry.assigned_user_id] = (totals[entry.assigned_user_id] ?? 0) + shiftHours(entry.startTime, entry.endTime);
+      }
+    }
+    return totals;
+  }, [previewEntriesByDate]);
+
   const previewWarningEntriesByDate = useMemo(() => {
-    const map: Record<string, DayWarningEntry[]> = {};
+    const map: Record<string, DayWarningEntry[]> = Object.fromEntries(weekDays.map((day) => [day.iso, []]));
 
     for (const day of weekDays) {
-      const dayEntries: DayWarningEntry[] = [];
-      const seenKeys = new Set<string>();
-
-      for (const cell of previewCardsByDate[day.iso] ?? []) {
-        const hasMissing = cell.missing_count > 0;
-        const startCoverageAlert = previewStartCoverageByShiftKey[cell.shift_key];
-        if (!hasMissing && !startCoverageAlert) continue;
-
-        const reasonsDetail = summariseRejectedReasons(previewRejectedReasonCountsByShiftKey[cell.shift_key] ?? {}, lang);
-        const detailParts = [
-          hasMissing && startCoverageAlert ? getStartCoverageLabel(lang) : undefined,
-          reasonsDetail,
-        ].filter(Boolean);
-
-        dayEntries.push({
-          key: cell.shift_key,
-          timeLabel: `${formatTime(cell.start_time)}-${formatTime(cell.end_time)}`,
-          positionLabel: cell.staff_position ?? cell.required_role,
-          metaLabel: hasMissing
-            ? t("schedule.needed_count", { count: cell.missing_count })
-            : getStartCoverageLabel(lang),
-          detailLabel: detailParts.length ? detailParts.join(" • ") : undefined,
-          tone: hasMissing ? "missing" : "coverage",
-        });
-        seenKeys.add(cell.shift_key);
+      const buckets = new Map<string, { count: number; timeLabel: string; positionLabel: string }>();
+      for (const item of previewOverridesForLocation) {
+        if (item.assigned_user_id) continue;
+        if (item.day_of_week !== weekDays.findIndex((candidate) => candidate.iso === day.iso)) continue;
+        const positionLabel = item.staff_position ?? item.required_role;
+        const key = `${item.start_time}:${item.end_time}:${positionLabel}`;
+        const bucket = buckets.get(key) ?? {
+          count: 0,
+          timeLabel: `${formatTime(item.start_time)}-${formatTime(item.end_time)}`,
+          positionLabel,
+        };
+        bucket.count += 1;
+        buckets.set(key, bucket);
       }
 
-      for (const alert of previewData?.start_coverage_alerts ?? []) {
-        if (alert.date !== day.iso) continue;
-        if (locationFilter && alert.location_id !== locationFilter) continue;
-        if (seenKeys.has(alert.shift_key)) continue;
-        dayEntries.push({
-          key: `coverage:${alert.shift_key}`,
-          timeLabel: `${formatTime(alert.start_time)}-${formatTime(alert.end_time)}`,
-          positionLabel: alert.staff_position ?? alert.required_role,
-          metaLabel: getStartCoverageLabel(lang),
-          tone: "coverage",
-        });
-      }
-
-      map[day.iso] = dayEntries.sort((a, b) => a.timeLabel.localeCompare(b.timeLabel));
+      map[day.iso] = Array.from(buckets.entries())
+        .map(([key, bucket]) => ({
+          key,
+          timeLabel: bucket.timeLabel,
+          positionLabel: bucket.positionLabel,
+          metaLabel: t("schedule.needed_count", { count: bucket.count }),
+          tone: "missing" as const,
+        }))
+        .sort((a, b) => a.timeLabel.localeCompare(b.timeLabel));
     }
 
     return map;
-  }, [lang, locationFilter, previewCardsByDate, previewData?.start_coverage_alerts, previewRejectedReasonCountsByShiftKey, previewStartCoverageByShiftKey, t, weekDays]);
+  }, [previewOverridesForLocation, t, weekDays]);
 
   const previewVisibleIssueCount = useMemo(
     () => Object.values(previewWarningEntriesByDate).reduce((sum, entries) => sum + entries.length, 0),
@@ -2127,36 +2110,12 @@ export function SchedulePage() {
     return Array.from({ length: (normalizedMax - normalizedMin) / 60 + 1 }, (_item, index) => normalizedMin + index * 60);
   }, [appliedEntriesByDate]);
   const appliedTimetableStartMinutes = appliedTimetableSlots[0] ?? 10 * 60;
-  const selectedPreviewCards = previewCardsByDate[selectedDay?.iso ?? ""] ?? [];
   const selectedAppliedEntries = (appliedEntriesByDate[selectedDay?.iso ?? ""] ?? []).filter((entry) => !entry.isOpen);
   const activeMobileWarningEntriesByDate = scheduleStage === "preview"
     ? previewWarningEntriesByDate
     : scheduleStage === "applied"
       ? appliedWarningEntriesByDate
       : undefined;
-
-  const previewSortedLocationMembers = useMemo(() => {
-    return [...sortedLocationMembers].sort((a, b) => {
-      const aHasWeekShift = Object.values(mergedPreviewCellsByUserDay[a.id] ?? {}).some((cells) => cells.length > 0) ? 1 : 0;
-      const bHasWeekShift = Object.values(mergedPreviewCellsByUserDay[b.id] ?? {}).some((cells) => cells.length > 0) ? 1 : 0;
-      if (aHasWeekShift !== bHasWeekShift) return bHasWeekShift - aHasWeekShift;
-      const byPosition = getPositionSortKey(a.staff_position ?? a.role) - getPositionSortKey(b.staff_position ?? b.role);
-      if (byPosition !== 0) return byPosition;
-      return a.full_name.localeCompare(b.full_name);
-    });
-  }, [mergedPreviewCellsByUserDay, sortedLocationMembers]);
-
-  const mobilePreviewSortedLocationMembers = useMemo(() => {
-    const selectedIso = selectedDay?.iso ?? "";
-    return [...previewSortedLocationMembers].sort((a, b) => {
-      const aHasSelectedDayShift = (mergedPreviewCellsByUserDay[a.id]?.[selectedIso]?.length ?? 0) > 0 ? 1 : 0;
-      const bHasSelectedDayShift = (mergedPreviewCellsByUserDay[b.id]?.[selectedIso]?.length ?? 0) > 0 ? 1 : 0;
-      if (aHasSelectedDayShift !== bHasSelectedDayShift) return bHasSelectedDayShift - aHasSelectedDayShift;
-      const byPosition = getPositionSortKey(a.staff_position ?? a.role) - getPositionSortKey(b.staff_position ?? b.role);
-      if (byPosition !== 0) return byPosition;
-      return a.full_name.localeCompare(b.full_name);
-    });
-  }, [mergedPreviewCellsByUserDay, previewSortedLocationMembers, selectedDay?.iso]);
 
   const managerAvailabilityByUserDay = useMemo(() => {
     const map: Record<string, Record<string, { desiredHours: number; windowLabel: string | null }>> = {};
@@ -2182,6 +2141,23 @@ export function SchedulePage() {
     return map;
   }, [teamAvailabilityQuery.data, weekDays]);
 
+  const managerAvailabilitySlotsByUserDay = useMemo(() => {
+    const map: Record<string, Record<string, AvailabilityPreferenceSlot[]>> = {};
+    for (const item of (teamAvailabilityQuery.data ?? []) as TeamAvailabilitySummaryRow[]) {
+      const byDay: Record<string, AvailabilityPreferenceSlot[]> = {};
+      const sourceSlots = Array.isArray(item.slots) ? item.slots : [];
+      for (const day of weekDays) {
+        const dayIndex = parseIsoDate(day.iso).getDay();
+        const normalizedDayIndex = dayIndex === 0 ? 6 : dayIndex - 1;
+        byDay[day.iso] = sourceSlots
+          .filter((slot) => slot.is_available && slot.day_of_week === normalizedDayIndex)
+          .sort((a, b) => a.start_time.localeCompare(b.start_time));
+      }
+      map[item.user_id] = byDay;
+    }
+    return map;
+  }, [teamAvailabilityQuery.data, weekDays]);
+
   useEffect(() => {
     if (!isManagerView || !locationFilter) return;
     if (managerShifts.length > 0 && scheduleStage === "idle") {
@@ -2197,9 +2173,109 @@ export function SchedulePage() {
     [locationFilter, managerShifts],
   );
 
+  const availabilityStatusForMember = (
+    member: LocationMember,
+    dayIso: string,
+    startTime: string,
+    endTime: string,
+    excludeOverrideId?: string,
+  ) => {
+    const availableSlots = managerAvailabilitySlotsByUserDay[member.id]?.[dayIso] ?? [];
+    const hasAvailability = availableSlots.length > 0;
+    const fullyAvailable = availableSlots.some(
+      (slot) => timeToMinutes(slot.start_time) <= timeToMinutes(startTime) && timeToMinutes(slot.end_time) >= timeToMinutes(endTime),
+    );
+    const hasConflict = Object.values(previewEntriesByDate)
+      .flat()
+      .some(
+        (entry) =>
+          entry.assigned_user_id === member.id &&
+          entry.overrideId !== excludeOverrideId &&
+          entry.date === dayIso &&
+          overlapsMinutes(timeToMinutes(entry.startTime), timeToMinutes(entry.endTime), timeToMinutes(startTime), timeToMinutes(endTime)),
+      );
+
+    if (hasConflict) {
+      return { rank: fullyAvailable ? 1 : 3, tone: "warning" as const, label: t("schedule.conflict_with_existing_shift") };
+    }
+    if (fullyAvailable) {
+      return {
+        rank: 0,
+        tone: "ok" as const,
+        label: t("schedule.available_for_selected_time", { time: `${formatTime(startTime)}-${formatTime(endTime)}` }),
+      };
+    }
+    if (!hasAvailability) {
+      return { rank: 2, tone: "muted" as const, label: t("schedule.no_submitted_availability") };
+    }
+    return { rank: 3, tone: "warning" as const, label: t("schedule.unavailable_for_selected_time") };
+  };
+
+  const previewEditorWorkerOptions = useMemo(() => {
+    if (!previewEditorModal) return [];
+    return sortedLocationMembers
+      .filter((member) => member.role !== "ADMIN")
+      .map((member) => {
+        const availability = availabilityStatusForMember(
+          member,
+          previewEditorModal.dayIso,
+          `${previewEditorModal.startTime}:00`,
+          `${previewEditorModal.endTime}:00`,
+          previewEditorModal.overrideId,
+        );
+        return {
+          value: member.id,
+          label: `${member.full_name} • ${member.staff_position ?? member.role} • ${availability.label}`,
+          rank: availability.rank,
+        };
+      })
+      .sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label));
+  }, [previewEditorModal, sortedLocationMembers]);
+
+  const selectedPreviewEditorMember = useMemo(
+    () => sortedLocationMembers.find((member) => member.id === previewEditorModal?.userId) ?? null,
+    [previewEditorModal?.userId, sortedLocationMembers],
+  );
+
+  const selectedPreviewEditorAvailability = useMemo(() => {
+    if (!previewEditorModal || !selectedPreviewEditorMember) return null;
+    return availabilityStatusForMember(
+      selectedPreviewEditorMember,
+      previewEditorModal.dayIso,
+      `${previewEditorModal.startTime}:00`,
+      `${previewEditorModal.endTime}:00`,
+      previewEditorModal.overrideId,
+    );
+  }, [previewEditorModal, selectedPreviewEditorMember]);
+
+  const openPreviewCreateModal = (dayIso: string) => {
+    const dayIndex = weekDays.findIndex((day) => day.iso === dayIso);
+    const defaultMember = sortedLocationMembers.find((member) => member.role !== "ADMIN");
+    if (dayIndex < 0 || !defaultMember) return;
+    setPreviewEditorModal({
+      mode: "create",
+      dayIso,
+      dayIndex,
+      userId: defaultMember.id,
+      startTime: "11:00",
+      endTime: "19:00",
+    });
+  };
+
+  const openPreviewEditModal = (entry: PreviewEditableEntry) => {
+    setPreviewEditorModal({
+      mode: "edit",
+      dayIso: entry.date,
+      dayIndex: entry.day_of_week,
+      overrideId: entry.overrideId,
+      userId: entry.assigned_user_id,
+      startTime: entry.startTime.slice(0, 5),
+      endTime: entry.endTime.slice(0, 5),
+    });
+  };
+
   const exitPreviewMode = () => {
-    setEditingShiftKey(null);
-    setEditingValue("");
+    setPreviewEditorModal(null);
     setPreviewData(null);
     setScheduleStage(hasAppliedLocationShifts ? "applied" : "idle");
   };
@@ -2400,9 +2476,9 @@ export function SchedulePage() {
                     disabled={Boolean(availabilityQuery.data?.locked_at)}
                     aria-pressed={enabled}
                     onClick={() => setAvailabilityDayEnabled(index, !enabled)}
-                    className={`relative inline-flex h-7 w-14 items-center rounded-full p-1 transition ${enabled ? "bg-emerald-500/90" : "bg-slate-200"} disabled:opacity-40`}
+                    className={`relative inline-flex h-11 w-16 items-center rounded-full p-1 transition ${enabled ? "bg-emerald-500/90" : "bg-slate-200"} disabled:opacity-40`}
                   >
-                    <span className={`size-5 rounded-full bg-white shadow-sm transition ${enabled ? "translate-x-7" : "translate-x-0"}`} />
+                    <span className={`size-7 rounded-full bg-white shadow-sm transition ${enabled ? "translate-x-8" : "translate-x-0"}`} />
                   </button>
                 </div>
                 <p className="mt-2 text-xs font-medium text-[var(--color-text-muted)]">{enabled ? t("schedule.available") : t("schedule.off")}</p>
@@ -2412,14 +2488,14 @@ export function SchedulePage() {
                     value={firstSlot ? firstSlot.start_time.slice(0, 5) : ""}
                     disabled={!enabled || Boolean(availabilityQuery.data?.locked_at)}
                     onChange={(event) => updateAvailabilityDayTime(index, "start_time", event.target.value, firstSlot)}
-                    className="h-9 w-full border-0 border-b border-[var(--color-border)] bg-transparent px-0 text-sm text-[var(--color-heading)] outline-none focus:border-[var(--color-primary)] disabled:text-[var(--color-text-muted)]"
+                    className="h-11 w-full border-0 border-b border-[var(--color-border)] bg-transparent px-0 text-base text-[var(--color-heading)] outline-none focus:border-[var(--color-primary)] disabled:text-[var(--color-text-muted)] sm:text-sm"
                   />
                   <input
                     type="time"
                     value={firstSlot ? firstSlot.end_time.slice(0, 5) : ""}
                     disabled={!enabled || Boolean(availabilityQuery.data?.locked_at)}
                     onChange={(event) => updateAvailabilityDayTime(index, "end_time", event.target.value, firstSlot)}
-                    className="h-9 w-full border-0 border-b border-[var(--color-border)] bg-transparent px-0 text-sm text-[var(--color-heading)] outline-none focus:border-[var(--color-primary)] disabled:text-[var(--color-text-muted)]"
+                    className="h-11 w-full border-0 border-b border-[var(--color-border)] bg-transparent px-0 text-base text-[var(--color-heading)] outline-none focus:border-[var(--color-primary)] disabled:text-[var(--color-text-muted)] sm:text-sm"
                   />
                 </div>
               </div>
@@ -2496,6 +2572,7 @@ export function SchedulePage() {
                               positionLabel={shift.staff_position ?? shift.required_role}
                               captionLabel={shift.location_name}
                               peopleLabel={shift.assignments.map((assignment) => assignment.user_name.split(" ")[0]).join(", ")}
+                              highlighted={shift.is_mine}
                               editable={false}
                               isEditing={false}
                               editText=""
@@ -2580,6 +2657,7 @@ export function SchedulePage() {
                                   positionLabel={shift.staff_position ?? shift.required_role}
                                   captionLabel={shift.location_name}
                                   peopleLabel={shift.assignments.map((assignment) => assignment.user_name.split(" ")[0]).join(", ")}
+                                  highlighted={shift.is_mine}
                                   editable={false}
                                   isEditing={false}
                                   editText=""
@@ -2782,10 +2860,13 @@ export function SchedulePage() {
                       onNext={() => setWeekStart((current) => shiftWeek(current, 7))}
                       className="min-w-[360px]"
                     />
+                    <Button variant="secondary" onClick={() => window.location.assign("/team")}>
+                      {t("schedule.edit_template_for_location")}
+                    </Button>
 
                     {scheduleStage === "idle" ? (
                       <Button onClick={() => previewMutation.mutate({ resetOverrides: false, mode: "generate" })} disabled={previewMutation.isPending || !locationFilter}>
-                        <Sparkles className="size-4" /> {t("schedule.generate")}
+                        <Sparkles className="size-4" /> {t("schedule.generate_from_template")}
                       </Button>
                     ) : null}
 
@@ -2825,11 +2906,14 @@ export function SchedulePage() {
                     onPrevious={() => setWeekStart((current) => shiftWeek(current, -7))}
                     onNext={() => setWeekStart((current) => shiftWeek(current, 7))}
                   />
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => window.location.assign("/team")}>
+                    {t("schedule.edit_template_for_location")}
+                  </Button>
 
                   <div className={`grid gap-3 ${scheduleStage === "idle" ? "grid-cols-1" : "grid-cols-2"}`}>
                     {scheduleStage === "idle" ? (
                       <Button className="w-full justify-center" onClick={() => previewMutation.mutate({ resetOverrides: false, mode: "generate" })} disabled={previewMutation.isPending || !locationFilter}>
-                        <Sparkles className="size-4" /> {t("schedule.generate")}
+                        <Sparkles className="size-4" /> {t("schedule.generate_from_template")}
                       </Button>
                     ) : null}
 
@@ -2887,13 +2971,36 @@ export function SchedulePage() {
                   ) : null}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-1">
-                  {roleLegendItems.map((item) => (
-                    <div key={item.label} className="inline-flex items-center gap-2 text-sm text-[var(--color-heading)]">
-                      <span className="size-4 rounded-md" style={{ backgroundColor: item.accent }} />
-                      <span>{item.label}</span>
+                <div className="pt-1">
+                  {scheduleStage === "applied" ? (
+                    <div className="hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-4">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button variant={mobileAppliedView === "cards" ? "default" : "secondary"} className="min-w-[132px]" onClick={() => setMobileAppliedView("cards")}>
+                          {t("schedule.cards_view")}
+                        </Button>
+                        <Button variant={mobileAppliedView === "timetable" ? "default" : "secondary"} className="min-w-[132px]" onClick={() => setMobileAppliedView("timetable")}>
+                          {t("schedule.timetable_view")}
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                        {roleLegendItems.map((item) => (
+                          <div key={item.label} className="inline-flex items-center gap-2 text-sm text-[var(--color-heading)]">
+                            <span className="size-4 rounded-md" style={{ backgroundColor: item.accent }} />
+                            <span>{item.label}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                      {roleLegendItems.map((item) => (
+                        <div key={item.label} className="inline-flex items-center gap-2 text-sm text-[var(--color-heading)]">
+                          <span className="size-4 rounded-md" style={{ backgroundColor: item.accent }} />
+                          <span>{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
               </CardHeader>
@@ -2904,13 +3011,6 @@ export function SchedulePage() {
                     <Button variant="secondary" className="h-9" onClick={exitPreviewMode}>
                       <ChevronLeft className="size-4" /> {t("common.back")}
                     </Button>
-                    <MobileDaySelector
-                      weekDays={weekDays}
-                      selectedDayIndex={selectedDayIndex}
-                      onSelect={setSelectedDayIndex}
-                      warningEntriesByDate={activeMobileWarningEntriesByDate}
-                      t={t}
-                    />
                   </div>
                 ) : scheduleStage === "applied" && mobileAppliedView === "timetable" ? null : (
                   <MobileDaySelector
@@ -2941,304 +3041,26 @@ export function SchedulePage() {
                   </div>
                 ) : null}
 
-                {scheduleStage === "preview" && previewCalendarQuery.data ? (
-                  <>
-                  <div className="space-y-3 lg:hidden">
-                    {selectedPreviewCards.map((cell) => {
-                      const canInlineEdit = cell.required_count <= 1 && cell.assigned_users.length <= 1;
-                      const draft = previewDrafts[cell.shift_key] ?? {
-                        startTime: cell.start_time.slice(0, 5),
-                        endTime: cell.end_time.slice(0, 5),
-                      };
-                      const isEditing = editingShiftKey === cell.shift_key && canInlineEdit;
-                      const timeLabel = `${formatTime(draft.startTime)}-${formatTime(draft.endTime)}`;
-                      const peopleLabel = cell.assigned_users.map((item) => item.user_name).join(", ");
-                      return (
-                        <div key={`mobile-preview-${cell.shift_key}`} className="surface-card rounded-[1rem] px-4 py-4">
-                          <ShiftBlock
-                            timeRangeLabel={timeLabel}
-                            positionLabel={cell.staff_position ?? cell.required_role}
-                            peopleLabel={peopleLabel || undefined}
-                            editable={canInlineEdit}
-                            isEditing={isEditing}
-                            editText={isEditing ? editingValue : `${draft.startTime}-${draft.endTime}`}
-                            onStartEdit={() => {
-                              if (!canInlineEdit) return;
-                              setEditingShiftKey(cell.shift_key);
-                              setEditingValue(`${draft.startTime}-${draft.endTime}`);
-                            }}
-                            onEditTextChange={(next) => setEditingValue(next)}
-                            onEditKeyDown={(event) => {
-                              if (event.key === "Escape") {
-                                event.preventDefault();
-                                setEditingShiftKey(null);
-                                setEditingValue("");
-                                return;
-                              }
-                              if (event.key !== "Enter") return;
-                              event.preventDefault();
-                              const parsed = parseInlineTimeRange(editingValue);
-                              if (!parsed) {
-                                toast.warning(t("schedule.time_format_warning"));
-                                return;
-                              }
-                              setPreviewDrafts((current) => ({
-                                ...current,
-                                [cell.shift_key]: {
-                                  startTime: parsed.start.slice(0, 5),
-                                  endTime: parsed.end.slice(0, 5),
-                                },
-                              }));
-                              patchPreviewEditMutation.mutate(
-                                {
-                                  action: "upsert",
-                                  shift_key: cell.shift_key,
-                                  start_time: parsed.start,
-                                  end_time: parsed.end,
-                                },
-                                {
-                                  onSuccess: () => {
-                                    setEditingShiftKey(null);
-                                    setEditingValue("");
-                                  },
-                                },
-                              );
-                            }}
-                            onDelete={
-                              canInlineEdit
-                                ? () =>
-                                    patchPreviewEditMutation.mutate(
-                                      { action: "delete", shift_key: cell.shift_key },
-                                      {
-                                        onSuccess: () => {
-                                          setEditingShiftKey(null);
-                                          setEditingValue("");
-                                        },
-                                      },
-                                    )
-                                : undefined
-                            }
-                          />
-                        </div>
-                      );
-                    })}
-                    <Button
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() =>
-                        setMobilePreviewCreateState({
-                          userId: mobilePreviewAssignableOptions[0]?.value ?? "",
-                          startTime: "11:00",
-                          endTime: "19:00",
-                        })
-                      }
-                      disabled={!locationFilter || !mobilePreviewAssignableOptions.length}
-                    >
-                      <Plus className="size-4" /> {t("schedule.add_shift")}
-                    </Button>
-                    {!selectedPreviewCards.length ? (
-                      <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-                        {t("schedule.no_shifts_this_day")}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="hidden max-h-[72vh] overflow-auto rounded-[1.5rem] border border-[var(--color-divider)] bg-white lg:block">
-                    <div className="min-w-[1180px]">
-                      <div className="sticky top-0 z-30 grid grid-cols-[220px_repeat(7,minmax(130px,1fr))] bg-white text-[var(--color-heading)]">
-                        <div className="sticky left-0 z-40 border-r border-[var(--color-divider)] bg-white px-3 py-2 text-sm font-semibold">{t("schedule.employees")}</div>
-                        {weekDays.map((day) => (
-                          <div
-                            key={day.iso}
-                            className={`border-r border-[var(--color-divider)] px-3 py-2 ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"}`}
-                          >
-                            <div className="relative pr-8">
-                              <p className="font-semibold">{day.title}</p>
-                              <div className="absolute right-0 top-0">
-                                <DayWarningPopover
-                                  warningEntries={previewWarningEntriesByDate[day.iso] ?? []}
-                                  isOpen={openPreviewWarningDay === day.iso}
-                                  onToggle={() => setOpenPreviewWarningDay(openPreviewWarningDay === day.iso ? null : day.iso)}
-                                  t={t}
-                                  buttonClassName="inline-flex size-6 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100"
-                                />
-                              </div>
-                            </div>
-                            <p className="text-xs text-[var(--color-text-muted)]">{day.caption}</p>
-                          </div>
-                        ))}
-                      </div>
-
-                      {previewSortedLocationMembers.map((member) => {
-                        const memberPositionLabel =
-                          member.staff_position ?? (member.role === "MANAGER" ? t("schedule.manager_label") : member.role === "STAFF" ? t("schedule.unassigned_label") : "ADMIN");
-                        const memberTone = positionTone(memberPositionLabel, member.role);
-                        return (
-                          <div key={member.id} className="grid grid-cols-[220px_repeat(7,minmax(130px,1fr))] border-b border-[var(--color-divider)] bg-white hover:bg-[rgba(15,23,42,0.02)]">
-                            <div className="sticky left-0 z-20 border-r border-[var(--color-divider)] bg-white px-3 py-2">
-                                <div className="flex w-full flex-col items-center justify-center text-center">
-                                  <WorkerAvatar name={member.full_name} size={28} />
-                                  <div className="min-w-0">
-                                    <p className="mt-1 truncate text-[12px] font-semibold text-[var(--color-heading)]">{member.full_name}</p>
-                                    <p className={`mt-0.5 truncate text-[10px] font-semibold ${memberTone.text}`}>{memberPositionLabel}</p>
-                                    {isADMIN ? (
-                                      <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
-                                        {member.hourly_rate_pln} PLN/h • {(previewHoursByUser[member.id] ?? 0).toFixed(1)}h
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              </div>
-                            {weekDays.map((day) => {
-                              const cells = mergedPreviewCellsByUserDay[member.id]?.[day.iso] ?? [];
-                              return (
-                                <div
-                                  key={`${member.id}-${day.iso}`}
-                                  className={`group min-h-[56px] border-r border-[var(--color-divider)] px-1 py-1 align-top ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"}`}
-                                >
-                                  {cells.length ? (
-                                    <div className="flex flex-col items-start gap-1">
-                                      {cells.map((cell) => {
-                                        const canInlineEdit =
-                                          cell.required_count <= 1 &&
-                                          cell.assigned_users.length <= 1 &&
-                                          (cell.assigned_users.length === 0 || cell.assigned_users.some((item) => item.user_id === member.id));
-                                        const draft = previewDrafts[cell.shift_key] ?? {
-                                          startTime: cell.start_time.slice(0, 5),
-                                          endTime: cell.end_time.slice(0, 5),
-                                        };
-                                        const isEditing = editingShiftKey === cell.shift_key && canInlineEdit;
-                                        const timeLabel = `${formatTime(draft.startTime)}-${formatTime(draft.endTime)}`;
-
-                                        return (
-                                          <ShiftBlock
-                                            key={`${member.id}-${cell.shift_key}`}
-                                            timeRangeLabel={timeLabel}
-                                            positionLabel={cell.staff_position ?? member.staff_position ?? member.role}
-                                            fitContent
-                                            editable={canInlineEdit}
-                                            isEditing={isEditing}
-                                            editText={isEditing ? editingValue : `${draft.startTime}-${draft.endTime}`}
-                                            onStartEdit={() => {
-                                              if (!canInlineEdit) return;
-                                              setEditingShiftKey(cell.shift_key);
-                                              setEditingValue(`${draft.startTime}-${draft.endTime}`);
-                                            }}
-                                            onEditTextChange={(next) => setEditingValue(next)}
-                                            onEditKeyDown={(event) => {
-                                              if (event.key === "Escape") {
-                                                event.preventDefault();
-                                                setEditingShiftKey(null);
-                                                setEditingValue("");
-                                                return;
-                                              }
-                                              if (event.key !== "Enter") return;
-                                              event.preventDefault();
-                                              const parsed = parseInlineTimeRange(editingValue);
-                                              if (!parsed) {
-                                                toast.warning(t("schedule.time_format_warning"));
-                                                return;
-                                              }
-                                              setPreviewDrafts((current) => ({
-                                                ...current,
-                                                [cell.shift_key]: {
-                                                  startTime: parsed.start.slice(0, 5),
-                                                  endTime: parsed.end.slice(0, 5),
-                                                },
-                                              }));
-                                              patchPreviewEditMutation.mutate(
-                                                {
-                                                  action: "upsert",
-                                                  shift_key: cell.shift_key,
-                                                  start_time: parsed.start,
-                                                  end_time: parsed.end,
-                                                },
-                                                {
-                                                  onSuccess: () => {
-                                                    setEditingShiftKey(null);
-                                                    setEditingValue("");
-                                                  },
-                                                },
-                                              );
-                                            }}
-                                            onDelete={
-                                              canInlineEdit
-                                                ? () => {
-                                                    patchPreviewEditMutation.mutate(
-                                                      { action: "delete", shift_key: cell.shift_key },
-                                                      {
-                                                        onSuccess: () => {
-                                                          setEditingShiftKey(null);
-                                                          setEditingValue("");
-                                                        },
-                                                      },
-                                                    );
-                                                  }
-                                                : undefined
-                                            }
-                                          />
-                                        );
-                                      })}
-                                    </div>
-                                  ) : (
-                                    <div className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-[0.85rem] border border-dashed border-transparent px-1 py-1.5 text-center group-hover:border-[var(--color-border)] group-hover:bg-[var(--color-surface-muted)]">
-                                      {managerAvailabilityByUserDay[member.id]?.[day.iso]?.windowLabel ? (
-                                        <>
-                                          <p className="truncate text-[10px] font-semibold text-[var(--color-heading)]">
-                                            {managerAvailabilityByUserDay[member.id][day.iso].windowLabel}
-                                          </p>
-                                          <p className="text-[9px] text-[var(--color-text-muted)]">
-                                            {t("schedule.desired_hours_week", { hours: managerAvailabilityByUserDay[member.id][day.iso].desiredHours })}
-                                          </p>
-                                        </>
-                                      ) : (
-                                        <p className="text-[9px] text-[var(--color-text-muted)]">{t("schedule.no_submitted_availability")}</p>
-                                      )}
-                                      <button
-                                        type="button"
-                                        className="invisible mt-0.5 grid size-6 place-items-center rounded-full border border-[var(--color-border)] bg-white text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] group-hover:visible"
-                                        onClick={() =>
-                                          patchPreviewEditMutation.mutate({
-                                            action: "create",
-                                            shift_key: `create:${member.id}:${day.iso}`,
-                                            location_id: locationFilter,
-                                            day_of_week: weekDays.findIndex((weekDay) => weekDay.iso === day.iso),
-                                            start_time: "11:00:00",
-                                            end_time: "22:00:00",
-                                            required_role: member.role,
-                                            staff_position: member.role === "STAFF" ? member.staff_position ?? "Cook" : null,
-                                            required_count: 1,
-                                            assigned_user_id: member.id,
-                                          })
-                                        }
-                                        disabled={member.role === "ADMIN"}
-                                      >
-                                        <Plus className="size-4" />
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  </>
+                {scheduleStage === "preview" ? (
+                  <PreviewCardsBoard
+                    weekDays={weekDays}
+                    entriesByDate={previewEntriesByDate}
+                    warningEntriesByDate={previewWarningEntriesByDate}
+                    todayIso={todayIso}
+                    t={t}
+                    onCreate={openPreviewCreateModal}
+                    onEdit={openPreviewEditModal}
+                    onDelete={(entry) =>
+                      patchPreviewEditMutation.mutate({
+                        action: "delete",
+                        shift_key: `override:${entry.overrideId}`,
+                      })
+                    }
+                  />
                 ) : null}
 
                 {scheduleStage === "applied" ? (
                   <>
-                  <div className="hidden lg:flex lg:items-center lg:justify-end">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant={mobileAppliedView === "cards" ? "default" : "secondary"} className="min-w-[132px]" onClick={() => setMobileAppliedView("cards")}>
-                        {t("schedule.cards_view")}
-                      </Button>
-                      <Button variant={mobileAppliedView === "timetable" ? "default" : "secondary"} className="min-w-[132px]" onClick={() => setMobileAppliedView("timetable")}>
-                        {t("schedule.timetable_view")}
-                      </Button>
-                    </div>
-                  </div>
                   <div className="space-y-3 lg:hidden">
                     <div className="grid grid-cols-2 gap-2">
                       <Button variant={mobileAppliedView === "cards" ? "default" : "secondary"} className="w-full" onClick={() => setMobileAppliedView("cards")}>
@@ -3247,6 +3069,16 @@ export function SchedulePage() {
                       <Button variant={mobileAppliedView === "timetable" ? "default" : "secondary"} className="w-full" onClick={() => setMobileAppliedView("timetable")}>
                         {t("schedule.timetable_view")}
                       </Button>
+                    </div>
+                    <div className="overflow-x-auto pb-1">
+                      <div className="inline-flex min-w-max items-center gap-x-5 gap-y-2">
+                        {roleLegendItems.map((item) => (
+                          <div key={`mobile-${item.label}`} className="inline-flex items-center gap-2 text-sm text-[var(--color-heading)]">
+                            <span className="size-4 rounded-md" style={{ backgroundColor: item.accent }} />
+                            <span>{item.label}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     {mobileAppliedView === "cards" ? (
@@ -3376,36 +3208,38 @@ export function SchedulePage() {
 
       )}
 
-      {mobilePreviewCreateState ? (
+      {previewEditorModal ? (
         <OverlayPortal>
-          <div className="mobile-sheet-backdrop lg:hidden">
-            <div className="mobile-sheet-panel">
-              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4">
+          <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
+            <div className="mobile-sheet-panel lg:w-full lg:max-w-[520px] lg:rounded-[1.5rem] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 lg:shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
                 <div>
-                  <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{t("schedule.add_shift")}</p>
+                  <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">
+                    {previewEditorModal.mode === "create" ? t("schedule.add_shift") : t("common.edit")}
+                  </p>
                   <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                    {selectedDay?.title} • {selectedDay?.caption}
+                    {weekDays[previewEditorModal.dayIndex]?.title} • {weekDays[previewEditorModal.dayIndex]?.caption}
                   </p>
                 </div>
                 <button
                   type="button"
                   className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
-                  onClick={() => setMobilePreviewCreateState(null)}
+                  onClick={() => setPreviewEditorModal(null)}
                   aria-label="Close"
                 >
                   <XCircle className="size-5" />
                 </button>
               </div>
 
-              <div className="mobile-sheet-scroll px-4 py-4">
+              <div className="mobile-sheet-scroll px-4 py-4 lg:px-0">
                 <div className="grid gap-4">
                   <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
                     {t("common.worker")}
                     <Select
-                      options={mobilePreviewAssignableOptions}
-                      value={mobilePreviewCreateState.userId}
+                      options={previewEditorWorkerOptions.map((item) => ({ value: item.value, label: item.label }))}
+                      value={previewEditorModal.userId}
                       onChange={(event) =>
-                        setMobilePreviewCreateState((current) =>
+                        setPreviewEditorModal((current) =>
                           current ? { ...current, userId: event.target.value } : current,
                         )
                       }
@@ -3416,9 +3250,9 @@ export function SchedulePage() {
                       {t("schedule.start_time_label")}
                       <Input
                         type="time"
-                        value={mobilePreviewCreateState.startTime}
+                        value={previewEditorModal.startTime}
                         onChange={(event) =>
-                          setMobilePreviewCreateState((current) =>
+                          setPreviewEditorModal((current) =>
                             current ? { ...current, startTime: event.target.value } : current,
                           )
                         }
@@ -3428,48 +3262,82 @@ export function SchedulePage() {
                       {t("schedule.end_time_label")}
                       <Input
                         type="time"
-                        value={mobilePreviewCreateState.endTime}
+                        value={previewEditorModal.endTime}
                         onChange={(event) =>
-                          setMobilePreviewCreateState((current) =>
+                          setPreviewEditorModal((current) =>
                             current ? { ...current, endTime: event.target.value } : current,
                           )
                         }
                       />
                     </label>
                   </div>
+                  {selectedPreviewEditorMember && selectedPreviewEditorAvailability ? (
+                    <div className="rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-3">
+                      <p className="text-sm font-semibold text-[var(--color-heading)]">
+                        {selectedPreviewEditorMember.full_name} • {selectedPreviewEditorMember.staff_position ?? selectedPreviewEditorMember.role}
+                      </p>
+                      <p
+                        className={`mt-1 text-sm ${
+                          selectedPreviewEditorAvailability.tone === "ok"
+                            ? "text-emerald-700"
+                            : selectedPreviewEditorAvailability.tone === "warning"
+                              ? "text-amber-700"
+                              : "text-[var(--color-text-muted)]"
+                        }`}
+                      >
+                        {selectedPreviewEditorAvailability.label}
+                      </p>
+                      {managerAvailabilityByUserDay[selectedPreviewEditorMember.id]?.[previewEditorModal.dayIso]?.windowLabel ? (
+                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                          {managerAvailabilityByUserDay[selectedPreviewEditorMember.id][previewEditorModal.dayIso].windowLabel}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
-              <div className="border-t border-[var(--color-divider)] px-4 py-4">
+              <div className="border-t border-[var(--color-divider)] px-4 py-4 lg:px-0">
                 <div className="grid gap-2">
-                  <Button variant="secondary" onClick={() => setMobilePreviewCreateState(null)}>
+                  <Button variant="secondary" onClick={() => setPreviewEditorModal(null)}>
                     {t("common.cancel")}
                   </Button>
                   <Button
                     onClick={() => {
-                      const selectedMember = sortedLocationMembers.find((member) => member.id === mobilePreviewCreateState.userId);
+                      const selectedMember = sortedLocationMembers.find((member) => member.id === previewEditorModal.userId);
                       if (!selectedMember) return;
                       patchPreviewEditMutation.mutate(
-                        {
-                          action: "create",
-                          shift_key: `create:${selectedMember.id}:${selectedDay?.iso}`,
-                          location_id: locationFilter,
-                          day_of_week: selectedDayIndex,
-                          start_time: `${mobilePreviewCreateState.startTime}:00`,
-                          end_time: `${mobilePreviewCreateState.endTime}:00`,
-                          required_role: selectedMember.role,
-                          staff_position: selectedMember.role === "STAFF" ? selectedMember.staff_position ?? "Cook" : null,
-                          required_count: 1,
-                          assigned_user_id: selectedMember.id,
-                        },
+                        previewEditorModal.mode === "create"
+                          ? {
+                              action: "create",
+                              shift_key: `create:${selectedMember.id}:${previewEditorModal.dayIso}`,
+                              location_id: locationFilter,
+                              day_of_week: previewEditorModal.dayIndex,
+                              start_time: `${previewEditorModal.startTime}:00`,
+                              end_time: `${previewEditorModal.endTime}:00`,
+                              required_role: selectedMember.role,
+                              staff_position: selectedMember.role === "STAFF" ? selectedMember.staff_position ?? "Cook" : null,
+                              required_count: 1,
+                              assigned_user_id: selectedMember.id,
+                            }
+                          : {
+                              action: "upsert",
+                              shift_key: `override:${previewEditorModal.overrideId}`,
+                              start_time: `${previewEditorModal.startTime}:00`,
+                              end_time: `${previewEditorModal.endTime}:00`,
+                              assigned_user_id: selectedMember.id,
+                              required_role: selectedMember.role,
+                              staff_position: selectedMember.role === "STAFF" ? selectedMember.staff_position ?? "Cook" : null,
+                              required_count: 1,
+                            },
                         {
                           onSuccess: () => {
-                            setMobilePreviewCreateState(null);
+                            setPreviewEditorModal(null);
                           },
                         },
                       );
                     }}
-                    disabled={patchPreviewEditMutation.isPending || !mobilePreviewCreateState.userId || !locationFilter}
+                    disabled={patchPreviewEditMutation.isPending || !previewEditorModal.userId || !locationFilter}
                   >
                     {t("common.save")}
                   </Button>

@@ -275,6 +275,107 @@ def test_workers_setup_patch_and_missing_availability_excludes_employee(client):
     assert any("availability_missing" in item["reasons"] for item in preview_data["rejected_candidates"])
 
 
+def test_generate_endpoint_does_not_publish_schedule(client):
+    ADMIN_token, location_id = signup_ADMIN(client, organization_name="Preview Only Org", email="ADMIN@preview-only.com")
+    staff_token = invite_accept_login(
+        client,
+        ADMIN_token=ADMIN_token,
+        email="staff@preview-only.com",
+        full_name="Preview Staff",
+        location_id=location_id,
+    )
+    staff_user_id = get_user_id(client, token=ADMIN_token, email="staff@preview-only.com")
+
+    patch_member = client.patch(
+        f"/locations/{location_id}/members/{staff_user_id}",
+        headers=auth_header(ADMIN_token),
+        json={"hourly_rate_pln": "32.00", "priority": 5, "max_hours_per_week": 40},
+    )
+    assert patch_member.status_code == 200
+
+    monday = current_monday()
+    assert submit_staff_availability(client, staff_token=staff_token, week_start=monday, desired_hours=32).status_code == 200
+    create_template(client, ADMIN_token=ADMIN_token, location_id=location_id)
+
+    generate = client.post(
+        "/schedule/generate",
+        headers=auth_header(ADMIN_token),
+        json={"week_start": monday.isoformat(), "location_id": location_id},
+    )
+    assert generate.status_code == 200
+    assert generate.json()["data"]["created_assignments"] == 1
+
+    shifts = client.get(
+        "/schedule/shifts",
+        headers=auth_header(ADMIN_token),
+        params={"week_start": monday.isoformat()},
+    )
+    assert shifts.status_code == 200
+    assert shifts.json()["data"] == []
+
+
+def test_freeze_applied_week_creates_single_slot_preview_overrides(client):
+    ADMIN_token, location_id = signup_ADMIN(client, organization_name="Freeze Org", email="ADMIN@freeze.com")
+    staff_a_token = invite_accept_login(
+        client,
+        ADMIN_token=ADMIN_token,
+        email="staff-a@freeze.com",
+        full_name="Freeze Staff A",
+        location_id=location_id,
+    )
+    staff_b_token = invite_accept_login(
+        client,
+        ADMIN_token=ADMIN_token,
+        email="staff-b@freeze.com",
+        full_name="Freeze Staff B",
+        location_id=location_id,
+    )
+    staff_a_id = get_user_id(client, token=ADMIN_token, email="staff-a@freeze.com")
+    staff_b_id = get_user_id(client, token=ADMIN_token, email="staff-b@freeze.com")
+
+    for staff_id, rate in ((staff_a_id, "28.00"), (staff_b_id, "29.00")):
+        patch_member = client.patch(
+            f"/locations/{location_id}/members/{staff_id}",
+            headers=auth_header(ADMIN_token),
+            json={"hourly_rate_pln": rate, "priority": 5, "max_hours_per_week": 40},
+        )
+        assert patch_member.status_code == 200
+
+    monday = current_monday()
+    assert submit_staff_availability(client, staff_token=staff_a_token, week_start=monday, desired_hours=32).status_code == 200
+    assert submit_staff_availability(client, staff_token=staff_b_token, week_start=monday, desired_hours=32).status_code == 200
+    create_template(client, ADMIN_token=ADMIN_token, location_id=location_id, required_count=3)
+
+    apply = client.post(
+        "/schedule/generate/apply",
+        headers=auth_header(ADMIN_token),
+        json={"week_start": monday.isoformat(), "location_id": location_id},
+    )
+    assert apply.status_code == 200
+    assert apply.json()["data"]["created_assignments"] == 2
+
+    freeze = client.post(
+        "/schedule/preview/freeze-applied",
+        headers=auth_header(ADMIN_token),
+        json={"week_start": monday.isoformat(), "location_id": location_id},
+    )
+    assert freeze.status_code == 200
+    freeze_items = freeze.json()["data"]
+    assert len(freeze_items) == 3
+    assert all(item["required_count"] == 1 for item in freeze_items)
+    assert sum(1 for item in freeze_items if item["assigned_user_id"]) == 2
+    assert sum(1 for item in freeze_items if item["assigned_user_id"] is None) == 1
+
+    preview_calendar = client.get(
+        "/schedule/preview/calendar",
+        headers=auth_header(ADMIN_token),
+        params={"week_start": monday.isoformat(), "location_id": location_id},
+    )
+    assert preview_calendar.status_code == 200
+    open_shifts_by_day = preview_calendar.json()["data"]["open_shifts_by_day"]
+    assert len(open_shifts_by_day[monday.isoformat()]) == 1
+
+
 def test_manual_override_without_reason_autofills_audit(client):
     ADMIN_token, location_id = signup_ADMIN(client, organization_name="Override Org", email="ADMIN@override.com")
     staff_a_token = invite_accept_login(

@@ -5,6 +5,7 @@ import logging
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
@@ -17,6 +18,7 @@ from app.routers import (
     locations,
     notifications,
     organizations,
+    payroll,
     positions,
     reports,
     schedule,
@@ -58,7 +60,7 @@ async def http_exception_handler(_: Request, exc: HTTPException):
 async def validation_exception_handler(_: Request, exc: RequestValidationError):
     return JSONResponse(
         status_code=422,
-        content=error_payload(code="VALIDATION_ERROR", message="Validation failed", details=exc.errors()),
+        content=error_payload(code="VALIDATION_ERROR", message="Validation failed", details=jsonable_encoder(exc.errors())),
     )
 
 
@@ -90,3 +92,4 @@ app.include_router(tasks.router)
 app.include_router(reports.router)
 app.include_router(notifications.router)
 app.include_router(dashboard.router)
+app.include_router(payroll.router)

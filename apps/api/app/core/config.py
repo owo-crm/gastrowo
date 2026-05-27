@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     frontend_url: str = "http://localhost:5173"
     resend_api_key: str = ""
+    resend_from_email: str = "noreply@info.owocrm.com"
+    auth_session_cookie_name: str = "gastrowo_session"
+    auth_session_ttl_days: int = 30
+    auth_session_secure_cookie: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 

@@ -1,13 +1,13 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
-import { canAccessInventory, canAccessNotes, canAccessReport, canManageTeam, canViewOverview } from "@/lib/access";
+import { canAccessNotes, canAccessReport, canManageTeam, canViewOverview, canViewPayroll } from "@/lib/access";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { BillingPage } from "@/pages/billing-page";
-import { InventoryPage } from "@/pages/inventory-page";
 import { LandingPage } from "@/pages/landing-page";
 import { LoginPage } from "@/pages/login-page";
 import { NotesDocumentsPage } from "@/pages/notes-documents-page";
 import { PendingLinkPage } from "@/pages/pending-link-page";
+import { PayrollPage } from "@/pages/payroll-page";
 import { ProfilePage } from "@/pages/profile-page";
 import { ReportPage } from "@/pages/report-page";
 import { SchedulePage } from "@/pages/schedule-page";
@@ -17,22 +17,29 @@ import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
-  const { token, me, isLoading } = useAuth();
+  const { token, me, isLoading, hasExplicitLogoutGuard } = useAuth();
   const location = useLocation();
   const { t } = useLanguage();
+  const effectiveToken = hasExplicitLogoutGuard ? null : token;
+  const effectiveMe = hasExplicitLogoutGuard ? null : me;
 
   if (isLoading) {
     return <div className="p-6 text-center text-[var(--color-text-muted)]">{t("common.loading")}</div>;
   }
 
-  if (!token) {
+  if (!effectiveToken) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
-  if (me && !me.is_linked) {
+  if (effectiveMe && !effectiveMe.is_linked) {
     return <Navigate to="/pending-link" replace />;
   }
 
   return children;
+}
+
+function AuthBootstrapScreen() {
+  const { t } = useLanguage();
+  return <div className="flex min-h-screen items-center justify-center p-6 text-center text-[var(--color-text-muted)]">{t("common.loading")}</div>;
 }
 
 function ADMINRoute({ children }: { children: JSX.Element }) {
@@ -51,7 +58,6 @@ function OverviewRoute({ children }: { children: JSX.Element }) {
 
 function ReportAccessRoute({ children }: { children: JSX.Element }) {
   const { me } = useAuth();
-  if (me?.role === "ADMIN") return <Navigate to="/overview" replace />;
   if (!canAccessReport(me)) return <Navigate to="/schedule" replace />;
   return children;
 }
@@ -68,33 +74,58 @@ function NotesAccessRoute({ children }: { children: JSX.Element }) {
   return children;
 }
 
-function InventoryAccessRoute({ children }: { children: JSX.Element }) {
+function PayrollAccessRoute({ children }: { children: JSX.Element }) {
   const { me } = useAuth();
-  if (!canAccessInventory(me)) return <Navigate to="/overview" replace />;
-  return children;
+  if (me?.role === "STAFF" || me?.role === "ADMIN") return children;
+  if (me?.role === "MANAGER" && canViewPayroll(me)) return children;
+  return <Navigate to="/schedule" replace />;
 }
 
 export function App() {
-  const { token, me } = useAuth();
-  const linkedDefaultRoute = me?.is_linked
-    ? me?.role === "ADMIN"
+  const { token, me, isLoading, hasExplicitLogoutGuard } = useAuth();
+  const effectiveToken = hasExplicitLogoutGuard ? null : token;
+  const effectiveMe = hasExplicitLogoutGuard ? null : me;
+  const hasUnresolvedSession = Boolean(effectiveToken && !effectiveMe);
+  const linkedDefaultRoute = effectiveMe?.is_linked
+    ? effectiveMe.role === "ADMIN"
       ? "/overview"
-      : me?.role === "MANAGER"
-        ? canViewOverview(me)
+      : effectiveMe.role === "MANAGER"
+        ? canViewOverview(effectiveMe)
           ? "/overview"
           : "/report"
         : "/schedule"
-    : "/pending-link";
+    : effectiveMe
+      ? "/pending-link"
+      : "/login";
+
+  if (isLoading) {
+    return <AuthBootstrapScreen />;
+  }
 
   return (
     <Routes>
-      <Route path="/" element={token ? <Navigate to={linkedDefaultRoute} replace /> : <LandingPage />} />
-      <Route path="/login" element={token ? <Navigate to={linkedDefaultRoute} replace /> : <LoginPage />} />
-      <Route path="/join" element={token ? <Navigate to={linkedDefaultRoute} replace /> : <LoginPage />} />
+      <Route
+        path="/"
+        element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : hasUnresolvedSession ? <PendingLinkPage /> : <LandingPage />}
+      />
+      <Route
+        path="/login"
+        element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : hasUnresolvedSession ? <PendingLinkPage /> : <LoginPage />}
+      />
+      <Route
+        path="/join"
+        element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : hasUnresolvedSession ? <PendingLinkPage /> : <LoginPage />}
+      />
       <Route
         path="/pending-link"
         element={
-          !token ? <Navigate to="/login" replace /> : me?.is_linked ? <Navigate to={linkedDefaultRoute} replace /> : <PendingLinkPage />
+          !effectiveToken ? (
+            <Navigate to="/login" replace />
+          ) : effectiveMe?.is_linked ? (
+            <Navigate to={linkedDefaultRoute} replace />
+          ) : (
+            <PendingLinkPage />
+          )
         }
       />
 
@@ -145,6 +176,16 @@ export function App() {
         }
       />
       <Route
+        path="/payroll"
+        element={
+          <ProtectedRoute>
+            <PayrollAccessRoute>
+              <PayrollPage />
+            </PayrollAccessRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/profile"
         element={
           <ProtectedRoute>
@@ -170,16 +211,7 @@ export function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/inventory"
-        element={
-          <ProtectedRoute>
-            <InventoryAccessRoute>
-              <InventoryPage />
-            </InventoryAccessRoute>
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/inventory" element={<Navigate to={effectiveToken ? linkedDefaultRoute : "/"} replace />} />
       <Route
         path="/billing"
         element={
@@ -193,7 +225,7 @@ export function App() {
 
       <Route path="/home" element={<Navigate to="/overview" replace />} />
       <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
-      <Route path="*" element={<Navigate to={token ? linkedDefaultRoute : "/"} replace />} />
+      <Route path="*" element={<Navigate to={effectiveToken ? linkedDefaultRoute : "/"} replace />} />
     </Routes>
   );
 }

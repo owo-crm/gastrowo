@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { OverlayPortal } from "@/components/ui/overlay-portal";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
+import { formatRelativeTimestamp } from "@/lib/date";
 import { fileToDataUrl } from "@/lib/file";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
@@ -215,16 +216,6 @@ function contactToneClass(index: number) {
   return contactToneClasses[index % contactToneClasses.length];
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
 function formatBytes(bytes?: number | null) {
   if (!bytes) return null;
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -266,7 +257,7 @@ function closeModalAnimation() {
 }
 
 export function NotesDocumentsPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { me } = useAuth();
   const toast = useToast();
 
@@ -762,7 +753,12 @@ export function NotesDocumentsPage() {
                           <UserRound className="size-4" /> {item.author}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
-                          <CalendarDays className="size-4" /> Updated {formatDateTime(item.updated_at)}
+                          <CalendarDays className="size-4" />{" "}
+                          {formatRelativeTimestamp(item.updated_at, {
+                            todayLabel: t("common.today"),
+                            yesterdayLabel: t("common.yesterday"),
+                            locale: lang,
+                          })}
                         </span>
                       </div>
                     </article>
@@ -837,7 +833,11 @@ export function NotesDocumentsPage() {
                       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-divider)] pt-3 text-xs text-[var(--color-text-muted)]">
                         <span className="inline-flex items-center gap-1.5">
                           <Building2 className="size-3.5" />
-                          Updated {formatDateTime(contact.updated_at)}
+                          {formatRelativeTimestamp(contact.updated_at, {
+                            todayLabel: t("common.today"),
+                            yesterdayLabel: t("common.yesterday"),
+                            locale: lang,
+                          })}
                         </span>
                         <div className="flex flex-wrap gap-2">
                           <Button variant="ghost" size="sm" onClick={() => openContactEditModal(contact)}>

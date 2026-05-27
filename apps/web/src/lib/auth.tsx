@@ -1,12 +1,17 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { api } from "@/lib/api";
 import type { AuthLoginResponse, MeResponse, OtpSendPurpose, OtpSendResponse, OtpVerifyResponse } from "@/lib/types";
+
+const TOKEN_STORAGE_KEY = "gastrowo.token";
+const LEGACY_TOKEN_STORAGE_KEY = "workdish.token";
+const EXPLICIT_LOGOUT_STORAGE_KEY = "gastrowo.explicit-logout";
 
 type AuthContextValue = {
   token: string | null;
   me: MeResponse | null;
   isLoading: boolean;
+  hasExplicitLogoutGuard: boolean;
   refreshMe: () => Promise<void>;
   sendOtp: (payload: { email: string; purpose: OtpSendPurpose; invite_token?: string | null }) => Promise<OtpSendResponse>;
   verifyOtp: (payload: { email: string; code: string; purpose: OtpSendPurpose; full_name?: string; invite_token?: string | null }) => Promise<OtpVerifyResponse>;
@@ -19,7 +24,7 @@ type AuthContextValue = {
     source: string;
   }) => Promise<void>;
   verifyInviteJoin: (payload: { email: string; code: string; invite_token: string }) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -29,40 +34,97 @@ function hasSessionToken(payload: AuthLoginResponse | OtpVerifyResponse): payloa
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("gastrowo.token") ?? localStorage.getItem("workdish.token"));
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_STORAGE_KEY) ?? localStorage.getItem(LEGACY_TOKEN_STORAGE_KEY));
   const [me, setMe] = useState<MeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasExplicitLogoutGuard, setHasExplicitLogoutGuard] = useState(() => sessionStorage.getItem(EXPLICIT_LOGOUT_STORAGE_KEY) === "1");
+  const authRunIdRef = useRef(0);
+
+  const clearLocalSession = () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_TOKEN_STORAGE_KEY);
+    setToken(null);
+    setMe(null);
+  };
 
   const hydrateMe = async (nextToken: string) => {
     const currentMe = await api.me(nextToken);
     setMe(currentMe);
   };
 
-  const applySession = async (nextToken: string) => {
-    localStorage.setItem("gastrowo.token", nextToken);
-    localStorage.removeItem("workdish.token");
+  const applyLocalSession = (nextToken: string) => {
+    localStorage.setItem(TOKEN_STORAGE_KEY, nextToken);
+    localStorage.removeItem(LEGACY_TOKEN_STORAGE_KEY);
+    sessionStorage.removeItem(EXPLICIT_LOGOUT_STORAGE_KEY);
+    setHasExplicitLogoutGuard(false);
     setToken(nextToken);
+  };
+
+  const applySession = async (nextToken: string) => {
+    applyLocalSession(nextToken);
     await hydrateMe(nextToken);
   };
 
   useEffect(() => {
+    let cancelled = false;
+    const runId = ++authRunIdRef.current;
+    const isStale = () => cancelled || authRunIdRef.current !== runId;
+
     const run = async () => {
-      if (!token) {
-        setIsLoading(false);
+      const shouldSkipBootstrap = sessionStorage.getItem(EXPLICIT_LOGOUT_STORAGE_KEY) === "1";
+      if (token) {
+        try {
+          await hydrateMe(token);
+        } catch {
+          // Keep an already-restored session stable instead of bouncing
+          // between /login and /pending-link when /auth/me is flaky.
+          if (!isStale()) {
+            setMe(null);
+          }
+        } finally {
+          if (!isStale()) {
+            setIsLoading(false);
+          }
+        }
         return;
       }
+
+      if (shouldSkipBootstrap) {
+        if (!isStale()) {
+          setHasExplicitLogoutGuard(true);
+          clearLocalSession();
+          setIsLoading(false);
+        }
+        return;
+      }
+
       try {
-        await hydrateMe(token);
+        const session = await api.bootstrapSession();
+        if (isStale() || sessionStorage.getItem(EXPLICIT_LOGOUT_STORAGE_KEY) === "1") {
+          return;
+        }
+        applyLocalSession(session.access_token);
+        try {
+          await hydrateMe(session.access_token);
+        } catch {
+          if (!isStale()) {
+            setMe(null);
+          }
+        }
       } catch {
-        localStorage.removeItem("gastrowo.token");
-        localStorage.removeItem("workdish.token");
-        setToken(null);
-        setMe(null);
+        if (!isStale()) {
+          clearLocalSession();
+        }
       } finally {
-        setIsLoading(false);
+        if (!isStale()) {
+          setIsLoading(false);
+        }
       }
     };
     void run();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   useEffect(() => {
@@ -114,11 +176,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await applySession(response.access_token);
   };
 
-  const logout = () => {
-    localStorage.removeItem("gastrowo.token");
-    localStorage.removeItem("workdish.token");
-    setToken(null);
-    setMe(null);
+  const logout = async () => {
+    authRunIdRef.current += 1;
+    sessionStorage.setItem(EXPLICIT_LOGOUT_STORAGE_KEY, "1");
+    setHasExplicitLogoutGuard(true);
+    try {
+      await api.logout();
+    } catch {
+      // Keep local logout reliable even if the server cookie clear fails.
+    }
+    clearLocalSession();
   };
 
   const refreshMe = async () => {
@@ -127,8 +194,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo<AuthContextValue>(
-    () => ({ token, me, isLoading, refreshMe, sendOtp, verifyOtp, loginWithPassword, completeOwnerOnboarding, verifyInviteJoin, logout }),
-    [token, me, isLoading],
+    () => ({
+      token,
+      me,
+      isLoading,
+      hasExplicitLogoutGuard,
+      refreshMe,
+      sendOtp,
+      verifyOtp,
+      loginWithPassword,
+      completeOwnerOnboarding,
+      verifyInviteJoin,
+      logout,
+    }),
+    [token, me, isLoading, hasExplicitLogoutGuard],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

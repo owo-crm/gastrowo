@@ -31,6 +31,7 @@ from app.models import (
 from app.schemas import (
     AssignmentPatch,
     ScheduleGenerateRequest,
+    SchedulePreviewMaterializeRequest,
     SchedulePreviewEditPatch,
     SchedulePreviewAssignmentOut,
     SchedulePreviewCalendarOut,
@@ -159,6 +160,96 @@ def _serialize_plan(plan) -> dict:
 
 def _serialize_override(item: ScheduleWeeklyOverride) -> dict:
     return WeeklyShiftOverrideOut.model_validate(item).model_dump(mode="json")
+
+
+def _replace_location_overrides(
+    db: Session,
+    *,
+    organization_id: UUID,
+    week_start: date,
+    location_id: UUID,
+    created_by: UUID,
+    overrides: list[ScheduleWeeklyOverride],
+) -> list[ScheduleWeeklyOverride]:
+    db.execute(
+        delete(ScheduleWeeklyOverride).where(
+            ScheduleWeeklyOverride.organization_id == organization_id,
+            ScheduleWeeklyOverride.week_start == week_start,
+            ScheduleWeeklyOverride.location_id == location_id,
+        )
+    )
+    created: list[ScheduleWeeklyOverride] = []
+    for item in overrides:
+        item.organization_id = organization_id
+        item.week_start = week_start
+        item.location_id = location_id
+        item.created_by = created_by
+        db.add(item)
+        created.append(item)
+    db.commit()
+    for item in created:
+        db.refresh(item)
+    return created
+
+
+def _build_materialized_preview_overrides(
+    *,
+    plan,
+    week_start: date,
+    location_id: UUID,
+    created_by: UUID,
+) -> list[ScheduleWeeklyOverride]:
+    assignments_by_shift: dict[str, list] = defaultdict(list)
+    for assignment in plan.assignments:
+        if assignment.location_id != location_id:
+            continue
+        assignments_by_shift[assignment.shift_key].append(assignment)
+
+    created: list[ScheduleWeeklyOverride] = []
+    for demand in plan.demand_specs:
+        if demand.location_id != location_id:
+            continue
+        source_template_id = demand.template_id if demand.source == "template" else None
+        demand_assignments = assignments_by_shift.get(demand.shift_key, [])
+        for assignment in demand_assignments:
+            created.append(
+                ScheduleWeeklyOverride(
+                    organization_id=UUID(int=0),
+                    week_start=week_start,
+                    source_template_id=source_template_id,
+                    location_id=location_id,
+                    day_of_week=demand.date.weekday(),
+                    start_time=demand.start_time,
+                    end_time=demand.end_time,
+                    required_role=demand.required_role,
+                    staff_position=demand.staff_position,
+                    required_count=1,
+                    is_deleted=False,
+                    assigned_user_id=assignment.user_id,
+                    created_by=created_by,
+                )
+            )
+        missing_count = max(0, demand.required_count - len(demand_assignments))
+        for _ in range(missing_count):
+            created.append(
+                ScheduleWeeklyOverride(
+                    organization_id=UUID(int=0),
+                    week_start=week_start,
+                    source_template_id=source_template_id,
+                    location_id=location_id,
+                    day_of_week=demand.date.weekday(),
+                    start_time=demand.start_time,
+                    end_time=demand.end_time,
+                    required_role=demand.required_role,
+                    staff_position=demand.staff_position,
+                    required_count=1,
+                    is_deleted=False,
+                    assigned_user_id=None,
+                    created_by=created_by,
+                )
+            )
+
+    return created
 
 
 def _build_preview_calendar(plan, users: list[tuple[OrganizationMembership, User]], week_start: date) -> dict:
@@ -567,6 +658,44 @@ def get_preview_calendar(
     return ok(_build_preview_calendar(plan, users, week_start))
 
 
+@router.post("/preview/materialize")
+def materialize_generated_preview(
+    payload: SchedulePreviewMaterializeRequest,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    organization_id = context.membership.organization_id
+    location = db.scalar(
+        select(Location).where(
+            Location.id == payload.location_id,
+            Location.organization_id == organization_id,
+        )
+    )
+    if location is None:
+        raise HTTPException(status_code=404, detail="Location not found")
+
+    plan = plan_week_schedule(
+        db=db,
+        organization_id=organization_id,
+        week_start=payload.week_start,
+        location_id=payload.location_id,
+    )
+    created = _replace_location_overrides(
+        db,
+        organization_id=organization_id,
+        week_start=payload.week_start,
+        location_id=payload.location_id,
+        created_by=context.user.id,
+        overrides=_build_materialized_preview_overrides(
+            plan=plan,
+            week_start=payload.week_start,
+            location_id=payload.location_id,
+            created_by=context.user.id,
+        ),
+    )
+    return ok([_serialize_override(item) for item in created])
+
+
 @router.get("/overrides")
 def list_weekly_overrides(
     week_start: date,
@@ -607,6 +736,7 @@ def put_weekly_overrides(
         override = ScheduleWeeklyOverride(
             organization_id=organization_id,
             week_start=payload.week_start,
+            source_template_id=item.source_template_id,
             location_id=item.location_id,
             day_of_week=item.day_of_week,
             start_time=item.start_time,
@@ -614,12 +744,102 @@ def put_weekly_overrides(
             required_role=item.required_role,
             staff_position=item.staff_position.strip() if item.staff_position else None,
             required_count=item.required_count,
-            assigned_user_id=item.assigned_user_id,
+            is_deleted=item.is_deleted,
+            assigned_user_id=None if item.is_deleted else item.assigned_user_id,
             created_by=context.user.id,
         )
         db.add(override)
         created.append(override)
     db.commit()
+    return ok([_serialize_override(item) for item in created])
+
+
+@router.post("/preview/freeze-applied")
+def freeze_applied_week_into_preview(
+    payload: ScheduleGenerateRequest,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    if payload.location_id is None:
+        raise HTTPException(status_code=422, detail="location_id is required")
+
+    organization_id = context.membership.organization_id
+    week_end = payload.week_start + timedelta(days=6)
+
+    location = db.scalar(
+        select(Location).where(
+            Location.id == payload.location_id,
+            Location.organization_id == organization_id,
+        )
+    )
+    if location is None:
+        raise HTTPException(status_code=404, detail="Location not found")
+
+    shifts = db.scalars(
+        select(Shift)
+        .where(
+            Shift.organization_id == organization_id,
+            Shift.location_id == payload.location_id,
+            Shift.date >= payload.week_start,
+            Shift.date <= week_end,
+        )
+        .order_by(Shift.date, Shift.start_time, Shift.id)
+    ).all()
+    shift_ids = [item.id for item in shifts]
+    assignments = db.scalars(select(Assignment).where(Assignment.shift_id.in_(shift_ids))).all() if shift_ids else []
+
+    assignments_by_shift: dict[UUID, list[Assignment]] = defaultdict(list)
+    for assignment in assignments:
+        assignments_by_shift[assignment.shift_id].append(assignment)
+
+    created_drafts: list[ScheduleWeeklyOverride] = []
+    for shift in shifts:
+        shift_assignments = assignments_by_shift.get(shift.id, [])
+        for assignment in shift_assignments:
+            created_drafts.append(
+                ScheduleWeeklyOverride(
+                organization_id=UUID(int=0),
+                week_start=payload.week_start,
+                source_template_id=None,
+                location_id=shift.location_id,
+                day_of_week=shift.date.weekday(),
+                start_time=shift.start_time,
+                end_time=shift.end_time,
+                required_role=shift.required_role,
+                staff_position=shift.staff_position,
+                required_count=1,
+                is_deleted=False,
+                assigned_user_id=assignment.user_id,
+                created_by=context.user.id,
+            ))
+
+        missing_count = max(0, shift.required_count - len(shift_assignments))
+        for _ in range(missing_count):
+            created_drafts.append(
+                ScheduleWeeklyOverride(
+                organization_id=UUID(int=0),
+                week_start=payload.week_start,
+                source_template_id=None,
+                location_id=shift.location_id,
+                day_of_week=shift.date.weekday(),
+                start_time=shift.start_time,
+                end_time=shift.end_time,
+                required_role=shift.required_role,
+                staff_position=shift.staff_position,
+                required_count=1,
+                is_deleted=False,
+                assigned_user_id=None,
+                created_by=context.user.id,
+            ))
+
+    created = _replace_location_overrides(
+        db,
+        organization_id=organization_id,
+        week_start=payload.week_start,
+        location_id=payload.location_id,
+        created_by=context.user.id,
+        overrides=created_drafts,
+    )
     return ok([_serialize_override(item) for item in created])
 
 
@@ -825,11 +1045,10 @@ def generate_schedule(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
-    plan = apply_week_schedule(
+    plan = plan_week_schedule(
         db=db,
         organization_id=context.membership.organization_id,
         week_start=payload.week_start,
-        actor_user_id=context.user.id,
         location_id=payload.location_id,
     )
     return ok(

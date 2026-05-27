@@ -3,25 +3,20 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import OrgContext, require_org_context
 from app.core.envelope import ok
 from app.db import get_db
 from app.models import InAppNotification
+from app.schemas import NotificationListOut, NotificationMarkReadRequest, NotificationOut
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
 def _serialize_notification(item: InAppNotification) -> dict:
-    return {
-        "id": str(item.id),
-        "title": item.title,
-        "body": item.body,
-        "read_at": item.read_at,
-        "created_at": item.created_at,
-    }
+    return NotificationOut.model_validate(item).model_dump(mode="json")
 
 
 @router.get("")
@@ -40,7 +35,41 @@ def list_notifications(
         .order_by(InAppNotification.created_at.desc())
         .limit(bounded_limit)
     ).all()
-    return ok([_serialize_notification(item) for item in rows])
+    unread_count = db.scalar(
+        select(func.count())
+        .select_from(InAppNotification)
+        .where(
+            InAppNotification.organization_id == context.membership.organization_id,
+            InAppNotification.user_id == context.user.id,
+            InAppNotification.read_at.is_(None),
+        )
+    ) or 0
+    return ok(
+        NotificationListOut(
+            items=[NotificationOut.model_validate(item) for item in rows],
+            unread_count=unread_count,
+        ).model_dump(mode="json")
+    )
+
+
+@router.post("/mark-read")
+def mark_notifications_read(
+    payload: NotificationMarkReadRequest,
+    context: OrgContext = Depends(require_org_context()),
+    db: Session = Depends(get_db),
+):
+    rows = db.scalars(
+        select(InAppNotification).where(
+            InAppNotification.id.in_(payload.ids),
+            InAppNotification.organization_id == context.membership.organization_id,
+            InAppNotification.user_id == context.user.id,
+        )
+    ).all()
+    for item in rows:
+        if item.read_at is None:
+            item.read_at = func.now()
+    db.commit()
+    return ok({"updated": len(rows)})
 
 
 @router.delete("/{notification_id}")

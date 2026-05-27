@@ -9,11 +9,14 @@ from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.models import (
     AssignmentStatusEnum,
+    NotificationTypeEnum,
     OtpPurposeEnum,
     RoleEnum,
     ShiftRequestStatusEnum,
     ShiftRequestTypeEnum,
     ShiftSourceEnum,
+    SubscriptionPlanEnum,
+    SubscriptionStatusEnum,
     TaskStatusEnum,
     TimesheetStatusEnum,
 )
@@ -74,6 +77,7 @@ class MeOut(APIModel):
     is_linked: bool
     memberships: list[MembershipOut]
     organization_settings: OrganizationSettingsOut | None = None
+    subscription: "SubscriptionSummaryOut | None" = None
 
 
 class OrganizationCreate(BaseModel):
@@ -158,6 +162,15 @@ class OtpVerifyResponse(APIModel):
     verification_token: str | None = None
 
 
+class SessionBootstrapResponse(APIModel):
+    access_token: str
+    token_type: str = "bearer"
+    status: str
+    memberships: list[MembershipOut]
+    active_organization_id: UUID | None = None
+    role: RoleEnum | None = None
+
+
 class OwnerOnboardingCompleteRequest(BaseModel):
     verification_token: str
     full_name: str = Field(min_length=2, max_length=120)
@@ -175,6 +188,55 @@ class InviteJoinVerifyRequest(BaseModel):
 class OrganizationOut(APIModel):
     id: UUID
     name: str
+
+
+class SubscriptionSummaryOut(APIModel):
+    plan: SubscriptionPlanEnum
+    status: SubscriptionStatusEnum
+    billing_cycle: str
+    trial_ends_at: datetime | None = None
+    current_period_ends_at: datetime | None = None
+    active_members_count: int
+    active_locations_count: int
+    member_cap: int | None = None
+    location_cap: int | None = None
+    soft_limit_reached: bool = False
+
+
+class NotificationOut(APIModel):
+    id: UUID
+    type: NotificationTypeEnum
+    title: str
+    body: str
+    action_url: str | None = None
+    entity_kind: str | None = None
+    entity_id: str | None = None
+    read_at: datetime | None
+    created_at: datetime
+
+
+class NotificationMarkReadRequest(BaseModel):
+    ids: list[UUID] = Field(min_length=1)
+
+
+class NotificationListOut(APIModel):
+    items: list[NotificationOut]
+    unread_count: int
+
+
+class MemberRemovalImpactOut(APIModel):
+    user_id: UUID
+    full_name: str
+    role: RoleEnum
+    future_assignments_count: int
+    pending_shift_requests_count: int
+    location_count: int
+    can_remove: bool
+    blocking_reason: str | None = None
+
+
+class MemberRemovalResultOut(MemberRemovalImpactOut):
+    removed: bool
 
 
 class LocationCreate(BaseModel):
@@ -289,6 +351,10 @@ class AvailabilityWeekUpsert(BaseModel):
     slots: list[AvailabilitySlotInput]
 
 
+class AvailabilityWeekApprove(BaseModel):
+    user_id: UUID
+
+
 class AvailabilitySlotOut(APIModel):
     id: UUID
     day_of_week: int
@@ -302,6 +368,8 @@ class AvailabilityWeekOut(APIModel):
     user_id: UUID
     week_start: date
     desired_hours: int
+    approved_at: datetime | None
+    approved_by: UUID | None
     locked_at: datetime | None
     locked_by: UUID | None
     slots: list[AvailabilitySlotOut]
@@ -550,19 +618,25 @@ class SchedulePreviewOut(BaseModel):
 class WeeklyShiftOverrideIn(BaseModel):
     id: UUID | None = None
     week_start: date
+    source_template_id: UUID | None = None
     location_id: UUID
     day_of_week: int = Field(ge=0, le=6)
     start_time: time
     end_time: time
     required_role: RoleEnum
     staff_position: str | None = Field(default=None, min_length=2, max_length=80)
-    required_count: int = Field(ge=1, le=25)
+    required_count: int = Field(ge=0, le=25)
+    is_deleted: bool = False
     assigned_user_id: UUID | None = None
 
     @model_validator(mode="after")
     def validate_override(self):
         if self.end_time <= self.start_time:
             raise ValueError("end_time must be later than start_time")
+        if self.is_deleted:
+            self.assigned_user_id = None
+        elif self.required_count <= 0:
+            raise ValueError("required_count must be greater than zero")
         if self.required_role == RoleEnum.STAFF and (self.staff_position is None or not self.staff_position.strip()):
             raise ValueError("staff_position is required when required_role is STAFF")
         if self.required_role != RoleEnum.STAFF:
@@ -602,6 +676,11 @@ class SchedulePreviewEditPatch(BaseModel):
     staff_position: str | None = Field(default=None, min_length=2, max_length=80)
     required_count: int | None = Field(default=None, ge=1, le=25)
     assigned_user_id: UUID | None = None
+
+
+class SchedulePreviewMaterializeRequest(BaseModel):
+    week_start: date
+    location_id: UUID
 
 
 class PreviewCalendarCellOut(BaseModel):

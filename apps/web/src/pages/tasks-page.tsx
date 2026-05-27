@@ -13,18 +13,11 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { formatRelativeTimestamp } from "@/lib/date";
 import { fileToDataUrl } from "@/lib/file";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import type { Task } from "@/lib/types";
-
-function formatTaskDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(value));
-}
 
 function taskMetaTone(isDone: boolean) {
   return isDone ? "text-emerald-700" : "text-[var(--color-text-muted)]";
@@ -39,6 +32,8 @@ function mobileComposerAnimation() {
   };
 }
 
+const emptyTaskForm = { title: "", description: "", assigned_to: "", location_id: "" };
+
 function TaskComposerFields({
   form,
   setForm,
@@ -50,6 +45,7 @@ function TaskComposerFields({
   isPending,
   t,
   compact = false,
+  showSubmitButton = true,
 }: {
   form: { title: string; description: string; assigned_to: string; location_id: string };
   setForm: Dispatch<SetStateAction<{ title: string; description: string; assigned_to: string; location_id: string }>>;
@@ -60,6 +56,7 @@ function TaskComposerFields({
   canSubmitTask: boolean;
   isPending: boolean;
   compact?: boolean;
+  showSubmitButton?: boolean;
   t: (key: string, params?: Record<string, string | number | null | undefined>) => string;
 }) {
   const fieldBlockClass = compact ? "space-y-1" : "space-y-1.5";
@@ -109,13 +106,15 @@ function TaskComposerFields({
         {taskFormErrors.location_id ? <p className="text-xs text-[var(--color-danger)]">{taskFormErrors.location_id}</p> : null}
       </div>
 
-      <Button
-        onClick={submitTask}
-        disabled={!canSubmitTask || isPending}
-        className={compact ? "w-full xl:min-h-[44px] xl:self-start xl:px-5" : "w-full"}
-      >
-        <Plus className="size-4" /> {t("tasks.create_task")}
-      </Button>
+      {showSubmitButton ? (
+        <Button
+          onClick={submitTask}
+          disabled={!canSubmitTask || isPending}
+          className={compact ? "w-full xl:min-h-[44px] xl:self-start xl:px-5" : "w-full"}
+        >
+          <Plus className="size-4" /> {t("tasks.create_task")}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -154,7 +153,7 @@ function TaskRow({
   const metaItems = [
     t("tasks.meta_to", { name: assignedName }),
     createdByName && createdByName !== assignedName ? t("tasks.meta_by", { name: createdByName }) : null,
-    t("tasks.created_on", { date: formatTaskDate(task.created_at) }),
+    t("tasks.created_on", { date: formatRelativeTimestamp(task.created_at, { todayLabel: t("common.today"), yesterdayLabel: t("common.yesterday") }) }),
   ].filter(Boolean);
 
   return (
@@ -255,9 +254,9 @@ export function TasksPage() {
   const { t } = useLanguage();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ title: "", description: "", assigned_to: "", location_id: "" });
+  const [form, setForm] = useState(emptyTaskForm);
   const [mobileStatusTab, setMobileStatusTab] = useState<"pending" | "done">("pending");
-  const [mobileComposerOpen, setMobileComposerOpen] = useState(false);
+  const [taskComposerOpen, setTaskComposerOpen] = useState(false);
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
 
   const usersQuery = useQuery({ queryKey: ["users"], queryFn: () => api.listUsers(token!), enabled: Boolean(token) });
@@ -294,6 +293,14 @@ export function TasksPage() {
   }, [normalizedTaskPayload, t, validLocationIds, validUserIds]);
 
   const canSubmitTask = Object.keys(taskFormErrors).length === 0;
+  const openTaskComposer = () => {
+    setForm(emptyTaskForm);
+    setTaskComposerOpen(true);
+  };
+  const closeTaskComposer = () => {
+    setTaskComposerOpen(false);
+    setForm(emptyTaskForm);
+  };
   const submitTask = () => {
     if (!canSubmitTask) return;
     createTaskMutation.mutate();
@@ -309,8 +316,7 @@ export function TasksPage() {
       }),
     onSuccess: (createdTask) => {
       toast.success(t("tasks.task_created"));
-      setForm({ title: "", description: "", assigned_to: "", location_id: "" });
-      setMobileComposerOpen(false);
+      closeTaskComposer();
       queryClient.setQueryData<Task[]>(["tasks"], (current) => [createdTask, ...(current ?? []).filter((task) => task.id !== createdTask.id)]);
       void queryClient.invalidateQueries({ queryKey: ["tasks"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
@@ -366,6 +372,7 @@ export function TasksPage() {
 
   const canCreate = Boolean(me);
   const canDelete = me?.role === "ADMIN" || me?.role === "MANAGER";
+  const isStaffView = me?.role === "STAFF";
   const tasks = tasksQuery.data ?? [];
   const columns = useMemo(
     () => ({
@@ -396,33 +403,23 @@ export function TasksPage() {
     deleteTaskMutation.mutate(task.id);
   };
 
-  if (me?.role === "STAFF") {
+  if (isStaffView) {
     return (
-      <AppShell title={t("tasks.title")} subtitle={t("tasks.subtitle.staff")} action={<Badge>{`${myPending.length}/${visibleStaffTasks.length}`}</Badge>}>
+      <AppShell
+        title={t("tasks.title")}
+        subtitle={t("tasks.subtitle.staff")}
+        action={
+          canCreate ? (
+            <Button size="sm" onClick={openTaskComposer}>
+              <Plus className="size-4" /> {t("tasks.create_task")}
+            </Button>
+          ) : (
+            <Badge>{`${myPending.length}/${visibleStaffTasks.length}`}</Badge>
+          )
+        }
+        hideBottomNav={taskComposerOpen}
+      >
         <div className="stagger-children space-y-4">
-          <Card className="overflow-hidden border-[var(--color-primary)]/12 bg-[linear-gradient(155deg,rgba(47,111,237,0.08),rgba(255,255,255,1))]">
-            <CardHeader className="pb-3">
-              <div>
-                <CardTitle>{t("tasks.create_task")}</CardTitle>
-                <CardDescription>{t("tasks.staff_create_description")}</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <TaskComposerFields
-                form={form}
-                setForm={setForm}
-                taskFormErrors={taskFormErrors}
-                users={usersQuery.data ?? []}
-                locations={locationsQuery.data ?? []}
-                submitTask={submitTask}
-                canSubmitTask={canSubmitTask}
-                isPending={createTaskMutation.isPending}
-                t={t}
-                compact
-              />
-            </CardContent>
-          </Card>
-
           <Card className="min-h-0 overflow-hidden">
             <CardHeader className="border-b border-[var(--color-divider)] pb-3">
               <div className="flex items-center justify-between gap-3">
@@ -468,27 +465,33 @@ export function TasksPage() {
   }
 
   return (
-    <AppShell title={t("tasks.title")} subtitle={t("tasks.subtitle.default")} action={<Badge>{columns.pending.length}</Badge>} hideBottomNav={mobileComposerOpen}>
+    <AppShell
+      title={t("tasks.title")}
+      subtitle={t("tasks.subtitle.default")}
+      action={
+        canCreate ? (
+          <Button size="sm" onClick={openTaskComposer}>
+            <Plus className="size-4" /> {t("tasks.create_task")}
+          </Button>
+        ) : (
+          <Badge>{columns.pending.length}</Badge>
+        )
+      }
+      hideBottomNav={taskComposerOpen}
+    >
       <div className="stagger-children space-y-4 lg:hidden">
-        {canCreate ? (
-          <div className="flex items-center justify-between gap-3">
-            <div className="inline-flex rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
-              {(["pending", "done"] as const).map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  className={`rounded-[0.8rem] px-3 py-2 text-sm font-semibold transition ${mobileStatusTab === status ? "bg-white text-[var(--color-primary)]" : "text-[var(--color-text-muted)]"}`}
-                  onClick={() => setMobileStatusTab(status)}
-                >
-                  {status === "pending" ? `${t("tasks.pending")} (${columns.pending.length})` : `${t("tasks.done")} (${columns.done.length})`}
-                </button>
-              ))}
-            </div>
-            <Button size="sm" onClick={() => setMobileComposerOpen(true)}>
-              <Plus className="size-4" /> {t("tasks.new")}
-            </Button>
-          </div>
-        ) : null}
+        <div className="inline-flex rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
+          {(["pending", "done"] as const).map((status) => (
+            <button
+              key={status}
+              type="button"
+              className={`rounded-[0.8rem] px-3 py-2 text-sm font-semibold transition ${mobileStatusTab === status ? "bg-white text-[var(--color-primary)]" : "text-[var(--color-text-muted)]"}`}
+              onClick={() => setMobileStatusTab(status)}
+            >
+              {status === "pending" ? `${t("tasks.pending")} (${columns.pending.length})` : `${t("tasks.done")} (${columns.done.length})`}
+            </button>
+          ))}
+        </div>
 
         <Card className="min-h-0 overflow-hidden">
           <CardHeader className="border-b border-[var(--color-divider)] pb-3">
@@ -529,35 +532,6 @@ export function TasksPage() {
       </div>
 
       <div className="hidden min-h-0 gap-5 lg:grid">
-        <Card className="overflow-hidden border-[var(--color-primary)]/12 bg-[linear-gradient(155deg,rgba(47,111,237,0.08),rgba(255,255,255,1))]">
-          <CardHeader className="pb-3">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <CardTitle>{t("tasks.create_task")}</CardTitle>
-                <CardDescription>{t("tasks.admin_create_description")}</CardDescription>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-muted)]">
-                <span className="rounded-full bg-[var(--color-warning-soft)] px-2.5 py-1 text-[var(--color-warning-text)]">{columns.pending.length} {t("tasks.pending")}</span>
-                <span className="rounded-full bg-[var(--color-success-soft)] px-2.5 py-1 text-[var(--color-success-text)]">{columns.done.length} {t("tasks.done")}</span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <TaskComposerFields
-              form={form}
-              setForm={setForm}
-              taskFormErrors={taskFormErrors}
-              users={usersQuery.data ?? []}
-              locations={locationsQuery.data ?? []}
-              submitTask={submitTask}
-              canSubmitTask={canSubmitTask}
-              isPending={createTaskMutation.isPending}
-              t={t}
-              compact
-            />
-          </CardContent>
-        </Card>
-
         <Card className="min-h-0 overflow-hidden">
           <CardHeader className="border-b border-[var(--color-divider)] pb-3">
             <div>
@@ -607,39 +581,41 @@ export function TasksPage() {
       </div>
 
       <AnimatePresence>
-        {canCreate && mobileComposerOpen ? (
+        {canCreate && taskComposerOpen ? (
           <OverlayPortal>
             <motion.div
-              className="fixed inset-0 z-[140] bg-slate-950/42 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-[140] bg-slate-950/42 backdrop-blur-sm"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
-              onClick={() => setMobileComposerOpen(false)}
+              onClick={closeTaskComposer}
             >
-              <div className="flex h-full w-full flex-col justify-end px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-16">
+              <div className="flex h-full w-full flex-col justify-end px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-16 sm:items-center sm:justify-center sm:p-4">
                 <motion.section
                   {...mobileComposerAnimation()}
-                  className="flex w-full max-h-[calc(100dvh-5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-[0_-24px_60px_rgba(15,23,42,0.18)]"
+                  className="flex w-full max-h-[calc(100dvh-5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-[0_-24px_60px_rgba(15,23,42,0.18)] sm:max-h-[90dvh] sm:max-w-[760px] sm:rounded-[1.6rem] sm:border sm:border-[var(--color-border)] sm:shadow-[0_26px_80px_rgba(15,23,42,0.18)]"
                   role="dialog"
                   aria-modal="true"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4">
+                  <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 sm:px-6 sm:py-5">
                     <div className="min-w-0">
                       <p className="text-lg font-semibold text-[var(--color-heading)]">{t("tasks.create_task")}</p>
-                      <p className="mt-1 text-sm text-[var(--color-text-muted)]">{t("tasks.mobile_composer_description")}</p>
+                      <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                        {isStaffView ? t("tasks.staff_create_description") : t("tasks.admin_create_description")}
+                      </p>
                     </div>
                     <button
                       type="button"
                       className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
-                      onClick={() => setMobileComposerOpen(false)}
+                      onClick={closeTaskComposer}
                       aria-label={t("common.close")}
                     >
                       <X className="size-5" />
                     </button>
                   </div>
-                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-5">
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-5 sm:px-6 sm:py-5">
                     <TaskComposerFields
                       form={form}
                       setForm={setForm}
@@ -650,7 +626,18 @@ export function TasksPage() {
                       canSubmitTask={canSubmitTask}
                       isPending={createTaskMutation.isPending}
                       t={t}
+                      showSubmitButton={false}
                     />
+                  </div>
+                  <div className="shrink-0 border-t border-[var(--color-divider)] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-4 sm:px-6 sm:py-5">
+                    <div className="grid gap-2 sm:flex sm:justify-end">
+                      <Button variant="secondary" onClick={closeTaskComposer}>
+                        {t("common.cancel")}
+                      </Button>
+                      <Button onClick={submitTask} disabled={!canSubmitTask || createTaskMutation.isPending}>
+                        <Plus className="size-4" /> {t("tasks.create_task")}
+                      </Button>
+                    </div>
                   </div>
                 </motion.section>
               </div>

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 import uuid
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -12,14 +13,32 @@ from app.core.deps import OrgContext, get_current_organization, get_current_user
 from app.core.envelope import ok
 from app.core.permissions import can_manage_business_settings, can_manage_team
 from app.db import get_db
-from app.models import InviteToken, Location, LocationMembership, Organization, OrganizationMembership, RoleEnum, User
+from app.models import (
+    Assignment,
+    InviteToken,
+    Location,
+    LocationMembership,
+    Organization,
+    OrganizationMembership,
+    OrganizationSubscription,
+    RoleEnum,
+    Shift,
+    ShiftRequest,
+    ShiftRequestStatusEnum,
+    SubscriptionPlanEnum,
+    SubscriptionStatusEnum,
+    User,
+)
 from app.schemas import (
     LinkByEmailRequest,
+    MemberRemovalImpactOut,
+    MemberRemovalResultOut,
     OrganizationCreate,
     OrganizationOut,
     OrganizationPatch,
     OrganizationSettingsOut,
     OrganizationSettingsPatch,
+    SubscriptionSummaryOut,
 )
 from app.services.auth_email import send_invite_email
 
@@ -45,6 +64,118 @@ def _require_business_settings_access(context: OrgContext, organization: Organiz
     if can_manage_business_settings(context.membership, organization):
         return
     raise HTTPException(status_code=403, detail="Business settings access is disabled for this role")
+
+
+def _get_or_create_subscription(db: Session, organization_id: UUID) -> OrganizationSubscription:
+    subscription = db.scalar(select(OrganizationSubscription).where(OrganizationSubscription.organization_id == organization_id))
+    if subscription is None:
+        subscription = OrganizationSubscription(
+            organization_id=organization_id,
+            plan=SubscriptionPlanEnum.FREE,
+            status=SubscriptionStatusEnum.ACTIVE,
+            billing_cycle="monthly",
+        )
+        db.add(subscription)
+        db.flush()
+    return subscription
+
+
+def _subscription_caps(subscription: OrganizationSubscription) -> tuple[int | None, int | None]:
+    if subscription.plan == SubscriptionPlanEnum.FREE:
+        return 5, 1
+    if subscription.plan == SubscriptionPlanEnum.PRO:
+        return 25, None
+    if subscription.plan == SubscriptionPlanEnum.BUSINESS:
+        return None, 5
+    return None, None
+
+
+def _build_subscription_summary(db: Session, organization_id: UUID) -> SubscriptionSummaryOut:
+    subscription = _get_or_create_subscription(db, organization_id)
+    active_members_count = db.scalar(
+        select(func.count()).select_from(OrganizationMembership).where(OrganizationMembership.organization_id == organization_id)
+    ) or 0
+    active_locations_count = db.scalar(select(func.count()).select_from(Location).where(Location.organization_id == organization_id)) or 0
+    member_cap, location_cap = _subscription_caps(subscription)
+    soft_limit_reached = bool(
+        (member_cap is not None and active_members_count >= member_cap)
+        or (location_cap is not None and active_locations_count >= location_cap)
+    )
+    return SubscriptionSummaryOut(
+        plan=subscription.plan,
+        status=subscription.status,
+        billing_cycle=subscription.billing_cycle,
+        trial_ends_at=subscription.trial_ends_at,
+        current_period_ends_at=subscription.current_period_ends_at,
+        active_members_count=active_members_count,
+        active_locations_count=active_locations_count,
+        member_cap=member_cap,
+        location_cap=location_cap,
+        soft_limit_reached=soft_limit_reached,
+    )
+
+
+def _member_removal_impact(db: Session, organization_id: UUID, user_id: UUID) -> MemberRemovalImpactOut:
+    membership = db.scalar(
+        select(OrganizationMembership).where(
+            OrganizationMembership.organization_id == organization_id,
+            OrganizationMembership.user_id == user_id,
+        )
+    )
+    user = db.get(User, user_id)
+    if membership is None or user is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    future_assignments_count = db.scalar(
+        select(func.count())
+        .select_from(Assignment)
+        .join(Shift, Shift.id == Assignment.shift_id)
+        .where(Assignment.user_id == user_id, Shift.organization_id == organization_id, Shift.date >= date.today())
+    ) or 0
+    pending_shift_requests_count = db.scalar(
+        select(func.count())
+        .select_from(ShiftRequest)
+        .join(Shift, Shift.id == ShiftRequest.shift_id)
+        .where(
+            Shift.organization_id == organization_id,
+            Shift.date >= date.today(),
+            ShiftRequest.status == ShiftRequestStatusEnum.PENDING,
+            (
+                (ShiftRequest.requester_user_id == user_id)
+                | (ShiftRequest.requester_assignment_id.in_(select(Assignment.id).where(Assignment.user_id == user_id)))
+                | (ShiftRequest.target_assignment_id.in_(select(Assignment.id).where(Assignment.user_id == user_id)))
+            ),
+        )
+    ) or 0
+    location_count = db.scalar(
+        select(func.count())
+        .select_from(LocationMembership)
+        .join(Location, Location.id == LocationMembership.location_id)
+        .where(LocationMembership.user_id == user_id, Location.organization_id == organization_id)
+    ) or 0
+
+    blocking_reason = None
+    can_remove = True
+    if membership.role == RoleEnum.ADMIN:
+        admin_count = db.scalar(
+            select(func.count()).select_from(OrganizationMembership).where(
+                OrganizationMembership.organization_id == organization_id,
+                OrganizationMembership.role == RoleEnum.ADMIN,
+            )
+        ) or 0
+        if admin_count <= 1:
+            can_remove = False
+            blocking_reason = "Cannot remove the last admin from the workspace"
+    return MemberRemovalImpactOut(
+        user_id=user.id,
+        full_name=user.full_name,
+        role=membership.role,
+        future_assignments_count=future_assignments_count,
+        pending_shift_requests_count=pending_shift_requests_count,
+        location_count=location_count,
+        can_remove=can_remove,
+        blocking_reason=blocking_reason,
+    )
 
 
 @router.get("")
@@ -89,6 +220,16 @@ def create_organization(
     db.add_all([membership, location])
     db.flush()
     db.add(LocationMembership(location_id=location.id, user_id=user.id))
+    db.add(
+        OrganizationSubscription(
+            organization_id=org.id,
+            plan=SubscriptionPlanEnum.PRO,
+            status=SubscriptionStatusEnum.TRIALING,
+            billing_cycle="monthly",
+            trial_ends_at=datetime.now(UTC) + timedelta(days=30),
+            current_period_ends_at=datetime.now(UTC) + timedelta(days=30),
+        )
+    )
     db.commit()
 
     return ok(OrganizationOut.model_validate(org).model_dump(mode="json"))
@@ -149,6 +290,9 @@ def link_member_by_email(
     organization = get_current_organization(context, db)
     if not can_manage_team(context.membership, organization):
         raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
+    subscription_summary = _build_subscription_summary(db, context.membership.organization_id)
+    if subscription_summary.member_cap is not None and subscription_summary.active_members_count >= subscription_summary.member_cap:
+        raise HTTPException(status_code=402, detail="Team member limit reached for the current plan")
     normalized_email = payload.email.lower()
     user = db.scalar(select(User).where(User.email == normalized_email))
     if user is None:
@@ -214,4 +358,85 @@ def link_member_by_email(
             "organization_id": str(context.membership.organization_id),
             "role": membership.role,
         }
+    )
+
+
+@router.get("/current/subscription")
+def current_subscription(
+    context: OrgContext = Depends(require_org_context()),
+    db: Session = Depends(get_db),
+):
+    return ok(_build_subscription_summary(db, context.membership.organization_id).model_dump(mode="json"))
+
+
+@router.get("/members/{user_id}/removal-impact")
+def member_removal_impact(
+    user_id: UUID,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    organization = get_current_organization(context, db)
+    if not can_manage_team(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
+    return ok(_member_removal_impact(db, context.membership.organization_id, user_id).model_dump(mode="json"))
+
+
+@router.delete("/members/{user_id}")
+def remove_member(
+    user_id: UUID,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    organization = get_current_organization(context, db)
+    if not can_manage_team(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
+    impact = _member_removal_impact(db, context.membership.organization_id, user_id)
+    if not impact.can_remove:
+        raise HTTPException(status_code=409, detail=impact.blocking_reason or "Member cannot be removed")
+
+    future_assignment_ids = db.scalars(
+        select(Assignment.id)
+        .join(Shift, Shift.id == Assignment.shift_id)
+        .where(Assignment.user_id == user_id, Shift.organization_id == context.membership.organization_id, Shift.date >= date.today())
+    ).all()
+    if future_assignment_ids:
+        pending_requests = db.scalars(
+            select(ShiftRequest).where(
+                ShiftRequest.status == ShiftRequestStatusEnum.PENDING,
+                (
+                    (ShiftRequest.requester_user_id == user_id)
+                    | (ShiftRequest.requester_assignment_id.in_(future_assignment_ids))
+                    | (ShiftRequest.target_assignment_id.in_(future_assignment_ids))
+                ),
+            )
+        ).all()
+        for request in pending_requests:
+            request.status = ShiftRequestStatusEnum.CANCELLED
+            request.resolved_at = datetime.now(UTC)
+            request.note = (request.note or "").strip() or "Cancelled automatically after member removal"
+        assignments = db.scalars(select(Assignment).where(Assignment.id.in_(future_assignment_ids))).all()
+        for assignment in assignments:
+            db.delete(assignment)
+
+    location_memberships = db.scalars(
+        select(LocationMembership)
+        .join(Location, Location.id == LocationMembership.location_id)
+        .where(Location.organization_id == context.membership.organization_id, LocationMembership.user_id == user_id)
+    ).all()
+    for location_membership in location_memberships:
+        db.delete(location_membership)
+    membership = db.scalar(
+        select(OrganizationMembership).where(
+            OrganizationMembership.organization_id == context.membership.organization_id,
+            OrganizationMembership.user_id == user_id,
+        )
+    )
+    if membership is not None:
+        db.delete(membership)
+    db.commit()
+    return ok(
+        MemberRemovalResultOut(
+            **impact.model_dump(),
+            removed=True,
+        ).model_dump(mode="json")
     )

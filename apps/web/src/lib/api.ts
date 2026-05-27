@@ -13,9 +13,12 @@ import type {
   PositionCatalog,
   OtpSendPurpose,
   OtpSendResponse,
+  SessionBootstrapResponse,
   OtpVerifyResponse,
+  NotificationListResponse,
   SchedulePreviewCalendar,
   SchedulePreviewEdit,
+  SchedulePreviewMaterializeRequest,
   SchedulePreview,
   Shift,
   ShiftTemplate,
@@ -25,23 +28,36 @@ import type {
   TimesheetEntry,
   TimesheetReviewAction,
   NotificationItem,
+  SubscriptionSummary,
+  PayrollSummary,
   User,
   WeeklyShiftOverride,
   WorkerSetup,
   ShiftEndPayload,
+  MemberRemovalImpact,
+  MemberRemovalResult,
 } from "@/lib/types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers ?? {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("NETWORK_ERROR");
+    }
+    throw error;
+  }
 
   const rawPayload = (await response.json().catch(() => null)) as (Envelope<T> & { detail?: unknown }) | null;
   const payload = rawPayload as Envelope<T> | null;
@@ -100,6 +116,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     });
+  },
+  bootstrapSession() {
+    return request<SessionBootstrapResponse>("/auth/session");
+  },
+  logout() {
+    return request<{ logged_out: boolean }>("/auth/logout", { method: "POST" });
   },
   me(token: string) {
     return request<MeResponse>("/auth/me", {}, token);
@@ -183,6 +205,15 @@ export const api = {
       },
       token,
     );
+  },
+  getMemberRemovalImpact(token: string, userId: string) {
+    return request<MemberRemovalImpact>(`/organizations/members/${userId}/removal-impact`, {}, token);
+  },
+  removeMember(token: string, userId: string) {
+    return request<MemberRemovalResult>(`/organizations/members/${userId}`, { method: "DELETE" }, token);
+  },
+  getCurrentSubscription(token: string) {
+    return request<SubscriptionSummary>("/organizations/current/subscription", {}, token);
   },
   patchLocationMember(
     token: string,
@@ -336,6 +367,7 @@ export const api = {
         overrides: overrides.map((item) => ({
           id: item.id,
           week_start: weekStart,
+          source_template_id: item.source_template_id ?? null,
           location_id: item.location_id,
           day_of_week: item.day_of_week,
           start_time: item.start_time,
@@ -343,9 +375,22 @@ export const api = {
           required_role: item.required_role,
           staff_position: item.staff_position ?? null,
           required_count: item.required_count,
+          is_deleted: item.is_deleted ?? false,
           assigned_user_id: item.assigned_user_id ?? null,
         })),
       }),
+    }, token);
+  },
+  freezeAppliedPreview(token: string, weekStart: string, locationId: string) {
+    return request<WeeklyShiftOverride[]>("/schedule/preview/freeze-applied", {
+      method: "POST",
+      body: JSON.stringify({ week_start: weekStart, location_id: locationId }),
+    }, token);
+  },
+  materializePreview(token: string, body: SchedulePreviewMaterializeRequest) {
+    return request<WeeklyShiftOverride[]>("/schedule/preview/materialize", {
+      method: "POST",
+      body: JSON.stringify(body),
     }, token);
   },
   applySchedule(token: string, weekStart: string, locationId?: string) {
@@ -459,8 +504,18 @@ export const api = {
   ownerDashboard(token: string, startDate: string, endDate: string) {
     return request<DashboardData>(`/dashboard/owner?start_date=${startDate}&end_date=${endDate}`, {}, token);
   },
+  getPayrollSummary(token: string, params: { start_date: string; end_date: string; user_id?: string } ) {
+    const search = new URLSearchParams();
+    search.set("start_date", params.start_date);
+    search.set("end_date", params.end_date);
+    if (params.user_id) search.set("user_id", params.user_id);
+    return request<PayrollSummary>(`/payroll/summary?${search.toString()}`, {}, token);
+  },
   listNotifications(token: string, limit = 20) {
-    return request<NotificationItem[]>(`/notifications?limit=${limit}`, {}, token);
+    return request<NotificationListResponse>(`/notifications?limit=${limit}`, {}, token);
+  },
+  markNotificationsRead(token: string, ids: string[]) {
+    return request<{ updated: number }>("/notifications/mark-read", { method: "POST", body: JSON.stringify({ ids }) }, token);
   },
   deleteNotification(token: string, notificationId: string) {
     return request<{ deleted: boolean; id: string }>(`/notifications/${notificationId}`, { method: "DELETE" }, token);

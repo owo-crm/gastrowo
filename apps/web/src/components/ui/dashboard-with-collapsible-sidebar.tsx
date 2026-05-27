@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { loadBusinessLogo } from "@/lib/business-branding";
+import { formatRelativeTimestamp } from "@/lib/date";
 import { useLanguage } from "@/lib/i18n";
 import { getNavItems } from "@/lib/navigation";
 import type { NotificationItem } from "@/lib/types";
@@ -25,18 +26,20 @@ type DashboardWithCollapsibleSidebarProps = {
   hideBottomNav?: boolean;
 };
 
-function formatNotificationDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const day = `${date.getDate()}`.padStart(2, "0");
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const hours = `${date.getHours()}`.padStart(2, "0");
-  const minutes = `${date.getMinutes()}`.padStart(2, "0");
-  return `${day}.${month} ${hours}:${minutes}`;
-}
-
-function notificationPresentation(title: string) {
-  const normalized = title.toLowerCase();
+function notificationPresentation(item: NotificationItem) {
+  if (item.type === "billing") {
+    return { Icon: CreditCard, className: "bg-amber-50 text-amber-700" };
+  }
+  if (item.type === "report") {
+    return { Icon: Coins, className: "bg-amber-50 text-amber-700" };
+  }
+  if (item.type === "timesheet") {
+    return { Icon: Clock3, className: "bg-sky-50 text-sky-700" };
+  }
+  if (item.type === "task") {
+    return { Icon: FilePlus2, className: "bg-indigo-50 text-indigo-700" };
+  }
+  const normalized = item.title.toLowerCase();
   if (normalized.includes("completed") || normalized.includes("approved") || normalized.includes("corrected")) {
     return { Icon: CheckCircle2, className: "bg-emerald-50 text-emerald-700" };
   }
@@ -64,7 +67,7 @@ export function DashboardWithCollapsibleSidebar({
   hideBottomNav = false,
 }: DashboardWithCollapsibleSidebarProps) {
   const { token, me, logout } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const queryClient = useQueryClient();
   const navItems = getNavItems(me);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -72,8 +75,6 @@ export function DashboardWithCollapsibleSidebar({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
   const [workspaceLogo, setWorkspaceLogo] = useState<string | null>(null);
-  const [viewedNotificationIds, setViewedNotificationIds] = useState<string[]>([]);
-
   const notificationsQuery = useQuery({
     queryKey: ["notifications"],
     queryFn: () => api.listNotifications(token!, 20),
@@ -88,39 +89,23 @@ export function DashboardWithCollapsibleSidebar({
     },
   });
 
-  const viewedNotificationsStorageKey = useMemo(() => `gastrowo.viewed-notifications.${me?.id ?? "guest"}`, [me?.id]);
+  const markReadMutation = useMutation({
+    mutationFn: (ids: string[]) => api.markNotificationsRead(token!, ids),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(viewedNotificationsStorageKey);
-      const parsed = raw ? JSON.parse(raw) : [];
-      setViewedNotificationIds(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : []);
-    } catch {
-      setViewedNotificationIds([]);
-    }
-  }, [viewedNotificationsStorageKey]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(viewedNotificationsStorageKey, JSON.stringify(viewedNotificationIds));
-  }, [viewedNotificationIds, viewedNotificationsStorageKey]);
-
-  const unreadNotifications = useMemo(() => {
-    const viewed = new Set(viewedNotificationIds);
-    return (notificationsQuery.data ?? []).filter((item) => !item.read_at && !viewed.has(item.id));
-  }, [notificationsQuery.data, viewedNotificationIds]);
+  const notificationItems = notificationsQuery.data?.items ?? [];
+  const unreadCount = notificationsQuery.data?.unread_count ?? 0;
+  const unreadNotifications = useMemo(() => notificationItems.filter((item) => !item.read_at), [notificationItems]);
 
   useEffect(() => {
     if (!notificationsOpen) return;
-    const currentItems = notificationsQuery.data ?? [];
-    if (!currentItems.length) return;
-    setViewedNotificationIds((current) => {
-      const next = new Set(current);
-      currentItems.forEach((item) => next.add(item.id));
-      return next.size === current.length ? current : Array.from(next);
-    });
-  }, [notificationsOpen, notificationsQuery.data]);
+    const unreadIds = unreadNotifications.map((item) => item.id);
+    if (!unreadIds.length || markReadMutation.isPending) return;
+    markReadMutation.mutate(unreadIds);
+  }, [notificationsOpen, unreadNotifications, markReadMutation]);
 
   useEffect(() => {
     setWorkspaceLogo(loadBusinessLogo(me?.active_organization_id));
@@ -240,7 +225,7 @@ export function DashboardWithCollapsibleSidebar({
                     }}
                   >
                     <Bell className="size-4" />
-                    {unreadNotifications.length > 0 ? (
+                    {unreadCount > 0 ? (
                       <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-[var(--color-danger)] animate-pulse" />
                     ) : null}
                   </button>
@@ -256,14 +241,20 @@ export function DashboardWithCollapsibleSidebar({
                         <div className="flex items-center justify-between gap-3 px-2 pb-3 mb-2 border-b border-[var(--color-divider)]">
                           <p className="text-sm font-semibold text-[var(--color-heading)]">{t("common.notifications")}</p>
                           <Badge className="bg-[var(--color-accent)] text-[var(--color-primary)] border-transparent">
-                            {t("shell.notification_count", { count: unreadNotifications.length })}
+                            {t("shell.notification_count", { count: unreadCount })}
                           </Badge>
                         </div>
                         <div className="max-h-[min(60dvh,380px)] space-y-1.5 overflow-y-auto pr-1">
-                          {(notificationsQuery.data ?? []).map((item: NotificationItem) => {
-                            const presentation = notificationPresentation(item.title);
+                          {notificationItems.map((item: NotificationItem) => {
+                            const presentation = notificationPresentation(item);
                             return (
-                              <div key={item.id} className="group flex items-start gap-3 rounded-[0.95rem] px-2.5 py-2.5 transition hover:bg-[var(--color-surface-muted)]">
+                              <div
+                                key={item.id}
+                                className={cn(
+                                  "group flex items-start gap-3 rounded-[0.95rem] px-2.5 py-2.5 transition hover:bg-[var(--color-surface-muted)]",
+                                  !item.read_at && "bg-[rgba(47,111,237,0.04)]",
+                                )}
+                              >
                                 <div className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-[0.8rem] ${presentation.className}`}>
                                   <presentation.Icon className="size-3.5" />
                                 </div>
@@ -280,12 +271,18 @@ export function DashboardWithCollapsibleSidebar({
                                     </button>
                                   </div>
                                   <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-[var(--color-text-muted)]">{item.body}</p>
-                                  <p className="mt-1 text-[10px] font-semibold tracking-wide text-[var(--color-text-muted)]">{formatNotificationDate(item.created_at)}</p>
+                                  <p className="mt-1 text-[10px] font-semibold tracking-wide text-[var(--color-text-muted)]">
+                                    {formatRelativeTimestamp(item.created_at, {
+                                      todayLabel: t("common.today"),
+                                      yesterdayLabel: t("common.yesterday"),
+                                      locale: lang,
+                                    })}
+                                  </p>
                                 </div>
                               </div>
                             );
                           })}
-                          {!notificationsQuery.data?.length ? (
+                          {!notificationItems.length ? (
                             <div className="px-3 py-8 text-center text-sm text-[var(--color-text-muted)]">{t("common.no_notifications")}</div>
                           ) : null}
                         </div>
@@ -339,7 +336,7 @@ export function DashboardWithCollapsibleSidebar({
                           className="flex min-h-10 w-full items-center gap-2 rounded-[0.9rem] px-3 text-left text-sm text-[var(--color-danger)] transition hover:bg-red-50"
                           onClick={() => {
                             setMenuOpen(false);
-                            logout();
+                            void logout();
                           }}
                         >
                           <LogOut className="size-4" />

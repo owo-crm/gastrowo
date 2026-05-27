@@ -825,51 +825,204 @@ function PortraitVisual({ variant }: { variant: "owner" | "manager" }) {
 
 function HeroPreview() {
   return (
-    <div className="rounded-[2rem] border border-[rgba(225,232,243,0.95)] bg-white/96 p-3 shadow-[0_30px_80px_rgba(15,23,42,0.08)] sm:p-4 hover:shadow-[0_40px_100px_rgba(15,23,42,0.12)] transition-all duration-500">
-      <HeroScheduleBoardAdaptive />
-    </div>
-  );
-}
-
-function PlannerPreview() {
-  return (
-    <div className="rounded-[1.9rem] border border-[rgba(225,232,243,0.95)] bg-white p-4 shadow-[0_24px_64px_rgba(15,23,42,0.07)] sm:p-5 hover:shadow-[0_32px_80px_rgba(15,23,42,0.1)] transition-all duration-500">
-      <div className="grid gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-8">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-[var(--color-heading)]">Grafik tygodniowy</p>
-              <p className="text-xs text-[var(--color-text-muted)]">20 - 26 maja 2034</p>
+    <div className="relative max-w-[700px] overflow-hidden rounded-[1.75rem] border border-[rgba(225,232,243,0.95)] bg-[linear-gradient(145deg,#ffffff_0%,#f7fbff_52%,#eef8f2_100%)] p-3 shadow-[0_24px_64px_rgba(15,23,42,0.07)] transition-all duration-500 hover:shadow-[0_34px_84px_rgba(15,23,42,0.10)] sm:p-4">
+      <div className="pointer-events-none absolute -right-16 -top-16 h-36 w-36 rounded-full bg-[rgba(37,99,235,0.08)] blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-16 left-0 h-32 w-32 rounded-full bg-[rgba(34,197,94,0.10)] blur-3xl" />
+      <div className="relative grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.45 }}
+          className="rounded-[1.35rem] border border-[rgba(223,231,243,0.95)] bg-white px-3.5 py-3.5 shadow-[0_14px_30px_rgba(15,23,42,0.05)] sm:px-4"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#2563eb]">Tydzie? gotowy</p>
+              <p className="mt-1.5 max-w-[15rem] text-[1.05rem] font-extrabold tracking-[-0.05em] text-[var(--color-heading)] sm:text-[1.15rem]">
+                Grafik gotowy w 3 minuty
+              </p>
             </div>
-            <div className="flex items-center gap-2 text-[11px] font-semibold text-[var(--color-text-muted)]">
-              <span>Nawigacja</span>
-              <button type="button" className="grid size-6 place-items-center rounded-full border border-[rgba(223,231,243,0.9)] hover:bg-[rgba(37,99,235,0.05)] hover:text-[#2563eb] transition-all duration-200">&lt;</button>
-              <button type="button" className="grid size-6 place-items-center rounded-full border border-[rgba(223,231,243,0.9)] hover:bg-[rgba(37,99,235,0.05)] hover:text-[#2563eb] transition-all duration-200">&gt;</button>
-            </div>
+            <div className="shrink-0 rounded-full bg-[rgba(37,99,235,0.08)] px-2.5 py-1 text-[10px] font-bold text-[#2563eb]">26 maja</div>
           </div>
-          <ScheduleBoard compact={true} />
-        </div>
-        <div className="rounded-[1.4rem] border border-[rgba(229,235,245,0.92)] bg-[rgba(249,251,255,0.88)] p-4 xl:col-span-4">
-          <p className="text-sm font-bold text-[var(--color-heading)]">Niedziela, 26 maja</p>
-          <div className="mt-4 space-y-3">
+          <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
             {[
-              ["Zmiana", "09:00 - 17:00"],
-              ["Rola", "Kelner"],
-              ["Pracownicy", "Anna, Dawid, Marta"],
+              { title: "Rano", subtitle: "Stare Miasto ? 06:30 - 12:30", people: ["Ada", "Marta"], tone: "bg-[rgba(37,99,235,0.08)] text-[#2563eb]" },
+              { title: "Po po?udniu", subtitle: "Stare Miasto ? 12:30 - 18:00", people: ["Kamil", "Julia"], tone: "bg-[rgba(34,197,94,0.10)] text-[#16a34a]" },
+            ].map((card, index) => (
+              <motion.div
+                key={card.title}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.38, delay: index * 0.08 }}
+                className="rounded-[1rem] border border-[rgba(229,235,245,0.92)] bg-[rgba(249,251,255,0.88)] p-2.5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-bold text-[var(--color-heading)]">{card.title}</p>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[var(--color-text-muted)]">{card.subtitle}</p>
+                  </div>
+                  <span className={cn("shrink-0 rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.10em]", card.tone)}>live</span>
+                </div>
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {card.people.map((person) => (
+                    <span key={person} className="rounded-full border border-[rgba(223,231,243,0.95)] bg-white px-2 py-1 text-[10px] font-semibold text-[var(--color-heading)]">
+                      {person}
+                    </span>
+                  ))}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {[
+              ["Zmiany", "14 / 15"],
+              ["Koszt", "28,6%"],
+              ["Pro?by", "3"],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-[1rem] border border-[rgba(229,235,245,0.92)] bg-white px-3 py-3">
+              <div key={label} className="rounded-[0.95rem] border border-[rgba(229,235,245,0.92)] bg-white px-2.5 py-2.5">
                 <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{label}</p>
-                <p className="mt-1.5 text-sm font-semibold text-[var(--color-heading)]">{value}</p>
+                <p className="mt-1.5 text-[15px] font-extrabold tracking-[-0.04em] text-[var(--color-heading)]">{value}</p>
               </div>
             ))}
           </div>
-          <Button className="mt-4 w-full rounded-[0.95rem]">Zapisz zmianę</Button>
+        </motion.div>
+
+        <div className="grid gap-2.5">
+          <motion.div
+            initial={{ opacity: 0, x: 16 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.42, delay: 0.06 }}
+            className="rounded-[1.2rem] border border-[rgba(229,235,245,0.92)] bg-white px-3 py-3 shadow-[0_14px_30px_rgba(15,23,42,0.05)]"
+          >
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#16a34a]">Pro?by o zmian?</p>
+            <div className="mt-2.5 space-y-2">
+              {[
+                ["Julia", "zamiana sobota"],
+                ["Tomek", "p??niejszy start"],
+                ["Micha?", "wolne niedziela"],
+              ].map(([name, text]) => (
+                <div key={name} className="rounded-[0.9rem] border border-[rgba(229,235,245,0.92)] bg-[rgba(249,251,255,0.88)] px-2.5 py-2">
+                  <p className="text-[13px] font-bold text-[var(--color-heading)]">{name}</p>
+                  <p className="mt-1 text-[11px] leading-4 text-[var(--color-text-muted)]">{text}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, x: 16 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.42, delay: 0.14 }}
+            className="rounded-[1.2rem] border border-[rgba(229,235,245,0.92)] bg-[linear-gradient(180deg,#2563eb,#1d4ed8)] px-3 py-3 text-white shadow-[0_16px_34px_rgba(37,99,235,0.20)]"
+          >
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/80">Dzisiaj</p>
+            <p className="mt-1.5 text-[1.7rem] font-extrabold tracking-[-0.06em]">12 450 PLN</p>
+            <p className="mt-1.5 text-[12px] leading-5 text-white/82">Przych?d wpisany i dzie? pod kontrol?.</p>
+          </motion.div>
         </div>
       </div>
     </div>
   );
 }
 
+function PlannerFlowPreview() {
+  return (
+    <div className="rounded-[1.9rem] border border-[rgba(225,232,243,0.95)] bg-white p-4 shadow-[0_24px_64px_rgba(15,23,42,0.07)] transition-all duration-500 hover:shadow-[0_32px_80px_rgba(15,23,42,0.1)] sm:p-5">
+      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-[1.45rem] border border-[rgba(229,235,245,0.92)] bg-[rgba(249,251,255,0.78)] p-4">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#2563eb]">Planowanie</p>
+          <p className="mt-2 text-[1.35rem] font-extrabold tracking-[-0.05em] text-[var(--color-heading)]">
+            Ułóż tydzień bez grzebania w skomplikowanej siatce
+          </p>
+          <div className="mt-4 space-y-3">
+            {[
+              {
+                step: "1",
+                title: "Wybierz dzień i lokal",
+                body: "Na starcie widzisz tylko to, co trzeba obsadzić dzisiaj albo w tym tygodniu.",
+              },
+              {
+                step: "2",
+                title: "Przypisz role i ludzi",
+                body: "System pokazuje dostępne osoby, a nie całą trudną tabelę do rozszyfrowania.",
+              },
+              {
+                step: "3",
+                title: "Publikuj i reaguj",
+                body: "Po publikacji zespół od razu widzi zmianę, a prośby wracają w jednym miejscu.",
+              },
+            ].map((item) => (
+              <div key={item.step} className="grid grid-cols-[34px_minmax(0,1fr)] gap-3 rounded-[1rem] border border-[rgba(229,235,245,0.92)] bg-white px-3 py-3">
+                <div className="grid h-8 w-8 place-items-center rounded-full bg-[rgba(37,99,235,0.10)] text-sm font-extrabold text-[#2563eb]">
+                  {item.step}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-[var(--color-heading)]">{item.title}</p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">{item.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-4">
+          <div className="rounded-[1.45rem] border border-[rgba(229,235,245,0.92)] bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.04)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-[var(--color-heading)]">Niedziela, 26 maja</p>
+                <p className="text-xs text-[var(--color-text-muted)]">Zmiana śniadaniowa i popołudniowa</p>
+              </div>
+              <span className="rounded-full bg-[rgba(34,197,94,0.10)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#16a34a]">
+                gotowe
+              </span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {[
+                ["06:30 - 12:30", "Barista", ["Ada", "Marta"]],
+                ["12:30 - 18:00", "Cashier", ["Julia"]],
+                ["12:30 - 18:00", "Barista", ["Kamil", "Ola"]],
+              ].map(([time, role, people]) => (
+                <div key={`${time}-${role}`} className="rounded-[1rem] border border-[rgba(229,235,245,0.92)] bg-[rgba(249,251,255,0.88)] px-3 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-[var(--color-heading)]">{time}</p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{role}</p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {(people as string[]).map((person) => (
+                        <span key={person} className="rounded-full border border-[rgba(223,231,243,0.95)] bg-white px-2.5 py-1 text-[11px] font-semibold text-[var(--color-heading)]">
+                          {person}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              ["Do obsadzenia", "1 slot"],
+              ["Gotowe do publikacji", "6 zmian"],
+              ["Koszt dnia", "1 280 PLN"],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-[1.15rem] border border-[rgba(229,235,245,0.92)] bg-[rgba(249,251,255,0.88)] px-3 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{label}</p>
+                <p className="mt-2 text-base font-extrabold tracking-[-0.04em] text-[var(--color-heading)]">{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlannerPreview() {
+  return <PlannerFlowPreview />;
+}
 function RequestsPreview() {
   return (
     <motion.div
@@ -1120,11 +1273,11 @@ export function LandingPage() {
       </header>
 
       <main className="pb-16 sm:pb-20">
-        <section className="pt-6 sm:pt-10">
+        <section className="pt-0 sm:pt-2">
           <SectionContainer>
-            <div className="grid gap-10 xl:grid-cols-12 xl:items-center">
-              <motion.div {...pageReveal} className="max-w-[35rem] xl:col-span-4">
-                <h1 className="text-[3rem] font-extrabold leading-[0.98] tracking-[-0.08em] text-[var(--color-heading)] sm:text-[4rem] lg:text-[4.85rem]">
+            <div className="flex min-h-[calc(100dvh-6.75rem)] items-center py-4 sm:py-6">
+              <motion.div {...pageReveal} className="max-w-[56rem]">
+                <h1 className="text-[2.75rem] font-extrabold leading-[0.98] tracking-[-0.08em] text-[var(--color-heading)] sm:text-[3.65rem] lg:text-[4.25rem]">
                   Kontroluj grafik,
                   <br />
                   <span className="bg-[linear-gradient(90deg,#2563eb_0%,#2563eb_42%,#16a34a_70%,#22c55e_100%)] bg-clip-text text-transparent">
@@ -1133,10 +1286,10 @@ export function LandingPage() {
                   <br />
                   restauracji bez chaosu.
                 </h1>
-                <p className="mt-7 max-w-[30rem] text-lg leading-8 text-[var(--color-text-muted)]">
+                <p className="mt-5 max-w-[32rem] text-[1.02rem] leading-7 text-[var(--color-text-muted)]">
                   GastrOWO to nowoczesny workspace dla restauracji. Planuj zmiany, zarządzaj zespołem, śledź przychody i trzymaj wszystko w jednym miejscu.
                 </p>
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                   <Button asChild size="lg" className="rounded-[1rem] px-6">
                     <Link to="/login?mode=onboarding">
                       Zacznij onboarding <ArrowRight className="size-4" />
@@ -1153,7 +1306,7 @@ export function LandingPage() {
                     </a>
                   </Button>
                 </div>
-                <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                <div className="mt-6 grid gap-4 sm:grid-cols-3">
                   {quickPoints.map((item) => {
                     const Icon = item.icon;
                     return (
@@ -1163,16 +1316,12 @@ export function LandingPage() {
                         </span>
                         <div>
                           <p className="text-sm font-bold text-[var(--color-heading)]">{item.title}</p>
-                          <p className="mt-1 text-sm text-[var(--color-text-muted)]">{item.body}</p>
+                          <p className="mt-1 text-sm leading-5 text-[var(--color-text-muted)]">{item.body}</p>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </motion.div>
-
-              <motion.div {...pageReveal} className="xl:col-span-8 xl:pl-2">
-                <HeroPreview />
               </motion.div>
             </div>
           </SectionContainer>
@@ -1351,16 +1500,16 @@ export function LandingPage() {
           <SectionContainer>
             <motion.div
               {...pageReveal}
-              className="overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#2563eb_0%,#1d4ed8_42%,#2563eb_100%)] px-6 py-7 text-white shadow-[0_24px_70px_rgba(37,99,235,0.28)] sm:px-8 sm:py-8"
+              className="overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#2563eb_0%,#1d4ed8_42%,#2563eb_100%)] px-6 py-7 shadow-[0_24px_70px_rgba(37,99,235,0.28)] sm:px-8 sm:py-8"
             >
               <div className="grid gap-8 xl:grid-cols-[1.15fr_1fr_auto] xl:items-center">
                 <div>
-                  <h2 className="text-[2.2rem] font-extrabold leading-[1.02] tracking-[-0.07em] sm:text-[2.8rem]">
+                  <h2 className="text-[2.2rem] font-extrabold leading-[1.02] tracking-[-0.07em] text-slate-950 sm:text-[2.8rem]">
                     Proste ceny. Szybki start.
                     <br />
                     Zero zbędnych formalności.
                   </h2>
-                  <p className="mt-4 max-w-[34rem] text-[17px] leading-8 text-white/84">
+                  <p className="mt-4 max-w-[34rem] text-[17px] leading-8 text-slate-900/84">
                     Wypróbuj GastrOWO za darmo i przekonaj się, jak uporządkuje Twoją restaurację.
                   </p>
                 </div>
@@ -1369,14 +1518,14 @@ export function LandingPage() {
                     ["14 dni za darmo", "Pełny dostęp bez karty płatniczej"],
                     ["Anuluj w każdej chwili", "Bez zobowiązań, bez ukrytych opłat"],
                   ].map(([title, body]) => (
-                    <div key={title} className="rounded-[1.25rem] border border-white/18 bg-white/10 px-4 py-4 backdrop-blur-sm">
+                    <div key={title} className="rounded-[1.25rem] border border-white/35 bg-white/78 px-4 py-4 backdrop-blur-sm">
                       <div className="flex items-center gap-3">
-                        <span className="grid size-10 place-items-center rounded-full border border-white/18 bg-white/8">
+                        <span className="grid size-10 place-items-center rounded-full border border-slate-300/70 bg-white/80 text-slate-950">
                           <CircleDollarSign className="size-5" />
                         </span>
-                        <p className="text-base font-bold">{title}</p>
+                        <p className="text-base font-bold text-slate-950">{title}</p>
                       </div>
-                      <p className="mt-3 text-sm leading-6 text-white/82">{body}</p>
+                      <p className="mt-3 text-sm leading-6 text-slate-900/78">{body}</p>
                     </div>
                   ))}
                 </div>

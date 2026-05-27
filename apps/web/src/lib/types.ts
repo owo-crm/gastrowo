@@ -48,6 +48,15 @@ export type AuthLoginResponse = {
   role: Role | null;
 };
 
+export type SessionBootstrapResponse = {
+  access_token: string;
+  token_type: string;
+  status: "linked" | "pending_link";
+  memberships: MembershipSummary[];
+  active_organization_id: string | null;
+  role: Role | null;
+};
+
 export type OtpSendPurpose = "login" | "owner_signup" | "worker_signup" | "invite_join";
 
 export type OtpSendResponse = {
@@ -77,6 +86,23 @@ export type MeResponse = {
   is_linked: boolean;
   memberships: MembershipSummary[];
   organization_settings: OrganizationSettings | null;
+  subscription: SubscriptionSummary | null;
+};
+
+export type SubscriptionPlan = "free" | "pro" | "business" | "enterprise";
+export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled" | "expired";
+
+export type SubscriptionSummary = {
+  plan: SubscriptionPlan;
+  status: SubscriptionStatus;
+  billing_cycle: string;
+  trial_ends_at: string | null;
+  current_period_ends_at: string | null;
+  active_members_count: number;
+  active_locations_count: number;
+  member_cap: number | null;
+  location_cap: number | null;
+  soft_limit_reached: boolean;
 };
 
 export type LinkMemberByEmailResponse =
@@ -321,6 +347,11 @@ export type SchedulePreviewEdit = {
   assigned_user_id?: string | null;
 };
 
+export type SchedulePreviewMaterializeRequest = {
+  week_start: string;
+  location_id: string;
+};
+
 export type SchedulePreviewCalendarCell = {
   shift_key: string;
   location_id: string;
@@ -413,10 +444,34 @@ export type Task = {
 
 export type NotificationItem = {
   id: string;
+  type: "general" | "schedule" | "task" | "report" | "shift_request" | "timesheet" | "team" | "billing";
   title: string;
   body: string;
+  action_url?: string | null;
+  entity_kind?: string | null;
+  entity_id?: string | null;
   read_at: string | null;
   created_at: string;
+};
+
+export type NotificationListResponse = {
+  items: NotificationItem[];
+  unread_count: number;
+};
+
+export type MemberRemovalImpact = {
+  user_id: string;
+  full_name: string;
+  role: Role;
+  future_assignments_count: number;
+  pending_shift_requests_count: number;
+  location_count: number;
+  can_remove: boolean;
+  blocking_reason: string | null;
+};
+
+export type MemberRemovalResult = MemberRemovalImpact & {
+  removed: boolean;
 };
 
 export type DashboardData = {
@@ -438,6 +493,26 @@ export type DashboardData = {
     payroll_pln: string;
     restricted_hours?: string;
   }>;
+};
+
+export type PayrollSummaryRow = {
+  user_id: string;
+  full_name: string;
+  role: Role;
+  staff_position?: string | null;
+  approved_hours: string;
+  hourly_rate_default_pln: string;
+  payroll_pln: string;
+  restricted_hours?: string;
+};
+
+export type PayrollSummary = {
+  period_start: string;
+  period_end: string;
+  viewer_scope: "self" | "team";
+  total_hours: string;
+  total_payroll_pln: string;
+  rows: PayrollSummaryRow[];
 };
 
 export type ShiftEndPayload = {

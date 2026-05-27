@@ -3,14 +3,14 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import OrgContext, get_current_organization, require_org_context
 from app.core.envelope import ok
 from app.core.permissions import can_manage_team, membership_permission_overrides
 from app.db import get_db
-from app.models import Location, LocationMembership, OrganizationMembership, RoleEnum, User
+from app.models import Location, LocationMembership, OrganizationMembership, OrganizationSubscription, RoleEnum, SubscriptionPlanEnum, User
 from app.schemas import LocationCreate, LocationMemberOut, LocationMemberPatch, LocationOut, LocationPatch
 
 router = APIRouter(prefix="/locations", tags=["locations"])
@@ -32,6 +32,14 @@ def _get_location_or_404(db: Session, organization_id: UUID, location_id: UUID) 
     if location is None:
         raise HTTPException(status_code=404, detail="Location not found")
     return location
+
+
+def _location_cap_for_plan(plan: SubscriptionPlanEnum) -> int | None:
+    if plan == SubscriptionPlanEnum.FREE:
+        return 1
+    if plan == SubscriptionPlanEnum.BUSINESS:
+        return 5
+    return None
 
 
 @router.get("")
@@ -101,6 +109,16 @@ def create_location(
     db: Session = Depends(get_db),
 ):
     _require_team_access(context, db)
+    subscription = db.scalar(
+        select(OrganizationSubscription).where(OrganizationSubscription.organization_id == context.membership.organization_id)
+    )
+    if subscription is not None:
+        location_cap = _location_cap_for_plan(subscription.plan)
+        current_count = db.scalar(
+            select(func.count()).select_from(Location).where(Location.organization_id == context.membership.organization_id)
+        ) or 0
+        if location_cap is not None and current_count >= location_cap:
+            raise HTTPException(status_code=402, detail="Location limit reached for the current plan")
     location = Location(
         organization_id=context.membership.organization_id,
         name=payload.name,

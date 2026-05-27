@@ -484,8 +484,7 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
     for demand in demand_specs:
         shift_hours = shift_duration_hours(demand.start_time, demand.end_time)
         candidates = role_buckets.get(demand.required_role, [])
-        eligible: list[tuple[OrganizationMembership, LocationMembership, float, User, bool, float, tuple[str, ...]]] = []
-        fallback_candidates: list[tuple[OrganizationMembership, LocationMembership, float, User, bool, float, tuple[str, ...]]] = []
+        eligible: list[tuple[OrganizationMembership, LocationMembership, float, User, bool]] = []
         rejected_for_demand: dict[UUID, RejectedCandidate] = {}
 
         for membership in candidates:
@@ -553,26 +552,10 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
                     user_name=user.full_name,
                     reasons=reasons,
                 )
-                if (
-                    location_member is not None
-                    and start_covered
-                    and set(reasons) == {"desired_hours_cap_exceeded"}
-                ):
-                    fallback_candidates.append(
-                        (
-                            membership,
-                            location_member,
-                            current_hours,
-                            user,
-                            start_covered,
-                            overlap_hours,
-                            tuple(reasons),
-                        )
-                    )
                 continue
 
             assert location_member is not None
-            eligible.append((membership, location_member, current_hours, user, start_covered, overlap_hours, tuple()))
+            eligible.append((membership, location_member, current_hours, user, start_covered))
 
         eligible.sort(
             key=lambda item: (
@@ -584,20 +567,6 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
             )
         )
         selected = eligible[: demand.required_count]
-        if len(selected) < demand.required_count and fallback_candidates:
-            remaining = demand.required_count - len(selected)
-            fallback_candidates.sort(
-                key=lambda item: (
-                    0 if demand.preferred_user_id and item[0].user_id == demand.preferred_user_id else 1,
-                    0 if item[4] else 1,
-                    -item[5],
-                    -item[1].priority,
-                    item[2],
-                    item[3].full_name.lower(),
-                    str(item[0].user_id),
-                )
-            )
-            selected.extend(fallback_candidates[:remaining])
 
         # Keep apply actionable, but surface shifts where nobody covers the actual start time.
         has_assigned_start_coverage = any(item[4] for item in selected)
@@ -625,7 +594,7 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
             if user_id not in selected_user_ids:
                 rejected_candidates.append(rejected_candidate)
 
-        for membership, location_member, _, user, start_covered, overlap_hours, soft_reasons in selected:
+        for membership, location_member, _, user, _start_covered in selected:
             updated_hours = hours_by_user.get(membership.user_id, 0.0) + shift_hours
             cost_pln = _decimal_hour_cost(Decimal(location_member.hourly_rate_pln), shift_hours)
             planned_assignments.append(
@@ -650,15 +619,6 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
             labor_total += cost_pln
             labor_by_day[demand.date.isoformat()] += cost_pln
             labor_by_location[demand.location_id] += cost_pln
-            if soft_reasons:
-                soft_label = ", ".join(reason.replace("_", " ") for reason in soft_reasons)
-                overlap_label = f"{overlap_hours:.1f}".rstrip("0").rstrip(".")
-                coverage_suffix = "" if start_covered else " without full start coverage"
-                warnings.append(
-                    f"{user.full_name} assigned to {demand.location_name} {demand.date.isoformat()} "
-                    f"{demand.start_time.strftime('%H:%M')}-{demand.end_time.strftime('%H:%M')} via fallback "
-                    f"({soft_label}, {overlap_label}h overlap{coverage_suffix})"
-                )
 
         if len(selected) < demand.required_count:
             unfilled_count = demand.required_count - len(selected)

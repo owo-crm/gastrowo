@@ -101,25 +101,80 @@ def _ensure_runtime_schema_compat() -> None:
         if "organizations" in tables:
             organization_columns = {column["name"] for column in inspector.get_columns("organizations")}
             if "staff_can_submit_revenue_reports" not in organization_columns:
-                connection.execute(text("ALTER TABLE organizations ADD COLUMN staff_can_submit_revenue_reports BOOLEAN NOT NULL DEFAULT FALSE"))
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN staff_can_submit_revenue_reports BOOLEAN NOT NULL DEFAULT 0"))
             if "staff_can_delete_revenue_reports" not in organization_columns:
-                connection.execute(text("ALTER TABLE organizations ADD COLUMN staff_can_delete_revenue_reports BOOLEAN NOT NULL DEFAULT FALSE"))
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN staff_can_delete_revenue_reports BOOLEAN NOT NULL DEFAULT 0"))
             if "manager_can_submit_revenue_reports" not in organization_columns:
-                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_submit_revenue_reports BOOLEAN NOT NULL DEFAULT TRUE"))
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_submit_revenue_reports BOOLEAN NOT NULL DEFAULT 1"))
             if "manager_can_delete_revenue_reports" not in organization_columns:
-                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_delete_revenue_reports BOOLEAN NOT NULL DEFAULT TRUE"))
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_delete_revenue_reports BOOLEAN NOT NULL DEFAULT 1"))
             if "manager_can_view_full_dashboard" not in organization_columns:
-                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_view_full_dashboard BOOLEAN NOT NULL DEFAULT FALSE"))
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_view_full_dashboard BOOLEAN NOT NULL DEFAULT 0"))
             if "manager_can_view_payroll" not in organization_columns:
-                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_view_payroll BOOLEAN NOT NULL DEFAULT FALSE"))
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_view_payroll BOOLEAN NOT NULL DEFAULT 0"))
             if "manager_can_manage_team" not in organization_columns:
-                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_manage_team BOOLEAN NOT NULL DEFAULT TRUE"))
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_manage_team BOOLEAN NOT NULL DEFAULT 1"))
             if "manager_can_manage_business_settings" not in organization_columns:
-                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_manage_business_settings BOOLEAN NOT NULL DEFAULT FALSE"))
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_manage_business_settings BOOLEAN NOT NULL DEFAULT 0"))
             if "manager_can_access_notes" not in organization_columns:
-                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_access_notes BOOLEAN NOT NULL DEFAULT TRUE"))
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_access_notes BOOLEAN NOT NULL DEFAULT 1"))
             if "manager_can_access_inventory" not in organization_columns:
-                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_access_inventory BOOLEAN NOT NULL DEFAULT TRUE"))
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN manager_can_access_inventory BOOLEAN NOT NULL DEFAULT 1"))
+
+        if "organization_subscriptions" not in tables:
+            connection.execute(
+                text(
+                    "CREATE TABLE organization_subscriptions ("
+                    "id CHAR(32) PRIMARY KEY, "
+                    "organization_id CHAR(32) NOT NULL UNIQUE, "
+                    "plan VARCHAR(16) NOT NULL DEFAULT 'free', "
+                    "status VARCHAR(16) NOT NULL DEFAULT 'active', "
+                    "billing_cycle VARCHAR(16) NOT NULL DEFAULT 'monthly', "
+                    "trial_ends_at TIMESTAMP, "
+                    "current_period_ends_at TIMESTAMP, "
+                    "stripe_customer_id VARCHAR(255), "
+                    "stripe_subscription_id VARCHAR(255), "
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    "FOREIGN KEY(organization_id) REFERENCES organizations(id) ON DELETE CASCADE"
+                    ")"
+                )
+            )
+            connection.execute(text("CREATE INDEX ix_organization_subscriptions_organization_id ON organization_subscriptions (organization_id)"))
+
+        if "in_app_notifications" in tables:
+            notification_columns = {column["name"] for column in inspector.get_columns("in_app_notifications")}
+            if "type" not in notification_columns:
+                connection.execute(text("ALTER TABLE in_app_notifications ADD COLUMN type VARCHAR(32) NOT NULL DEFAULT 'general'"))
+            if "action_url" not in notification_columns:
+                connection.execute(text("ALTER TABLE in_app_notifications ADD COLUMN action_url VARCHAR(500)"))
+            if "entity_kind" not in notification_columns:
+                connection.execute(text("ALTER TABLE in_app_notifications ADD COLUMN entity_kind VARCHAR(80)"))
+            if "entity_id" not in notification_columns:
+                connection.execute(text("ALTER TABLE in_app_notifications ADD COLUMN entity_id VARCHAR(64)"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_in_app_notifications_type ON in_app_notifications (type)"))
+
+        if "auth_sessions" not in tables:
+            connection.execute(
+                text(
+                    "CREATE TABLE auth_sessions ("
+                    "id CHAR(32) PRIMARY KEY, "
+                    "user_id CHAR(32) NOT NULL, "
+                    "organization_id CHAR(32), "
+                    "token_hash VARCHAR(64) NOT NULL UNIQUE, "
+                    "label VARCHAR(120), "
+                    "last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    "expires_at TIMESTAMP NOT NULL, "
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    "FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE, "
+                    "FOREIGN KEY(organization_id) REFERENCES organizations(id) ON DELETE CASCADE"
+                    ")"
+                )
+            )
+            connection.execute(text("CREATE INDEX ix_auth_sessions_user_id ON auth_sessions (user_id)"))
+            connection.execute(text("CREATE INDEX ix_auth_sessions_organization_id ON auth_sessions (organization_id)"))
+            connection.execute(text("CREATE INDEX ix_auth_sessions_token_hash ON auth_sessions (token_hash)"))
+            connection.execute(text("CREATE INDEX ix_auth_sessions_expires_at ON auth_sessions (expires_at)"))
 
         if "organization_memberships" in tables:
             membership_columns = {column["name"] for column in inspector.get_columns("organization_memberships")}
@@ -153,6 +208,13 @@ def _ensure_runtime_schema_compat() -> None:
                 )
             )
 
+        if "availability_weeks" in tables:
+            availability_week_columns = {column["name"] for column in inspector.get_columns("availability_weeks")}
+            if "approved_at" not in availability_week_columns:
+                connection.execute(text("ALTER TABLE availability_weeks ADD COLUMN approved_at TIMESTAMP"))
+            if "approved_by" not in availability_week_columns:
+                connection.execute(text("ALTER TABLE availability_weeks ADD COLUMN approved_by CHAR(32)"))
+
         if "position_catalog" not in tables:
             connection.execute(
                 text(
@@ -160,7 +222,7 @@ def _ensure_runtime_schema_compat() -> None:
                     "id CHAR(32) PRIMARY KEY, "
                     "organization_id CHAR(32) NOT NULL, "
                     "name VARCHAR(80) NOT NULL, "
-                    "is_active BOOLEAN NOT NULL DEFAULT TRUE, "
+                    "is_active BOOLEAN NOT NULL DEFAULT 1, "
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
                     "CONSTRAINT uq_position_catalog_org_name UNIQUE (organization_id, name), "
                     "FOREIGN KEY(organization_id) REFERENCES organizations(id) ON DELETE CASCADE"
@@ -185,7 +247,7 @@ def _ensure_runtime_schema_compat() -> None:
                     "required_role VARCHAR(7) NOT NULL, "
                     "staff_position VARCHAR(80), "
                     "required_count INTEGER NOT NULL DEFAULT 1, "
-                    "is_deleted BOOLEAN NOT NULL DEFAULT FALSE, "
+                    "is_deleted BOOLEAN NOT NULL DEFAULT 0, "
                     "assigned_user_id CHAR(32), "
                     "created_by CHAR(32), "
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
@@ -213,7 +275,7 @@ def _ensure_runtime_schema_compat() -> None:
                     )
                 )
             if "is_deleted" not in override_columns:
-                connection.execute(text("ALTER TABLE schedule_weekly_overrides ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE"))
+                connection.execute(text("ALTER TABLE schedule_weekly_overrides ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT 0"))
                 connection.execute(
                     text(
                         "CREATE INDEX IF NOT EXISTS ix_schedule_weekly_overrides_is_deleted "
@@ -243,7 +305,7 @@ def _ensure_runtime_schema_compat() -> None:
                     "arrived_at TIME NOT NULL, "
                     "left_at TIME NOT NULL, "
                     "note TEXT, "
-                    "is_restricted_entry BOOLEAN NOT NULL DEFAULT FALSE, "
+                    "is_restricted_entry BOOLEAN NOT NULL DEFAULT 0, "
                     "status VARCHAR(16) NOT NULL DEFAULT 'PENDING', "
                     "review_note TEXT, "
                     "reviewed_by CHAR(32), "
@@ -286,6 +348,19 @@ def _ensure_runtime_schema_compat() -> None:
 
         organizations = connection.execute(text("SELECT id FROM organizations")).fetchall() if "organizations" in tables else []
         for (organization_id,) in organizations:
+            subscription_exists = connection.execute(
+                text("SELECT id FROM organization_subscriptions WHERE organization_id = :organization_id"),
+                {"organization_id": organization_id},
+            ).first()
+            if subscription_exists is None:
+                connection.execute(
+                    text(
+                        "INSERT INTO organization_subscriptions "
+                        "(id, organization_id, plan, status, billing_cycle, created_at, updated_at) "
+                        "VALUES (:id, :organization_id, 'free', 'active', 'monthly', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+                    ),
+                    {"id": uuid.uuid4().hex, "organization_id": organization_id},
+                )
             for name in ("Cook", "Bartender", "Waiter", "Manager"):
                 exists = connection.execute(
                     text("SELECT id FROM position_catalog WHERE organization_id = :organization_id AND name = :name"),

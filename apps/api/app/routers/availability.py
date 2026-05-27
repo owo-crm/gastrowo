@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,7 +11,7 @@ from app.core.deps import OrgContext, require_org_context
 from app.core.envelope import ok
 from app.db import get_db
 from app.models import AvailabilitySlot, AvailabilityWeek, OrganizationMembership, RoleEnum, User
-from app.schemas import AvailabilitySlotOut, AvailabilityWeekOut, AvailabilityWeekUpsert, TeamAvailabilitySummaryRowOut
+from app.schemas import AvailabilitySlotOut, AvailabilityWeekApprove, AvailabilityWeekOut, AvailabilityWeekUpsert, TeamAvailabilitySummaryRowOut
 
 router = APIRouter(prefix="/availability", tags=["availability"])
 
@@ -33,6 +33,20 @@ def _ensure_member_exists(db: Session, organization_id: UUID, user_id: UUID) -> 
     )
     if membership is None:
         raise HTTPException(status_code=404, detail="Organization member not found")
+
+
+def _serialize_week(week: AvailabilityWeek, slots: list[AvailabilitySlot]) -> AvailabilityWeekOut:
+    return AvailabilityWeekOut(
+        id=week.id,
+        user_id=week.user_id,
+        week_start=week.week_start,
+        desired_hours=week.desired_hours,
+        approved_at=week.approved_at,
+        approved_by=week.approved_by,
+        locked_at=week.locked_at,
+        locked_by=week.locked_by,
+        slots=[AvailabilitySlotOut.model_validate(item) for item in slots],
+    )
 
 
 @router.put("/weeks/{week_start}")
@@ -73,6 +87,8 @@ def upsert_week_availability(
     else:
         week.desired_hours = payload.desired_hours
         week.submitted_by = context.user.id
+    week.approved_at = None
+    week.approved_by = None
 
     db.execute(delete(AvailabilitySlot).where(AvailabilitySlot.week_id == week.id))
 
@@ -91,16 +107,32 @@ def upsert_week_availability(
     db.commit()
 
     slots = db.scalars(select(AvailabilitySlot).where(AvailabilitySlot.week_id == week.id)).all()
-    response = AvailabilityWeekOut(
-        id=week.id,
-        user_id=week.user_id,
-        week_start=week.week_start,
-        desired_hours=week.desired_hours,
-        locked_at=week.locked_at,
-        locked_by=week.locked_by,
-        slots=[AvailabilitySlotOut.model_validate(item) for item in slots],
+    return ok(_serialize_week(week, slots).model_dump(mode="json"))
+
+
+@router.patch("/weeks/{week_start}/approve")
+def approve_week_availability(
+    week_start: date,
+    payload: AvailabilityWeekApprove,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    organization_id = context.membership.organization_id
+    _ensure_member_exists(db, organization_id, payload.user_id)
+    week = db.scalar(
+        select(AvailabilityWeek).where(
+            AvailabilityWeek.organization_id == organization_id,
+            AvailabilityWeek.user_id == payload.user_id,
+            AvailabilityWeek.week_start == week_start,
+        )
     )
-    return ok(response.model_dump(mode="json"))
+    if week is None:
+        raise HTTPException(status_code=404, detail="Availability week not found")
+    week.approved_at = datetime.now(UTC)
+    week.approved_by = context.user.id
+    db.commit()
+    slots = db.scalars(select(AvailabilitySlot).where(AvailabilitySlot.week_id == week.id)).all()
+    return ok(_serialize_week(week, slots).model_dump(mode="json"))
 
 
 @router.get("/weeks/{week_start}")
@@ -125,16 +157,7 @@ def get_week_availability(
         return ok(None)
 
     slots = db.scalars(select(AvailabilitySlot).where(AvailabilitySlot.week_id == week.id)).all()
-    response = AvailabilityWeekOut(
-        id=week.id,
-        user_id=week.user_id,
-        week_start=week.week_start,
-        desired_hours=week.desired_hours,
-        locked_at=week.locked_at,
-        locked_by=week.locked_by,
-        slots=[AvailabilitySlotOut.model_validate(item) for item in slots],
-    )
-    return ok(response.model_dump(mode="json"))
+    return ok(_serialize_week(week, slots).model_dump(mode="json"))
 
 
 @router.get("/weeks/{week_start}/team-summary")
@@ -184,7 +207,10 @@ def get_week_team_summary(
         else:
             desired_hours = week.desired_hours
             slots_count = slots_by_week.get(week.id, 0)
-            status = "filled" if desired_hours > 0 and slots_count > 0 else "partial"
+            if desired_hours > 0 and slots_count > 0 and week.approved_at is not None:
+                status = "approved"
+            else:
+                status = "filled" if desired_hours > 0 and slots_count > 0 else "partial"
 
         summary.append(
             TeamAvailabilitySummaryRowOut(

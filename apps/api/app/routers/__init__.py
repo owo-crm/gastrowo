@@ -1,4 +1,4 @@
-from . import auth, availability, dashboard, locations, organizations, positions, reports, schedule, shifts, tasks, timesheets, users, workers
+from . import auth, availability, dashboard, locations, organizations, payroll, positions, reports, schedule, shifts, tasks, timesheets, users, workers
 
 __all__ = [
     "auth",
@@ -6,6 +6,7 @@ __all__ = [
     "dashboard",
     "locations",
     "organizations",
+    "payroll",
     "positions",
     "reports",
     "schedule",
