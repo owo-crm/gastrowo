@@ -171,6 +171,20 @@ class SessionBootstrapResponse(APIModel):
     role: RoleEnum | None = None
 
 
+class MarketingWaitlistSignupRequest(BaseModel):
+    email: EmailStr
+
+
+class MarketingWaitlistLeadOut(APIModel):
+    id: UUID
+    email: EmailStr
+    created_at: datetime
+
+
+class MarketingWaitlistSignupOut(APIModel):
+    email: EmailStr
+    created: bool
+    created_at: datetime
 class OwnerOnboardingCompleteRequest(BaseModel):
     verification_token: str
     full_name: str = Field(min_length=2, max_length=120)
@@ -203,6 +217,24 @@ class SubscriptionSummaryOut(APIModel):
     soft_limit_reached: bool = False
 
 
+class BillingCheckoutSessionRequest(BaseModel):
+    plan: SubscriptionPlanEnum
+    billing_cycle: Literal["monthly", "annual"] = "monthly"
+
+    @model_validator(mode="after")
+    def validate_plan(self):
+        if self.plan not in {SubscriptionPlanEnum.PRO, SubscriptionPlanEnum.BUSINESS}:
+            raise ValueError("Checkout is only available for Pro or Business plans")
+        return self
+
+
+class BillingCheckoutSessionOut(APIModel):
+    id: str
+    url: str
+
+
+class BillingPortalSessionOut(APIModel):
+    url: str
 class NotificationOut(APIModel):
     id: UUID
     type: NotificationTypeEnum

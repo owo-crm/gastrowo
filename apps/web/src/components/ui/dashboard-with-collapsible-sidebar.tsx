@@ -147,8 +147,8 @@ export function DashboardWithCollapsibleSidebar({
       <div className="relative mx-auto min-h-screen max-w-[1600px] lg:flex">
         <aside className="sidebar-surface fixed inset-y-0 left-0 z-40 hidden h-screen w-[272px] shrink-0 flex-col overflow-y-auto px-5 py-1 lg:flex">
           <Link to="/overview" className="flex justify-center">
-            <div className="flex w-full">
-              <BrandLogo kind="mark" tone="dark" className="size-32" px-1/>
+            <div className="flex w-full items-center justify-center py-5">
+              <BrandLogo kind="wordmark" tone="dark" className="text-[2.9rem]" />
             </div>
           </Link>
 

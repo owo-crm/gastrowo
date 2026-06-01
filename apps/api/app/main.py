@@ -14,8 +14,10 @@ from app.db import init_db
 from app.routers import (
     auth,
     availability,
+    billing,
     dashboard,
     locations,
+    marketing,
     notifications,
     organizations,
     payroll,
@@ -80,7 +82,9 @@ def healthcheck():
 
 app.include_router(auth.router)
 app.include_router(organizations.router)
+app.include_router(billing.router)
 app.include_router(locations.router)
+app.include_router(marketing.router)
 app.include_router(users.router)
 app.include_router(workers.router)
 app.include_router(positions.router)

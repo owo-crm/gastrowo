@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from app.core.security import create_access_token, hash_password
+from app.models import Organization, OrganizationMembership, RoleEnum, User
+
 
 def auth_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
@@ -119,6 +122,50 @@ def create_template(client, *, ADMIN_token: str, location_id: str, day_of_week: 
         },
     )
     assert response.status_code == 200
+
+
+def test_marketing_waitlist_signup_and_duplicate(client):
+    first = client.post("/marketing/waitlist", json={"email": "launch@example.com"})
+    assert first.status_code == 200
+    first_payload = first.json()["data"]
+    assert first_payload["email"] == "launch@example.com"
+    assert first_payload["created"] is True
+
+    second = client.post("/marketing/waitlist", json={"email": "Launch@example.com"})
+    assert second.status_code == 200
+    second_payload = second.json()["data"]
+    assert second_payload["email"] == "launch@example.com"
+    assert second_payload["created"] is False
+    assert second_payload["created_at"] == first_payload["created_at"]
+
+
+def test_marketing_waitlist_admin_only_listing(client, db_session):
+    client.post("/marketing/waitlist", json={"email": "first@example.com"})
+    client.post("/marketing/waitlist", json={"email": "second@example.com"})
+
+    organization = Organization(name="Leads Org")
+    admin_user = User(email="admin-leads@example.com", full_name="Admin Leads", password_hash=hash_password("ADMIN123!"))
+    staff_user = User(email="staff@leads.com", full_name="Lead Staff", password_hash=hash_password("Staff123!"))
+    db_session.add_all([organization, admin_user, staff_user])
+    db_session.flush()
+    db_session.add_all(
+        [
+            OrganizationMembership(organization_id=organization.id, user_id=admin_user.id, role=RoleEnum.ADMIN, max_hours_per_week=40),
+            OrganizationMembership(organization_id=organization.id, user_id=staff_user.id, role=RoleEnum.STAFF, max_hours_per_week=40),
+        ]
+    )
+    db_session.commit()
+
+    ADMIN_token = create_access_token(str(admin_user.id), str(organization.id))
+    staff_token = create_access_token(str(staff_user.id), str(organization.id))
+
+    forbidden = client.get("/marketing/waitlist", headers=auth_header(staff_token))
+    assert forbidden.status_code == 403
+
+    allowed = client.get("/marketing/waitlist", headers=auth_header(ADMIN_token))
+    assert allowed.status_code == 200
+    emails = [item["email"] for item in allowed.json()["data"]]
+    assert emails[:2] == ["second@example.com", "first@example.com"]
 
 
 def test_full_api_flow_with_preview_apply_and_dashboard_labor(client):

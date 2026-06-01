@@ -1,4 +1,4 @@
-import { CalendarDays, CreditCard, FileText, FileUp, House, ListTodo, Users, type LucideIcon } from "lucide-react";
+import { CalendarDays, CreditCard, FileClock, FileText, FileUp, House, ListTodo, Mailbox, Users, type LucideIcon } from "lucide-react";
 
 import { canAccessNotes, canAccessReport, canManageTeam, canViewOverview } from "@/lib/access";
 import type { MeResponse } from "@/lib/types";
@@ -26,17 +26,19 @@ export function getNavItems(me?: MeResponse | null): NavItem[] {
       { to: "/overview", key: "overview", icon: House },
       { to: "/report", key: "report", icon: FileUp },
       { to: "/schedule", key: "schedule", icon: CalendarDays },
+      { to: "/timesheets", key: "timesheets", icon: FileClock },
       { to: "/payroll", key: "payroll", icon: CreditCard },
       { to: "/tasks", key: "tasks", icon: ListTodo },
       { to: "/team", key: "team", icon: Users },
       { to: "/notes", key: "notes", icon: FileText },
+      { to: "/waitlist", key: "waitlist", icon: Mailbox },
     ];
   }
 
   if (me?.role === "MANAGER") {
     const items: NavItem[] = [];
     if (canViewOverview(me)) items.push({ to: "/overview", key: "overview", icon: House });
-    items.push({ to: "/report", key: "report", icon: FileUp }, ...managerBase);
+    items.push({ to: "/report", key: "report", icon: FileUp }, { to: "/timesheets", key: "timesheets", icon: FileClock }, ...managerBase);
     if (canManageTeam(me)) items.push({ to: "/team", key: "team", icon: Users });
     if (canAccessNotes(me)) items.push({ to: "/notes", key: "notes", icon: FileText });
     return items;

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
+import { useLocation } from "react-router-dom";
 
 import {
   ChevronLeft,
@@ -492,6 +493,7 @@ function WeekRangeNavigator({ label, onPrevious, onNext, className }: WeekRangeN
         <button
           type="button"
           onClick={onPrevious}
+          aria-label="Previous week"
           className="grid size-8 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
         >
           <ChevronLeft className="size-4" />
@@ -502,6 +504,7 @@ function WeekRangeNavigator({ label, onPrevious, onNext, className }: WeekRangeN
         <button
           type="button"
           onClick={onNext}
+          aria-label="Next week"
           className="grid size-8 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
         >
           <ChevronRight className="size-4" />
@@ -632,6 +635,7 @@ type AppliedTimetableEntry = {
   missingCount: number;
   isOpen: boolean;
   isConflict: boolean;
+  isMine: boolean;
 };
 
 type AppliedTimetableLayoutEntry = AppliedTimetableEntry & {
@@ -810,7 +814,13 @@ function AppliedShiftCard({
   return (
     <div
       className={`rounded-[1rem] border px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] ${
-        entry.isConflict ? "border-red-200 bg-red-50/90" : entry.isOpen ? "border-red-200 bg-red-50/85" : "border-[var(--color-divider)] bg-white"
+        entry.isConflict
+          ? "border-red-200 bg-red-50/90"
+          : entry.isOpen
+            ? "border-red-200 bg-red-50/85"
+            : entry.isMine
+              ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-200"
+              : "border-[var(--color-divider)] bg-white"
       }`}
       style={{
         boxShadow: `inset 4px 0 0 ${entry.isConflict ? "#ef4444" : entry.isOpen ? "#ef4444" : tone.accent}`,
@@ -819,6 +829,7 @@ function AppliedShiftCard({
           : entry.isOpen
             ? "rgba(254, 242, 242, 0.9)"
             : hexToRgba(tone.accent, 0.11),
+        borderColor: entry.isMine && !entry.isConflict && !entry.isOpen ? "#86efac" : undefined,
       }}
     >
       <div className="flex items-start justify-between gap-2">
@@ -865,10 +876,22 @@ function PreviewEditableShiftCard({
           <p className="mt-2 text-sm leading-5 text-[var(--color-heading)]">{entry.assigned_user_name}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button size="sm" variant="secondary" className="h-8 px-2.5" onClick={onEdit}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-8 px-2.5"
+            onClick={onEdit}
+            aria-label={`Edit shift ${entry.assigned_user_name} ${formatTime(entry.startTime)}-${formatTime(entry.endTime)}`}
+          >
             <Pencil className="size-4" />
           </Button>
-          <Button size="sm" variant="secondary" className="h-8 px-2.5 text-[var(--color-danger)] hover:text-[var(--color-danger)]" onClick={onDelete}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-8 px-2.5 text-[var(--color-danger)] hover:text-[var(--color-danger)]"
+            onClick={onDelete}
+            aria-label={`Delete shift ${entry.assigned_user_name} ${formatTime(entry.startTime)}-${formatTime(entry.endTime)}`}
+          >
             <Trash2 className="size-4" />
           </Button>
         </div>
@@ -928,7 +951,13 @@ function PreviewCardsBoard({
                   t={t}
                   buttonClassName="inline-flex size-6 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100"
                 />
-                <Button size="sm" variant="secondary" className="h-8 px-2.5" onClick={() => onCreate(day.iso)}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-8 px-2.5"
+                  onClick={() => onCreate(day.iso)}
+                  aria-label={`Add shift ${day.title} ${day.caption}`}
+                >
                   <Plus className="size-4" />
                 </Button>
               </div>
@@ -1153,10 +1182,10 @@ function AppliedTimetableBoard({
                       }}
                       >
                       <div
-                        className={`relative flex h-full w-full flex-col rounded-none border px-1 py-0 ${compact ? "gap-0.5" : "gap-1"}`}
+                        className={`relative flex h-full w-full flex-col rounded-none border px-1 py-0 ${compact ? "gap-0.5" : "gap-1"} ${entry.isMine ? "ring-1 ring-emerald-200" : ""}`}
                         style={{
                           backgroundColor,
-                          borderColor,
+                          borderColor: entry.isMine && !entry.isConflict && !entry.isOpen ? "#86efac" : borderColor,
                         }}
                       >
                         {entry.isConflict ? (
@@ -1235,6 +1264,12 @@ type PreviewEditorModalState = {
   endTime: string;
 };
 
+type TeamAvailabilityEditorState = {
+  userId: string;
+  fullName: string;
+  slots: AvailabilityPreferenceSlot[];
+};
+
 type TimesheetModalState =
   | {
       mode: "shift";
@@ -1288,11 +1323,11 @@ function latestTimesheet(entries: TimesheetEntry[]): TimesheetEntry | undefined 
 
 export function SchedulePage() {
   const { t, lang } = useLanguage();
-
-   const { token, me } = useAuth();
-   const toast = useToast();
-
-   const queryClient = useQueryClient();
+  const location = useLocation();
+  const { token, me } = useAuth();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const isTimesheetsRoute = location.pathname === "/timesheets";
 
 
 
@@ -1354,6 +1389,7 @@ export function SchedulePage() {
   const [mobileAppliedView, setMobileAppliedView] = useState<AppliedReadOnlyViewMode>("cards");
   const [previewEditorModal, setPreviewEditorModal] = useState<PreviewEditorModalState | null>(null);
   const [timesheetModal, setTimesheetModal] = useState<TimesheetModalState | null>(null);
+  const [teamAvailabilityEditor, setTeamAvailabilityEditor] = useState<TeamAvailabilityEditorState | null>(null);
   const [timesheetForm, setTimesheetForm] = useState<TimesheetFormState>({ arrived_at: "11:00", left_at: "22:00", note: "" });
   const [reviewModal, setReviewModal] = useState<ReviewModalState | null>(null);
   const weekEnd = shiftWeek(weekStart, 6);
@@ -1754,6 +1790,38 @@ export function SchedulePage() {
     },
 
   });
+  const approveAvailabilityMutation = useMutation({
+    mutationFn: (userId: string) => api.approveAvailability(token!, weekStart, userId),
+    onSuccess: () => {
+      toast.success(t("schedule.availability_approved"));
+      void queryClient.invalidateQueries({ queryKey: ["team-availability-summary", weekStart] });
+      void queryClient.invalidateQueries({ queryKey: ["availability", weekStart] });
+    },
+    onError: (error) => {
+      toast.error(t("schedule.approve_availability_failed"), error instanceof Error ? error.message : undefined);
+    },
+  });
+  const saveTeamAvailabilityEditorMutation = useMutation({
+    mutationFn: () => {
+      if (!teamAvailabilityEditor) {
+        throw new Error("Missing team availability editor state.");
+      }
+      return api.putAvailability(token!, weekStart, {
+        user_id: teamAvailabilityEditor.userId,
+        desired_hours: teamAvailabilityEditorDesiredHoursForApi,
+        slots: teamAvailabilityEditor.slots,
+      });
+    },
+    onSuccess: () => {
+      setTeamAvailabilityEditor(null);
+      toast.success(t("schedule.availability_saved"));
+      void queryClient.invalidateQueries({ queryKey: ["team-availability-summary", weekStart] });
+      void queryClient.invalidateQueries({ queryKey: ["availability", weekStart] });
+    },
+    onError: (error) => {
+      toast.error(t("team.availability_failed"), error instanceof Error ? error.message : undefined);
+    },
+  });
 
   const createTimesheetMutation = useMutation({
     mutationFn: async ({ modal, form }: { modal: TimesheetModalState; form: TimesheetFormState }) => {
@@ -2023,6 +2091,7 @@ export function SchedulePage() {
       if (endMinutes <= startMinutes) endMinutes += 24 * 60;
       const positionLabel = shift.staff_position ?? shift.required_role;
       const assignedNames = shift.assignments.map((assignment) => memberNameById[assignment.user_id] ?? t("schedule.assigned_label"));
+      const isMine = shift.assignments.some((assignment) => assignment.user_id === me?.id);
       const missingCount = Math.max(0, shift.required_count - shift.assignments.length);
       if (assignedNames.length) {
         map[shift.date]?.push({
@@ -2042,6 +2111,7 @@ export function SchedulePage() {
           missingCount,
           isOpen: false,
           isConflict: conflictingShiftIds.has(shift.id),
+          isMine,
         });
       }
       if (missingCount > 0) {
@@ -2062,6 +2132,7 @@ export function SchedulePage() {
           missingCount,
           isOpen: true,
           isConflict: false,
+          isMine: false,
         });
       }
     }
@@ -2077,7 +2148,7 @@ export function SchedulePage() {
     }
 
     return map;
-  }, [conflictingShiftIds, managerShifts, memberNameById, t, weekDays]);
+  }, [conflictingShiftIds, managerShifts, me?.id, memberNameById, t, weekDays]);
 
   const appliedTimetableByDate = useMemo(() => {
     const map: Record<string, AppliedTimetableLayoutEntry[]> = {};
@@ -2391,8 +2462,16 @@ export function SchedulePage() {
     () => Math.round(availabilityDraft.slots.reduce((sum, slot) => sum + shiftHours(slot.start_time, slot.end_time), 0) * 10) / 10,
     [availabilityDraft.slots],
   );
+  const teamAvailabilityEditorDesiredHours = useMemo(
+    () =>
+      teamAvailabilityEditor
+        ? Math.round(teamAvailabilityEditor.slots.reduce((sum, slot) => sum + shiftHours(slot.start_time, slot.end_time), 0) * 10) / 10
+        : 0,
+    [teamAvailabilityEditor],
+  );
 
   const availabilityDesiredHoursForApi = useMemo(() => Math.round(availabilityDesiredHours), [availabilityDesiredHours]);
+  const teamAvailabilityEditorDesiredHoursForApi = useMemo(() => Math.round(teamAvailabilityEditorDesiredHours), [teamAvailabilityEditorDesiredHours]);
 
   const setAvailabilityDayEnabled = (dayIndex: number, enabled: boolean) => {
     setAvailabilityDraft((current) => {
@@ -2407,6 +2486,31 @@ export function SchedulePage() {
 
   const updateAvailabilityDayTime = (dayIndex: number, field: "start_time" | "end_time", value: string, baseline?: AvailabilityPreferenceSlot) => {
     setAvailabilityDraft((current) => {
+      const remaining = current.slots.filter((slot) => slot.day_of_week !== dayIndex);
+      const nextBaseline = baseline ?? { day_of_week: dayIndex, start_time: "11:00:00", end_time: "19:00:00", is_available: true };
+      return {
+        ...current,
+        slots: [...remaining, { ...nextBaseline, [field]: `${value}:00` }],
+      };
+    });
+  };
+
+  const setTeamAvailabilityDayEnabled = (dayIndex: number, enabled: boolean) => {
+    setTeamAvailabilityEditor((current) => {
+      if (!current) return current;
+      const remaining = current.slots.filter((slot) => slot.day_of_week !== dayIndex);
+      return {
+        ...current,
+        slots: enabled
+          ? [...remaining, { day_of_week: dayIndex, start_time: "11:00:00", end_time: "19:00:00", is_available: true }]
+          : remaining,
+      };
+    });
+  };
+
+  const updateTeamAvailabilityDayTime = (dayIndex: number, field: "start_time" | "end_time", value: string, baseline?: AvailabilityPreferenceSlot) => {
+    setTeamAvailabilityEditor((current) => {
+      if (!current) return current;
       const remaining = current.slots.filter((slot) => slot.day_of_week !== dayIndex);
       const nextBaseline = baseline ?? { day_of_week: dayIndex, start_time: "11:00:00", end_time: "19:00:00", is_available: true };
       return {
@@ -2508,15 +2612,91 @@ export function SchedulePage() {
     </Card>
   ) : null;
 
+  const availabilityStatusBadgeClass = (status: TeamAvailabilitySummaryRow["status"]) => {
+    if (status === "approved") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    if (status === "filled") return "border-sky-200 bg-sky-50 text-sky-700";
+    if (status === "partial") return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-slate-200 bg-slate-50 text-slate-600";
+  };
+
+  const availabilityStatusLabel = (status: TeamAvailabilitySummaryRow["status"]) => {
+    if (status === "approved") return t("schedule.status_approved_availability");
+    if (status === "filled") return t("schedule.status_filled");
+    if (status === "partial") return t("schedule.status_partial");
+    return t("schedule.status_empty");
+  };
+
+  const teamAvailabilityCard = isManagerView ? (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("schedule.team_availability")}</CardTitle>
+        <CardDescription>{t("schedule.team_availability_description")}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {(teamAvailabilityQuery.data ?? []).filter((item) => item.full_name !== me?.full_name || item.user_id !== me?.id).length ? (
+          <div className="space-y-3">
+            {(teamAvailabilityQuery.data ?? [])
+              .filter((item) => item.user_id !== me?.id)
+              .map((item) => (
+                <div key={item.user_id} className="flex flex-wrap items-center justify-between gap-3 rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-[var(--color-heading)]">{item.full_name}</p>
+                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                      {item.desired_hours}h • {t("schedule.items_count", { count: item.slots_count })}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className={availabilityStatusBadgeClass(item.status)}>{availabilityStatusLabel(item.status)}</Badge>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        setTeamAvailabilityEditor({
+                          userId: item.user_id,
+                          fullName: item.full_name,
+                          slots: (item.slots ?? []).map((slot) => ({
+                            day_of_week: slot.day_of_week,
+                            start_time: slot.start_time,
+                            end_time: slot.end_time,
+                            is_available: slot.is_available,
+                          })),
+                        })
+                      }
+                    >
+                      <Pencil className="size-4" /> {t("common.edit")}
+                    </Button>
+                    {item.slots_count > 0 && item.status !== "approved" ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => approveAvailabilityMutation.mutate(item.user_id)}
+                        disabled={approveAvailabilityMutation.isPending}
+                      >
+                        <CheckCircle2 className="size-4" /> {t("schedule.approve_availability")}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+          </div>
+        ) : (
+          <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+            {t("schedule.no_team_availability")}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  ) : null;
+
 
 
   return (
 
     <AppShell
-      title={t("schedule.title")}
+      title={isTimesheetsRoute ? t("nav.timesheets") : t("schedule.title")}
       headerVariant={isManagerView ? "minimal" : "default"}
       restaurantName="Old Town"
-      subtitle={isStaff ? t("schedule.subtitle.staff") : undefined}
+      subtitle={isTimesheetsRoute ? t("schedule.timesheet_approvals_description") : isStaff ? t("schedule.subtitle.staff") : undefined}
       action={isStaff ? <div className="hidden sm:block"><Badge>{t("schedule.week_of", { date: weekStart })}</Badge></div> : undefined}
     >
       {isStaff ? (
@@ -2722,9 +2902,10 @@ export function SchedulePage() {
 
           <section className="min-w-0 space-y-5">
 
-            {availabilityCard ? (
+            {!isTimesheetsRoute && availabilityCard ? (
               <div className="stagger-item">{availabilityCard}</div>
             ) : null}
+            {!isTimesheetsRoute && teamAvailabilityCard ? <div className="stagger-item">{teamAvailabilityCard}</div> : null}
 
             <Card>
 
@@ -2839,6 +3020,7 @@ export function SchedulePage() {
 
             </Card>
 
+            {!isTimesheetsRoute ? (
             <Card>
 
               <CardHeader>
@@ -3133,7 +3315,9 @@ export function SchedulePage() {
                 ) : null}
               </CardContent>
             </Card>
+            ) : null}
 
+            {!isTimesheetsRoute ? (
             <Card>
 
               <CardHeader>
@@ -3201,6 +3385,7 @@ export function SchedulePage() {
               </CardContent>
 
             </Card>
+            ) : null}
 
           </section>
 
@@ -3339,6 +3524,94 @@ export function SchedulePage() {
                     }}
                     disabled={patchPreviewEditMutation.isPending || !previewEditorModal.userId || !locationFilter}
                   >
+                    {t("common.save")}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </OverlayPortal>
+      ) : null}
+
+      {teamAvailabilityEditor ? (
+        <OverlayPortal>
+          <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
+            <div className="mobile-sheet-panel lg:w-full lg:max-w-[520px] lg:rounded-[1.5rem] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 lg:shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
+                <div>
+                  <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{t("schedule.approve_availability")}</p>
+                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">{teamAvailabilityEditor.fullName}</p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
+                  onClick={() => setTeamAvailabilityEditor(null)}
+                  aria-label="Close"
+                >
+                  <XCircle className="size-5" />
+                </button>
+              </div>
+
+              <div className="mobile-sheet-scroll px-4 py-4 lg:px-0">
+                <div className="grid gap-4 lg:mt-5">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("schedule.hours_per_week")}</p>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <p className="text-2xl font-bold tracking-[-0.06em] text-[var(--color-heading)]">{teamAvailabilityEditorDesiredHours.toFixed(1)}</p>
+                      <p className="text-sm text-[var(--color-text-muted)]">{t("schedule.derived_from_ranges")}</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {weekDays.map((day, index) => {
+                      const slots = teamAvailabilityEditor.slots.filter((slot) => slot.day_of_week === index);
+                      const firstSlot = slots[0];
+                      const enabled = Boolean(firstSlot);
+                      return (
+                        <div key={`team-availability-editor-${day.iso}`} className="rounded-[1rem] border border-[var(--color-border)] bg-white px-4 py-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{day.title}</p>
+                              <p className="text-xs text-[var(--color-text-muted)]">{day.caption}</p>
+                            </div>
+                            <button
+                              type="button"
+                              aria-pressed={enabled}
+                              onClick={() => setTeamAvailabilityDayEnabled(index, !enabled)}
+                              className={`relative inline-flex h-11 w-16 items-center rounded-full p-1 transition ${enabled ? "bg-emerald-500/90" : "bg-slate-200"}`}
+                            >
+                              <span className={`size-7 rounded-full bg-white shadow-sm transition ${enabled ? "translate-x-8" : "translate-x-0"}`} />
+                            </button>
+                          </div>
+                          <p className="mt-2 text-xs font-medium text-[var(--color-text-muted)]">{enabled ? t("schedule.available") : t("schedule.off")}</p>
+                          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <input
+                              type="time"
+                              value={firstSlot ? firstSlot.start_time.slice(0, 5) : ""}
+                              disabled={!enabled}
+                              onChange={(event) => updateTeamAvailabilityDayTime(index, "start_time", event.target.value, firstSlot)}
+                              className="h-11 w-full border-0 border-b border-[var(--color-border)] bg-transparent px-0 text-base text-[var(--color-heading)] outline-none focus:border-[var(--color-primary)] disabled:text-[var(--color-text-muted)] sm:text-sm"
+                            />
+                            <input
+                              type="time"
+                              value={firstSlot ? firstSlot.end_time.slice(0, 5) : ""}
+                              disabled={!enabled}
+                              onChange={(event) => updateTeamAvailabilityDayTime(index, "end_time", event.target.value, firstSlot)}
+                              className="h-11 w-full border-0 border-b border-[var(--color-border)] bg-transparent px-0 text-base text-[var(--color-heading)] outline-none focus:border-[var(--color-primary)] disabled:text-[var(--color-text-muted)] sm:text-sm"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-[var(--color-divider)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
+                <div className="grid gap-2 lg:flex">
+                  <Button variant="secondary" onClick={() => setTeamAvailabilityEditor(null)}>
+                    {t("common.cancel")}
+                  </Button>
+                  <Button onClick={() => saveTeamAvailabilityEditorMutation.mutate()} disabled={saveTeamAvailabilityEditorMutation.isPending}>
                     {t("common.save")}
                   </Button>
                 </div>

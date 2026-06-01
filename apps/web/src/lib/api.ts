@@ -1,5 +1,8 @@
 import type {
   AssignmentOverridePayload,
+  BillingCheckoutCycle,
+  BillingCheckoutSession,
+  BillingPortalSession,
   AuthLoginResponse,
   AvailabilityPreferenceSlot,
   AvailabilityPreferenceWeek,
@@ -24,6 +27,7 @@ import type {
   ShiftTemplate,
   ShiftRequest,
   StaffCalendarDay,
+  SubscriptionPlan,
   Task,
   TimesheetEntry,
   TimesheetReviewAction,
@@ -32,6 +36,8 @@ import type {
   PayrollSummary,
   User,
   WeeklyShiftOverride,
+  WaitlistLead,
+  WaitlistSignupResponse,
   WorkerSetup,
   ShiftEndPayload,
   MemberRemovalImpact,
@@ -116,6 +122,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     });
+  },
+  joinWaitlist(input: { email: string }) {
+    return request<WaitlistSignupResponse>("/marketing/waitlist", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+  listWaitlist(token: string) {
+    return request<WaitlistLead[]>("/marketing/waitlist", {}, token);
   },
   bootstrapSession() {
     return request<SessionBootstrapResponse>("/auth/session");
@@ -215,6 +230,17 @@ export const api = {
   getCurrentSubscription(token: string) {
     return request<SubscriptionSummary>("/organizations/current/subscription", {}, token);
   },
+  createCheckoutSession(token: string, body: { plan: SubscriptionPlan; billing_cycle: BillingCheckoutCycle }) {
+    return request<BillingCheckoutSession>("/billing/checkout-session", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }, token);
+  },
+  createBillingPortalSession(token: string) {
+    return request<BillingPortalSession>("/billing/portal-session", {
+      method: "POST",
+    }, token);
+  },
   patchLocationMember(
     token: string,
     locationId: string,
@@ -273,6 +299,12 @@ export const api = {
         user_id: body.user_id,
         slots: body.slots,
       }),
+    }, token);
+  },
+  approveAvailability(token: string, weekStart: string, userId: string) {
+    return request<AvailabilityPreferenceWeek>(`/availability/weeks/${weekStart}/approve`, {
+      method: "PATCH",
+      body: JSON.stringify({ user_id: userId }),
     }, token);
   },
   createTemplate(

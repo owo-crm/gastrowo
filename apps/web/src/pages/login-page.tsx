@@ -37,6 +37,26 @@ function DevHint({ code, label }: { code?: string | null; label: string }) {
   return <p className="text-xs text-[var(--color-text-muted)]">{label} <span className="font-mono text-[var(--color-heading)]">{code}</span></p>;
 }
 
+function LegalAuthNotice() {
+  return (
+    <p className="text-sm leading-6 text-[var(--color-text-muted)]">
+      Kontynuując, potwierdzasz zapoznanie się z{" "}
+      <Link to="/regulamin" className="font-semibold text-[var(--color-heading)] hover:text-[var(--color-primary)]">
+        Regulaminem
+      </Link>
+      ,{" "}
+      <Link to="/polityka-prywatnosci" className="font-semibold text-[var(--color-heading)] hover:text-[var(--color-primary)]">
+        Polityką prywatności
+      </Link>{" "}
+      i{" "}
+      <Link to="/polityka-cookies" className="font-semibold text-[var(--color-heading)] hover:text-[var(--color-primary)]">
+        Polityką cookies
+      </Link>
+      .
+    </p>
+  );
+}
+
 export function LoginPage() {
   const { sendOtp, verifyOtp, loginWithPassword, completeOwnerOnboarding, verifyInviteJoin } = useAuth();
   const toast = useToast();
@@ -46,7 +66,7 @@ export function LoginPage() {
   const inviteToken = searchParams.get("token")?.trim() || "";
   const invitedEmail = searchParams.get("email")?.trim().toLowerCase() || "";
   const isInviteJoin = Boolean(inviteToken && invitedEmail);
-  const requestedMode: AuthMode = searchParams.get("mode") === "signin" ? "signin" : "onboarding";
+  const requestedMode: AuthMode = searchParams.get("mode") === "onboarding" ? "onboarding" : "signin";
 
   const [mode, setMode] = useState<AuthMode>(requestedMode);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -312,6 +332,7 @@ export function LoginPage() {
           </Button>
         </div>
       ) : null}
+      <LegalAuthNotice />
     </div>
   );
 
@@ -401,9 +422,10 @@ export function LoginPage() {
             <Lock className="mt-0.5 size-4 shrink-0" /> <span>{t("login.use_password_instead")}</span>
           </button>
         ) : null}
-        <button type="button" className="max-w-full text-left text-sm leading-5 text-[var(--color-primary)]" onClick={switchToOnboarding}>
-          {t("login.start_onboarding")}
-        </button>
+        <p className="max-w-full text-sm leading-6 text-[var(--color-text-muted)]">
+          Potrzebujesz nowego dostępu? <Link to="/" className="font-semibold text-[var(--color-primary)]">Zostaw email na stronie głównej</Link> i odbierz miesiąc darmowego dostępu oraz 50% zniżki na pierwszy płatny miesiąc.
+        </p>
+        <LegalAuthNotice />
       </div>
     </div>
   );
@@ -578,6 +600,7 @@ export function LoginPage() {
             ))}
           </div>
         </div>
+        <LegalAuthNotice />
         <Button type="button" className="w-full" onClick={handleCompleteOwner} disabled={isSubmitting || !organizationName.trim() || !source}>
           {t("login.create_business")}
         </Button>
@@ -615,9 +638,9 @@ export function LoginPage() {
             <Card className="w-full rounded-[1.9rem] border border-[rgba(148,163,184,0.16)] bg-white/98 p-2 shadow-[0_28px_65px_rgba(15,23,42,0.08)]">
               <CardHeader className="p-5 pb-3 md:p-6 md:pb-3">
                 <div className="mb-4 flex flex-wrap gap-2">
-                  {[t("login.mode.onboarding_title"), t("login.mode.signin_title"), t("login.mode.join_title")].map((label) => (
+                  {[(mode === "onboarding" ? t("login.mode.onboarding_title") : null), t("login.mode.signin_title"), t("login.mode.join_title")].filter(Boolean).map((label) => (
                     <span
-                      key={label}
+                      key={label as string}
                       className="rounded-full border border-[rgba(216,225,236,0.92)] bg-[rgba(243,247,251,0.86)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]"
                     >
                       {label}

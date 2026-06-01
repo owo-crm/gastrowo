@@ -205,6 +205,7 @@ export function TeamPage() {
   const [deletePopupOpen, setDeletePopupOpen] = useState(false);
   const [deleteText, setDeleteText] = useState("");
   const [linkEmail, setLinkEmail] = useState("");
+  const [linkEmailError, setLinkEmailError] = useState<string | null>(null);
   const [memberRemovalOpen, setMemberRemovalOpen] = useState(false);
   const [selectedTemplateDay, setSelectedTemplateDay] = useState("0");
   const [templateDrafts, setTemplateDrafts] = useState<
@@ -449,6 +450,9 @@ export function TeamPage() {
   });
 
   const linkByEmailMutation = useMutation({
+    onMutate: () => {
+      setLinkEmailError(null);
+    },
     mutationFn: () =>
       api.linkMemberByEmail(token!, {
         email: linkEmail.trim().toLowerCase(),
@@ -462,10 +466,12 @@ export function TeamPage() {
         toast.success("Invite sent", linkEmail.trim().toLowerCase());
       }
       setLinkEmail("");
+      setLinkEmailError(null);
       void queryClient.invalidateQueries({ queryKey: ["users"] });
       void queryClient.invalidateQueries({ queryKey: ["worker-setup"] });
     },
     onError: (error) => {
+      setLinkEmailError(error instanceof Error ? error.message : "Failed to link by email");
       toast.error("Failed to link by email", error instanceof Error ? error.message : undefined);
     },
   });
@@ -630,7 +636,7 @@ export function TeamPage() {
     return totals;
   }, [usersQuery.data]);
   const availabilitySummaryByUser = useMemo(() => {
-    const map: Record<string, { status: "filled" | "partial" | "empty"; desired_hours: number; slots_count: number }> = {};
+    const map: Record<string, { status: "filled" | "partial" | "empty" | "approved"; desired_hours: number; slots_count: number }> = {};
     for (const item of teamAvailabilitySummaryQuery.data ?? []) {
       map[item.user_id] = {
         status: item.status,
@@ -829,11 +835,20 @@ export function TeamPage() {
                       </div>
                     </div>
                     <div className="mt-4 grid gap-3">
-                      <Input placeholder="worker@restaurant.com" type="email" value={linkEmail} onChange={(event) => setLinkEmail(event.target.value)} />
-                        <Button className="bg-emerald-700 text-white hover:bg-emerald-800" onClick={() => linkByEmailMutation.mutate()} disabled={!linkEmail || linkByEmailMutation.isPending}>
-                          <MailPlus className="size-4" /> Add by email
-                        </Button>
-                      </div>
+                      <Input
+                        placeholder="worker@restaurant.com"
+                        type="email"
+                        value={linkEmail}
+                        onChange={(event) => {
+                          setLinkEmail(event.target.value);
+                          if (linkEmailError) setLinkEmailError(null);
+                        }}
+                      />
+                      <Button className="bg-emerald-700 text-white hover:bg-emerald-800" onClick={() => linkByEmailMutation.mutate()} disabled={!linkEmail || linkByEmailMutation.isPending}>
+                        <MailPlus className="size-4" /> Add by email
+                      </Button>
+                      {linkEmailError ? <p className="text-sm text-rose-600">{linkEmailError}</p> : null}
+                    </div>
                   </div>
                 ) : null}
                 {[

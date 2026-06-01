@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -8,8 +8,11 @@ import {
   ChevronDown,
   CircleDollarSign,
   Clock3,
+  Facebook,
+  Instagram,
   LayoutGrid,
   ListTodo,
+  Mail,
   MessageSquareMore,
   NotebookText,
   PlayCircle,
@@ -21,6 +24,10 @@ import { Link } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api";
+import { trackMarketingEvent } from "@/lib/marketing-analytics";
+import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 const pageReveal = {
@@ -100,7 +107,7 @@ const workflowSteps: Array<{ icon: LucideIcon; title: string; body: string; tone
   {
     icon: LayoutGrid,
     title: "Utwórz workspace",
-    body: "Załóż restaurację, dodaj lokal, ustaw role i godziny otwarcia.",
+    body: "Zostaw email, a po starcie pomożemy uruchomić workspace, lokal i podstawowe ustawienia.",
     tone: "bg-[rgba(37,99,235,0.10)] text-[#2563eb]",
   },
   {
@@ -145,12 +152,12 @@ const audienceCards = [
 ];
 
 const faqItems = [
-  "Czy mogę wypróbować GastrOWO za darmo?",
-  "Czy pracownicy potrzebują własnego konta?",
-  "Czy mogę używać GastrOWO w więcej niż jednym lokalu?",
-  "Jak działa planowanie grafiku?",
+  "Czy mogę wypróbować Gastrostuff za darmo?",
+  "Czy Gastrostuff pomaga tylko przy grafiku?",
+  "Czy Gastrostuff sprawdzi się w więcej niż jednym lokalu?",
+  "Czy mogę kontrolować przychód i koszty pracy w jednym miejscu?",
   "Czy moje dane są bezpieczne?",
-  "Czy mogę anulować subskrypcję w dowolnym momencie?",
+  "Co dostaję po zostawieniu emaila?",
 ];
 
 const requestRows = [
@@ -205,8 +212,74 @@ function LandingWordmark({ size = "lg" }: { size?: "lg" | "sm" }) {
     <BrandLogo
       kind="wordmark"
       tone="light"
-      className={cn("w-auto object-contain", size === "lg" ? "h-14 sm:h-16" : "h-8 sm:h-9")}
+      className={cn("w-auto object-contain text-center", size === "lg" ? "text-[4.2rem] sm:text-[4.95rem]" : "text-[2.65rem] sm:text-[3.1rem]")}
     />
+  );
+}
+
+function WaitlistCaptureForm({
+  buttonLabel = "Zostaw email",
+  noteClassName,
+  trackingContext = "landing",
+}: {
+  buttonLabel?: string;
+  noteClassName?: string;
+  trackingContext?: string;
+}) {
+  const toast = useToast();
+  const [email, setEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return;
+
+    setIsSubmitting(true);
+    try {
+      const result = await api.joinWaitlist({ email: normalizedEmail });
+      setIsSubmitted(true);
+      setEmail("");
+      trackMarketingEvent("waitlist_signup", {
+        context: trackingContext,
+        cta_label: buttonLabel,
+        created: result.created,
+        page: window.location.pathname,
+      });
+      toast.success(
+        result.created ? "Zapisano na waitlistę" : "Email już jest na waitliście",
+        result.created
+          ? "To nie jest natychmiastowy dostęp. Odezwiemy się po starcie z miesiącem gratis i 50% zniżki na pierwszy płatny miesiąc."
+          : "Ten adres już czeka na liście startowej Gastrostuff.",
+      );
+    } catch (error) {
+      toast.error("Nie udało się zapisać emaila", error instanceof Error ? error.message : undefined);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
+        <Input
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="twoj@email.pl"
+          className="h-12 rounded-[1rem] border-[rgba(215,224,238,0.95)] bg-white/96 px-4 text-sm shadow-[0_10px_26px_rgba(15,23,42,0.04)]"
+        />
+        <Button type="submit" size="lg" className="rounded-[1rem] px-6" disabled={isSubmitting || !email.trim()}>
+          <Mail className="size-4" /> {isSubmitting ? "Zapisywanie..." : buttonLabel}
+        </Button>
+      </form>
+      <p className={cn("mt-3 text-sm leading-6 text-[var(--color-text-muted)]", noteClassName)}>
+        To jest waitlista do Gastrostuff, nie natychmiastowy dostęp. Po starcie osoby z listy dostaną 1 miesiąc darmowego dostępu oraz 50% zniżki na pierwszy płatny miesiąc.
+      </p>
+      <LegalInlineLinks className={cn("mt-2", noteClassName)} />
+      {isSubmitted ? <p className="mt-2 text-sm font-semibold text-[#16a34a]">Dzięki. Twój email jest na waitliście. Dostęp wyślemy dopiero po starcie.</p> : null}
+    </div>
   );
 }
 
@@ -487,6 +560,26 @@ function HeroScheduleBoardAdaptive() {
 }
 function SectionContainer({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8", className)}>{children}</div>;
+}
+
+function LegalInlineLinks({ className }: { className?: string }) {
+  return (
+    <p className={cn("text-sm leading-6 text-[var(--color-text-muted)]", className)}>
+      Korzystając z formularza, potwierdzasz zapoznanie się z{" "}
+      <Link to="/regulamin" className="font-semibold text-[var(--color-heading)] hover:text-[#2563eb]">
+        Regulaminem
+      </Link>
+      ,{" "}
+      <Link to="/polityka-prywatnosci" className="font-semibold text-[var(--color-heading)] hover:text-[#2563eb]">
+        Polityką prywatności
+      </Link>{" "}
+      i{" "}
+      <Link to="/polityka-cookies" className="font-semibold text-[var(--color-heading)] hover:text-[#2563eb]">
+        Polityką cookies
+      </Link>
+      .
+    </p>
+  );
 }
 
 function Eyebrow({ children }: { children: ReactNode }) {
@@ -786,39 +879,18 @@ function PortraitVisual({ variant }: { variant: "owner" | "manager" }) {
   return (
     <div
       className={cn(
-        "relative h-[260px] w-full overflow-hidden rounded-[1.1rem]",
+        "relative flex h-[260px] w-full items-end justify-center overflow-hidden rounded-[1.1rem]",
         isOwner
           ? "bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.78),transparent_28%),linear-gradient(135deg,#dbeafe_0%,#eef5ff_44%,#d6e8ff_100%)]"
           : "bg-[radial-gradient(circle_at_68%_18%,rgba(255,255,255,0.74),transparent_28%),linear-gradient(135deg,#dcfce7_0%,#effcf4_42%,#daf7e7_100%)]",
       )}
     >
-      <div className="absolute inset-x-6 bottom-0 top-10 rounded-[1.2rem] bg-white/34 blur-[1px]" />
-      <div
-        className={cn(
-          "absolute bottom-0 left-1/2 h-[62%] w-[54%] -translate-x-1/2 rounded-t-[3rem]",
-          isOwner ? "bg-[linear-gradient(180deg,#475569,#1f2937)]" : "bg-[linear-gradient(180deg,#0f766e,#164e63)]",
-        )}
+      <div className="absolute inset-x-5 bottom-0 top-8 rounded-[1.25rem] bg-white/34 blur-[1px]" />
+      <img
+        src={isOwner ? "/landing/owner.png" : "/landing/manager.png"}
+        alt={isOwner ? "Właściciel Gastrostuff" : "Manager Gastrostuff"}
+        className="relative z-10 h-[240px] w-auto object-contain object-bottom"
       />
-      <div className="absolute bottom-[48%] left-1/2 h-[30%] w-[26%] -translate-x-1/2 rounded-[2rem] bg-[#f2c9a6]" />
-      <div className="absolute bottom-[56%] left-1/2 h-[26%] w-[30%] -translate-x-1/2 rounded-full bg-[#f5d3b5]" />
-      <div
-        className={cn(
-          "absolute bottom-[64%] left-1/2 h-[20%] w-[32%] -translate-x-1/2 rounded-[45%_45%_40%_40%]",
-          isOwner ? "bg-[linear-gradient(180deg,#4b5563,#111827)]" : "bg-[linear-gradient(180deg,#d1a679,#f4d4aa)]",
-        )}
-      />
-      <div
-        className={cn(
-          "absolute bottom-[18%] left-1/2 h-[25%] w-[22%] -translate-x-1/2 rounded-[1rem]",
-          isOwner ? "bg-[linear-gradient(180deg,#e2e8f0,#f8fafc)]" : "bg-[linear-gradient(180deg,#1f2937,#0f172a)]",
-        )}
-      />
-      {isOwner ? (
-        <div className="absolute bottom-[11%] left-1/2 h-[14%] w-[26%] -translate-x-1/2 rounded-[1rem] border border-white/70 bg-[#2563eb]/92" />
-      ) : (
-        <div className="absolute bottom-[15%] left-[56%] h-[16%] w-[22%] rounded-[0.9rem] border border-white/70 bg-[#111827]/92 shadow-[0_10px_20px_rgba(15,23,42,0.18)]" />
-      )}
-      <div className="absolute inset-x-4 bottom-4 h-16 rounded-[1rem] bg-white/42 backdrop-blur-sm" />
     </div>
   );
 }
@@ -1215,6 +1287,15 @@ function WorkspacePreview() {
 
 function FaqItem({ index, question, openIndex, onToggle }: { index: number; question: string; openIndex: number | null; onToggle: (index: number) => void }) {
   const isOpen = openIndex === index;
+  const answers = [
+    "Tak. Z okazji otwarcia dajemy miesiąc darmowego dostępu zamiast 14 dni.",
+    "Nie. Grafik to tylko jedna z warstw. Gastrostuff łączy zespół, raport dnia, zadania i podstawową kontrolę operacyjną restauracji.",
+    "Tak. Gastrostuff jest projektowany zarówno pod pojedyncze restauracje, jak i biznesy prowadzące kilka lokali.",
+    "Tak. W jednym rytmie pracy widzisz przychód dzienny, koszt pracy, zmiany zespołu i zadania operacyjne.",
+    "Tak. Dane z formularza waitlist służą tylko do kontaktu o wdrożeniu i ofercie otwarcia.",
+    "To zapis na waitlistę, nie natychmiastowy dostęp. Po starcie dostaniesz wiadomość, miesiąc darmowego dostępu i 50% zniżki na pierwszy płatny miesiąc.",
+  ];
+
   return (
     <div className="rounded-[1.1rem] border border-[rgba(227,233,243,0.96)] bg-white">
       <button
@@ -1227,7 +1308,7 @@ function FaqItem({ index, question, openIndex, onToggle }: { index: number; ques
       </button>
       {isOpen ? (
         <div className="border-t border-[rgba(233,238,246,0.92)] px-5 py-4 text-sm leading-7 text-[var(--color-text-muted)]">
-          GastrOWO upraszcza planowanie, dostępność zespołu i codzienną operację restauracji bez dokładania zbędnych kroków.
+          {answers[index]}
         </div>
       ) : null}
     </div>
@@ -1262,11 +1343,12 @@ export function LandingPage() {
               <Link to="/login?mode=signin" className="text-[15px] font-semibold text-[var(--color-heading)] transition hover:text-[#2563eb]">
                 Logowanie
               </Link>
-              <Button asChild className="rounded-[1rem] px-5">
-                <Link to="/login?mode=onboarding">
-                  Zacznij za darmo <ArrowRight className="size-4" />
-                </Link>
-              </Button>
+              <a
+                href="#zostaw-email"
+                className="inline-flex min-h-11 items-center rounded-[1rem] bg-[var(--color-primary)] px-5 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(37,99,235,0.22)] transition hover:translate-y-[-1px]"
+              >
+                Zostaw email
+              </a>
             </div>
           </div>
         </SectionContainer>
@@ -1276,35 +1358,29 @@ export function LandingPage() {
         <section className="pt-0 sm:pt-2">
           <SectionContainer>
             <div className="flex min-h-[calc(100dvh-6.75rem)] items-center py-4 sm:py-6">
-              <motion.div {...pageReveal} className="max-w-[56rem]">
+              <motion.div {...pageReveal} className="max-w-[58rem]">
                 <h1 className="text-[2.75rem] font-extrabold leading-[0.98] tracking-[-0.08em] text-[var(--color-heading)] sm:text-[3.65rem] lg:text-[4.25rem]">
-                  Kontroluj grafik,
+                  Grafik, zespół i liczby
                   <br />
                   <span className="bg-[linear-gradient(90deg,#2563eb_0%,#2563eb_42%,#16a34a_70%,#22c55e_100%)] bg-clip-text text-transparent">
-                    zespół i operacje
+                    w jednym rytmie
                   </span>
                   <br />
-                  restauracji bez chaosu.
+                  dla restauracji.
                 </h1>
                 <p className="mt-5 max-w-[32rem] text-[1.02rem] leading-7 text-[var(--color-text-muted)]">
-                  GastrOWO to nowoczesny workspace dla restauracji. Planuj zmiany, zarządzaj zespołem, śledź przychody i trzymaj wszystko w jednym miejscu.
+                  Gastrostuff to nowoczesny workspace dla restauracji. Zostaw email i dołącz do waitlisty, aby po starcie dostać miesiąc darmowego dostępu oraz 50% zniżki na pierwszy płatny miesiąc.
                 </p>
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                  <Button asChild size="lg" className="rounded-[1rem] px-6">
-                    <Link to="/login?mode=onboarding">
-                      Zacznij onboarding <ArrowRight className="size-4" />
+                <div id="zostaw-email" className="mt-6 max-w-[42rem] rounded-[1.4rem] border border-[rgba(215,224,238,0.95)] bg-white/88 p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)] backdrop-blur-sm sm:p-5">
+                  <WaitlistCaptureForm trackingContext="hero" />
+                  <div className="mt-4 flex flex-wrap items-center gap-4 text-sm font-medium text-[var(--color-text-muted)]">
+                    <Link to="/login?mode=signin" className="text-[var(--color-heading)] hover:text-[#2563eb]">
+                      Mam konto, chcę się zalogować
                     </Link>
-                  </Button>
-                  <Button
-                    asChild
-                    variant="secondary"
-                    size="lg"
-                    className="rounded-[1rem] border border-[rgba(215,224,238,0.95)] bg-white px-6 shadow-[0_10px_26px_rgba(15,23,42,0.04)]"
-                  >
-                    <a href="#produkt">
+                    <a href="#produkt" className="inline-flex items-center gap-2 hover:text-[#2563eb]">
                       <PlayCircle className="size-4 text-[#2563eb]" /> Zobacz produkt
                     </a>
-                  </Button>
+                  </div>
                 </div>
                 <div className="mt-6 grid gap-4 sm:grid-cols-3">
                   {quickPoints.map((item) => {
@@ -1502,40 +1578,37 @@ export function LandingPage() {
               {...pageReveal}
               className="overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#2563eb_0%,#1d4ed8_42%,#2563eb_100%)] px-6 py-7 shadow-[0_24px_70px_rgba(37,99,235,0.28)] sm:px-8 sm:py-8"
             >
-              <div className="grid gap-8 xl:grid-cols-[1.15fr_1fr_auto] xl:items-center">
-                <div>
+              <div className="grid gap-8 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:items-start">
+                <div className="max-w-[28rem]">
                   <h2 className="text-[2.2rem] font-extrabold leading-[1.02] tracking-[-0.07em] text-slate-950 sm:text-[2.8rem]">
-                    Proste ceny. Szybki start.
+                    Oferta otwarcia.
                     <br />
-                    Zero zbędnych formalności.
+                    Dłuższy darmowy start.
                   </h2>
                   <p className="mt-4 max-w-[34rem] text-[17px] leading-8 text-slate-900/84">
-                    Wypróbuj GastrOWO za darmo i przekonaj się, jak uporządkuje Twoją restaurację.
+                    Dołącz do waitlisty Gastrostuff. Dostępu nie wysyłamy od razu: po starcie dostaniesz 1 miesiąc za darmo, a przy pierwszych zapisach także 50% zniżki na pierwszy płatny miesiąc.
                   </p>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {[
-                    ["14 dni za darmo", "Pełny dostęp bez karty płatniczej"],
-                    ["Anuluj w każdej chwili", "Bez zobowiązań, bez ukrytych opłat"],
-                  ].map(([title, body]) => (
-                    <div key={title} className="rounded-[1.25rem] border border-white/35 bg-white/78 px-4 py-4 backdrop-blur-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="grid size-10 place-items-center rounded-full border border-slate-300/70 bg-white/80 text-slate-950">
-                          <CircleDollarSign className="size-5" />
-                        </span>
-                        <p className="text-base font-bold text-slate-950">{title}</p>
+                <div className="grid gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {[
+                      ["1 miesiąc za darmo", "Pełny dostęp po starcie Gastrostuff, bez karty płatniczej"],
+                      ["50% na pierwszy płatny miesiąc", "Bonus dla osób, które dołączą do waitlisty jeszcze przed startem"],
+                    ].map(([title, body]) => (
+                      <div key={title} className="rounded-[1.25rem] border border-white/35 bg-white/82 px-4 py-4 backdrop-blur-sm shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
+                        <div className="flex items-center gap-3">
+                          <span className="grid size-10 place-items-center rounded-full border border-slate-300/70 bg-white text-slate-950">
+                            <CircleDollarSign className="size-5" />
+                          </span>
+                          <p className="text-base font-bold leading-6 text-slate-950">{title}</p>
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-slate-900/78">{body}</p>
                       </div>
-                      <p className="mt-3 text-sm leading-6 text-slate-900/78">{body}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="rounded-[1.3rem] bg-white p-2 shadow-[0_16px_40px_rgba(15,23,42,0.14)]">
-                  <Button asChild className="h-auto rounded-[1rem] px-6 py-4 text-base">
-                    <Link to="/login?mode=onboarding">
-                      Zacznij za darmo <ArrowRight className="size-4" />
-                    </Link>
-                  </Button>
-                  <p className="px-4 pb-2 pt-3 text-center text-sm font-medium text-[var(--color-text-muted)]">Start w 2 minuty</p>
+                    ))}
+                  </div>
+                  <div className="rounded-[1.3rem] bg-white p-4 shadow-[0_16px_40px_rgba(15,23,42,0.14)]">
+                    <WaitlistCaptureForm buttonLabel="Dołącz do waitlisty" noteClassName="text-slate-900/72" trackingContext="offer-section" />
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -1566,10 +1639,28 @@ export function LandingPage() {
               <p className="mt-4 text-[15px] leading-7 text-[var(--color-text-muted)]">
                 Nowoczesny workspace dla restauracji. Grafik, zespół, przychody i operacje w jednym miejscu.
               </p>
+              <a href="mailto:support@gastrostuff.pl" className="mt-4 inline-flex text-sm font-semibold text-[var(--color-heading)] hover:text-[#2563eb]">
+                support@gastrostuff.pl
+              </a>
               <div className="mt-5 flex items-center gap-4 text-sm font-semibold text-[var(--color-heading)]">
-                <span>FB</span>
-                <span>IG</span>
-                <span>IN</span>
+                <a
+                  href="https://www.instagram.com/gastrostuff.pl/"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Instagram Gastrostuff"
+                  className="inline-flex size-10 items-center justify-center rounded-full border border-[rgba(227,233,243,0.96)] bg-white transition hover:border-[#2563eb] hover:text-[#2563eb]"
+                >
+                  <Instagram className="size-4" />
+                </a>
+                <a
+                  href="https://www.facebook.com/profile.php?id=61590746600186"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Facebook Gastrostuff"
+                  className="inline-flex size-10 items-center justify-center rounded-full border border-[rgba(227,233,243,0.96)] bg-white transition hover:border-[#2563eb] hover:text-[#2563eb]"
+                >
+                  <Facebook className="size-4" />
+                </a>
               </div>
             </div>
 
@@ -1594,27 +1685,32 @@ export function LandingPage() {
               <div>
                 <p className="text-sm font-extrabold uppercase tracking-[0.14em] text-[var(--color-heading)]">Wsparcie</p>
                 <div className="mt-4 space-y-3 text-sm text-[var(--color-text-muted)]">
-                  <p>Pomoc</p>
-                  <p>FAQ</p>
-                  <p>Polityka prywatności</p>
-                  <p>Regulamin</p>
+                  <Link to="/polityka-prywatnosci" className="block transition hover:text-[#2563eb]">
+                    Polityka prywatności
+                  </Link>
+                  <Link to="/polityka-cookies" className="block transition hover:text-[#2563eb]">
+                    Polityka cookies
+                  </Link>
+                  <Link to="/regulamin" className="block transition hover:text-[#2563eb]">
+                    Regulamin
+                  </Link>
                 </div>
               </div>
             </div>
 
             <div className="rounded-[1.6rem] border border-[rgba(227,233,243,0.96)] bg-[rgba(248,251,255,0.92)] p-6 shadow-[0_16px_36px_rgba(15,23,42,0.05)]">
               <p className="text-xl font-extrabold leading-[1.1] tracking-[-0.05em] text-[var(--color-heading)]">
-                Gotowy, aby uporządkować
+                Chcesz wejść do Gastrostuff
                 <br />
-                swoją restaurację?
+                z ofertą otwarcia?
               </p>
-              <Button asChild className="mt-5 w-full rounded-[1rem]">
-                <Link to="/login?mode=onboarding">Zacznij onboarding</Link>
-              </Button>
+              <div className="mt-5">
+                <WaitlistCaptureForm buttonLabel="Zostaw email" trackingContext="footer-cta" />
+              </div>
             </div>
           </div>
           <div className="mt-8 border-t border-[rgba(227,233,243,0.96)] pt-5 text-center text-sm text-[var(--color-text-muted)]">
-            © 2034 GastrOWO. Wszelkie prawa zastrzeżone.
+            © 2026 Gastrostuff. Wszelkie prawa zastrzeżone.
           </div>
         </SectionContainer>
       </footer>

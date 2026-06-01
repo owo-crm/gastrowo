@@ -4,6 +4,7 @@ import { canAccessNotes, canAccessReport, canManageTeam, canViewOverview, canVie
 import { DashboardPage } from "@/pages/dashboard-page";
 import { BillingPage } from "@/pages/billing-page";
 import { LandingPage } from "@/pages/landing-page";
+import { CookiesPolicyPage, PrivacyPolicyPage, TermsPage } from "@/pages/legal-pages";
 import { LoginPage } from "@/pages/login-page";
 import { NotesDocumentsPage } from "@/pages/notes-documents-page";
 import { PendingLinkPage } from "@/pages/pending-link-page";
@@ -13,6 +14,7 @@ import { ReportPage } from "@/pages/report-page";
 import { SchedulePage } from "@/pages/schedule-page";
 import { TasksPage } from "@/pages/tasks-page";
 import { TeamPage } from "@/pages/team-page";
+import { WaitlistPage } from "@/pages/waitlist-page";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 
@@ -116,6 +118,9 @@ export function App() {
         path="/join"
         element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : hasUnresolvedSession ? <PendingLinkPage /> : <LoginPage />}
       />
+      <Route path="/regulamin" element={<TermsPage />} />
+      <Route path="/polityka-prywatnosci" element={<PrivacyPolicyPage />} />
+      <Route path="/polityka-cookies" element={<CookiesPolicyPage />} />
       <Route
         path="/pending-link"
         element={
@@ -151,6 +156,14 @@ export function App() {
       />
       <Route
         path="/schedule"
+        element={
+          <ProtectedRoute>
+            <SchedulePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/timesheets"
         element={
           <ProtectedRoute>
             <SchedulePage />
@@ -218,6 +231,16 @@ export function App() {
           <ProtectedRoute>
             <ADMINRoute>
               <BillingPage />
+            </ADMINRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/waitlist"
+        element={
+          <ProtectedRoute>
+            <ADMINRoute>
+              <WaitlistPage />
             </ADMINRoute>
           </ProtectedRoute>
         }

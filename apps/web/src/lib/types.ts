@@ -105,6 +105,29 @@ export type SubscriptionSummary = {
   soft_limit_reached: boolean;
 };
 
+export type BillingCheckoutCycle = "monthly" | "annual";
+
+export type BillingCheckoutSession = {
+  id: string;
+  url: string;
+};
+
+export type BillingPortalSession = {
+  url: string;
+};
+
+export type WaitlistSignupResponse = {
+  email: string;
+  created: boolean;
+  created_at: string;
+};
+
+export type WaitlistLead = {
+  id: string;
+  email: string;
+  created_at: string;
+};
+
 export type LinkMemberByEmailResponse =
   | {
       status: "linked";
@@ -223,6 +246,8 @@ export type AvailabilityPreferenceWeek = {
   user_id: string;
   week_start: string;
   desired_hours: number;
+  approved_at: string | null;
+  approved_by: string | null;
   locked_at: string | null;
   locked_by: string | null;
   slots: AvailabilityPreferenceSlot[];
@@ -233,7 +258,7 @@ export type TeamAvailabilitySummaryRow = {
   full_name: string;
   desired_hours: number;
   slots_count: number;
-  status: "filled" | "partial" | "empty";
+  status: "filled" | "partial" | "empty" | "approved";
   slots: AvailabilityPreferenceSlot[];
 };
 

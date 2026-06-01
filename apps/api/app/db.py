@@ -176,6 +176,61 @@ def _ensure_runtime_schema_compat() -> None:
             connection.execute(text("CREATE INDEX ix_auth_sessions_token_hash ON auth_sessions (token_hash)"))
             connection.execute(text("CREATE INDEX ix_auth_sessions_expires_at ON auth_sessions (expires_at)"))
 
+        if "organization_subscriptions" not in tables:
+            connection.execute(
+                text(
+                    "CREATE TABLE organization_subscriptions ("
+                    "id CHAR(32) PRIMARY KEY, "
+                    "organization_id CHAR(32) NOT NULL UNIQUE, "
+                    "plan VARCHAR(16) NOT NULL DEFAULT 'free', "
+                    "status VARCHAR(16) NOT NULL DEFAULT 'active', "
+                    "billing_cycle VARCHAR(16) NOT NULL DEFAULT 'monthly', "
+                    "trial_ends_at TIMESTAMP, "
+                    "current_period_ends_at TIMESTAMP, "
+                    "stripe_customer_id VARCHAR(255), "
+                    "stripe_subscription_id VARCHAR(255), "
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    "FOREIGN KEY(organization_id) REFERENCES organizations(id) ON DELETE CASCADE"
+                    ")"
+                )
+            )
+            connection.execute(text("CREATE INDEX ix_organization_subscriptions_organization_id ON organization_subscriptions (organization_id)"))
+
+        if "in_app_notifications" in tables:
+            notification_columns = {column["name"] for column in inspector.get_columns("in_app_notifications")}
+            if "type" not in notification_columns:
+                connection.execute(text("ALTER TABLE in_app_notifications ADD COLUMN type VARCHAR(32) NOT NULL DEFAULT 'general'"))
+            if "action_url" not in notification_columns:
+                connection.execute(text("ALTER TABLE in_app_notifications ADD COLUMN action_url VARCHAR(500)"))
+            if "entity_kind" not in notification_columns:
+                connection.execute(text("ALTER TABLE in_app_notifications ADD COLUMN entity_kind VARCHAR(80)"))
+            if "entity_id" not in notification_columns:
+                connection.execute(text("ALTER TABLE in_app_notifications ADD COLUMN entity_id VARCHAR(64)"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_in_app_notifications_type ON in_app_notifications (type)"))
+
+        if "auth_sessions" not in tables:
+            connection.execute(
+                text(
+                    "CREATE TABLE auth_sessions ("
+                    "id CHAR(32) PRIMARY KEY, "
+                    "user_id CHAR(32) NOT NULL, "
+                    "organization_id CHAR(32), "
+                    "token_hash VARCHAR(64) NOT NULL UNIQUE, "
+                    "label VARCHAR(120), "
+                    "last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    "expires_at TIMESTAMP NOT NULL, "
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    "FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE, "
+                    "FOREIGN KEY(organization_id) REFERENCES organizations(id) ON DELETE CASCADE"
+                    ")"
+                )
+            )
+            connection.execute(text("CREATE INDEX ix_auth_sessions_user_id ON auth_sessions (user_id)"))
+            connection.execute(text("CREATE INDEX ix_auth_sessions_organization_id ON auth_sessions (organization_id)"))
+            connection.execute(text("CREATE INDEX ix_auth_sessions_token_hash ON auth_sessions (token_hash)"))
+            connection.execute(text("CREATE INDEX ix_auth_sessions_expires_at ON auth_sessions (expires_at)"))
+
         if "organization_memberships" in tables:
             membership_columns = {column["name"] for column in inspector.get_columns("organization_memberships")}
             if "staff_position" not in membership_columns:

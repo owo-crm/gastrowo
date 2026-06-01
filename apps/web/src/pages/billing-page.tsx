@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { CalendarClock, CheckCircle2, CreditCard, MapPin, Users2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -8,7 +8,8 @@ import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
-import type { SubscriptionPlan } from "@/lib/types";
+import { useToast } from "@/lib/toast";
+import type { BillingCheckoutCycle, SubscriptionPlan } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const plans: Array<{
@@ -21,21 +22,21 @@ const plans: Array<{
   {
     key: "free",
     title: "Free",
-    price: "0 zł",
+    price: "0 zl",
     cycle: "/ mies.",
-    highlights: ["1 lokal", "do 5 aktywnych członków", "grafik i dostępność"],
+    highlights: ["1 lokal", "do 5 aktywnych czlonkow", "grafik i dostepnosc"],
   },
   {
     key: "pro",
     title: "Pro",
-    price: "89 zł",
+    price: "89 zl",
     cycle: "/ lokal / mies.",
-    highlights: ["do 25 aktywnych członków", "raporty i prośby o zmiany", "powiadomienia i eksporty"],
+    highlights: ["do 25 aktywnych czlonkow", "raporty i prosby o zmiany", "powiadomienia i eksporty"],
   },
   {
     key: "business",
     title: "Business",
-    price: "179 zł",
+    price: "179 zl",
     cycle: "/ workspace / mies.",
     highlights: ["do 5 lokali", "uprawnienia i raporty zbiorcze", "zadania, notatki i inventory"],
   },
@@ -48,6 +49,8 @@ function planLabel(plan: SubscriptionPlan) {
 export function BillingPage() {
   const { token, me } = useAuth();
   const { t } = useLanguage();
+  const toast = useToast();
+
   const subscriptionQuery = useQuery({
     queryKey: ["subscription"],
     queryFn: () => api.getCurrentSubscription(token!),
@@ -56,15 +59,47 @@ export function BillingPage() {
   });
   const subscription = subscriptionQuery.data;
 
+  const checkoutMutation = useMutation({
+    mutationFn: (body: { plan: SubscriptionPlan; billing_cycle: BillingCheckoutCycle }) => api.createCheckoutSession(token!, body),
+    onSuccess: (session) => {
+      window.location.assign(session.url);
+    },
+    onError: (error) => {
+      toast.error("Stripe checkout unavailable", error instanceof Error ? error.message : undefined);
+    },
+  });
+
+  const portalMutation = useMutation({
+    mutationFn: () => api.createBillingPortalSession(token!),
+    onSuccess: (session) => {
+      window.location.assign(session.url);
+    },
+    onError: (error) => {
+      toast.error("Billing portal unavailable", error instanceof Error ? error.message : undefined);
+    },
+  });
+
+  const handleCheckout = (plan: SubscriptionPlan) => {
+    if (!token) return;
+    checkoutMutation.mutate({ plan, billing_cycle: "monthly" });
+  };
+
   return (
     <AppShell
       title={t("billing.title")}
-      subtitle="Rozliczenie oparte o lokale, bez naliczania za każdego pracownika osobno."
+      subtitle={t("billing.subtitle")}
       action={
         subscription ? (
-          <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
-            {subscription.status === "trialing" ? "30 dni trialu Pro" : `Plan ${planLabel(subscription.plan)}`}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
+              {subscription.status === "trialing" ? "30 dni trialu Pro" : `Plan ${planLabel(subscription.plan)}`}
+            </Badge>
+            {subscription.plan !== "free" ? (
+              <Button variant="secondary" onClick={() => portalMutation.mutate()} disabled={portalMutation.isPending}>
+                {portalMutation.isPending ? "Opening..." : "Open billing portal"}
+              </Button>
+            ) : null}
+          </div>
         ) : undefined
       }
     >
@@ -74,10 +109,10 @@ export function BillingPage() {
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Billing</p>
               <h2 className="mt-3 text-2xl font-bold tracking-[-0.05em] text-[var(--color-heading)] sm:text-3xl">
-                Przewidywalna subskrypcja dla restauracji i małych sieci
+                Przewidywalna subskrypcja dla restauracji i malych sieci
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">
-                Startujesz bez karty. Trial daje pełny dostęp do Pro przez 30 dni, a potem możesz zostać na Free albo przejść na płatny plan.
+                Startujesz bez karty. Trial daje pelny dostep do Pro przez 30 dni, a potem mozesz zostac na Free albo przejsc na platny plan.
               </p>
             </div>
             <div className="grid gap-3 rounded-[1.25rem] bg-white/88 p-4 sm:rounded-[1.4rem]">
@@ -97,29 +132,29 @@ export function BillingPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-3">
                   <Users2 className="size-4 text-[var(--color-primary)]" />
-                  <p className="mt-3 text-xs uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Aktywny zespół</p>
+                  <p className="mt-3 text-xs uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Aktywny zespol</p>
                   <p className="mt-1 text-sm font-semibold text-[var(--color-heading)]">
-                    {subscription ? `${subscription.active_members_count}${subscription.member_cap ? ` / ${subscription.member_cap}` : ""}` : "—"}
+                    {subscription ? `${subscription.active_members_count}${subscription.member_cap ? ` / ${subscription.member_cap}` : ""}` : "-"}
                   </p>
                 </div>
                 <div className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-3">
                   <MapPin className="size-4 text-[var(--color-primary)]" />
                   <p className="mt-3 text-xs uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Lokale</p>
                   <p className="mt-1 text-sm font-semibold text-[var(--color-heading)]">
-                    {subscription ? `${subscription.active_locations_count}${subscription.location_cap ? ` / ${subscription.location_cap}` : ""}` : "—"}
+                    {subscription ? `${subscription.active_locations_count}${subscription.location_cap ? ` / ${subscription.location_cap}` : ""}` : "-"}
                   </p>
                 </div>
                 <div className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-3">
                   <CalendarClock className="size-4 text-[var(--color-primary)]" />
                   <p className="mt-3 text-xs uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Koniec trialu / okresu</p>
                   <p className="mt-1 text-sm font-semibold text-[var(--color-heading)]">
-                    {subscription?.trial_ends_at ?? subscription?.current_period_ends_at ?? "—"}
+                    {subscription?.trial_ends_at ?? subscription?.current_period_ends_at ?? "-"}
                   </p>
                 </div>
                 <div className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-3">
                   <CreditCard className="size-4 text-[var(--color-primary)]" />
                   <p className="mt-3 text-xs uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Rocznie</p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--color-heading)]">2 miesiące gratis</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--color-heading)]">2 miesiace gratis</p>
                 </div>
               </div>
             </div>
@@ -157,8 +192,13 @@ export function BillingPage() {
                     ))}
                   </div>
                 </div>
-                <Button variant={isCurrent ? "secondary" : "default"} className="mt-8" disabled>
-                  {isCurrent ? "Aktywny plan" : "Checkout Stripe w kolejnym kroku"}
+                <Button
+                  variant={isCurrent ? "secondary" : "default"}
+                  className="mt-8"
+                  disabled={isCurrent || checkoutMutation.isPending}
+                  onClick={() => handleCheckout(plan.key)}
+                >
+                  {isCurrent ? "Aktywny plan" : checkoutMutation.isPending ? "Opening Stripe..." : "Open Stripe checkout"}
                 </Button>
               </Card>
             );

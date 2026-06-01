@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Story+Script&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -325,6 +325,16 @@ a {
 .stagger-grid > *:nth-child(7) { animation-delay: 315ms; }
 .stagger-children > *:nth-child(8),
 .stagger-grid > *:nth-child(8) { animation-delay: 360ms; }
+
+@media (max-width: 639px) {
+  body :where(p, span, label, small, a, button, li, td, th) {
+    font-size: max(14px, 1em) !important;
+  }
+
+  body :where(input, textarea, select) {
+    font-size: max(16px, 1em) !important;
+  }
+}
 
 @media (min-width: 640px) {
   .mobile-page-section {
