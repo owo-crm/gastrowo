@@ -22,7 +22,7 @@ export function getNavItems(me?: MeResponse | null): NavItem[] {
   ];
 
   if (me?.role === "ADMIN") {
-    return [
+    const items: NavItem[] = [
       { to: "/overview", key: "overview", icon: House },
       { to: "/report", key: "report", icon: FileUp },
       { to: "/schedule", key: "schedule", icon: CalendarDays },
@@ -31,8 +31,10 @@ export function getNavItems(me?: MeResponse | null): NavItem[] {
       { to: "/tasks", key: "tasks", icon: ListTodo },
       { to: "/team", key: "team", icon: Users },
       { to: "/notes", key: "notes", icon: FileText },
-      { to: "/waitlist", key: "waitlist", icon: Mailbox },
     ];
+    // Waitlist leads are GastrOWO-internal, not restaurant data.
+    if (me.is_platform_admin) items.push({ to: "/waitlist", key: "waitlist", icon: Mailbox });
+    return items;
   }
 
   if (me?.role === "MANAGER") {

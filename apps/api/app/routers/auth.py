@@ -573,5 +573,6 @@ def me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
         memberships=[MembershipOut.model_validate(item) for item in memberships],
         organization_settings=_settings_out(organization),
         subscription=_build_subscription_summary(db, active_membership.organization_id if active_membership else None),
+        is_platform_admin=user.email.lower() in settings.parsed_platform_admin_emails,
     )
     return ok(payload_out.model_dump(mode="json"))

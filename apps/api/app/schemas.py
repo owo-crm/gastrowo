@@ -79,6 +79,7 @@ class MeOut(APIModel):
     memberships: list[MembershipOut]
     organization_settings: OrganizationSettingsOut | None = None
     subscription: "SubscriptionSummaryOut | None" = None
+    is_platform_admin: bool = False
 
 
 class OrganizationCreate(BaseModel):

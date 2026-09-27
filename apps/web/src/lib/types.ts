@@ -77,6 +77,7 @@ export type OtpVerifyResponse = {
 
 export type MeResponse = {
   id: string;
+  is_platform_admin?: boolean;
   email: string;
   full_name: string;
   avatar_url?: string | null;
