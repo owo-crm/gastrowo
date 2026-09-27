@@ -5,16 +5,16 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-xl2 px-3 py-2 text-center text-sm font-semibold leading-tight whitespace-normal transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-50 sm:min-h-11 sm:px-4",
+  "inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-center text-sm font-semibold leading-tight whitespace-normal transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-50 sm:min-h-11 sm:px-4",
   {
     variants: {
       variant: {
         default:
-          "border border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-white shadow-[0_14px_32px_rgba(47,111,237,0.18)] hover:bg-[#245fd1] hover:shadow-[0_18px_34px_rgba(47,111,237,0.24)]",
-        secondary: "surface-card text-[var(--color-heading)] shadow-none hover:bg-[var(--color-surface-muted)]",
+          "border border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-white hover:bg-[#245fd1]",
+        secondary: "border border-[var(--color-border)] bg-white text-[var(--color-heading)] hover:bg-[var(--color-surface-muted)]",
         ghost: "bg-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]",
         danger:
-          "border border-[color:var(--color-danger)]/35 bg-[color:var(--color-danger)] text-white shadow-[0_14px_30px_rgba(239,107,107,0.18)] hover:bg-[#df5555]",
+          "border border-[color:var(--color-danger)]/35 bg-[color:var(--color-danger)] text-white hover:bg-[#df5555]",
       },
       size: {
         default: "h-auto min-h-11",

@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { uiTranslations } from "@/lib/i18n-ui";
 
 export type Lang = "en" | "pl" | "ru";
 
@@ -1634,7 +1635,7 @@ function interpolate(template: string, params?: Record<string, string | number |
 }
 
 function resolve(lang: Lang, key: string): TranslationValue | undefined {
-  return supplementalTranslations[lang]?.[key] ?? translations[lang][key] ?? supplementalTranslations.en[key] ?? translations.en[key];
+  return uiTranslations[lang]?.[key] ?? uiTranslations.en[key] ?? supplementalTranslations[lang]?.[key] ?? translations[lang][key] ?? supplementalTranslations.en[key] ?? translations.en[key];
 }
 
 export function translateKey(lang: Lang, key: string, params?: Record<string, string | number | null | undefined>) {
@@ -1649,7 +1650,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {
     const stored = typeof window === "undefined" ? null : window.localStorage.getItem(STORAGE_KEY);
     if (stored === "pl" || stored === "ru" || stored === "en") return stored;
-    return "en";
+    // Polish market: default to Polish; Russian/Ukrainian browsers get Russian.
+    const browser = typeof navigator === "undefined" ? "" : navigator.language.toLowerCase();
+    return browser.startsWith("ru") || browser.startsWith("uk") ? "ru" : "pl";
   });
 
   useEffect(() => {

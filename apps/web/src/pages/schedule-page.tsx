@@ -39,6 +39,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 
 import { hasPlanFeature } from "@/lib/access";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
+import { ScheduleTabs } from "@/components/schedule-tabs";
+import { MyWeekShifts } from "@/components/my-week-shifts";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import type { Lang } from "@/lib/i18n";
@@ -449,8 +452,8 @@ function MobileDaySelector({ weekDays, selectedDayIndex, onSelect, warningEntrie
 
   return (
     <div className={className}>
-      <div className="overflow-x-auto pb-1">
-        <div className="inline-flex min-w-max items-center gap-1 rounded-[1.5rem] border border-[var(--color-border)] bg-white p-1 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+      <div className="pb-1">
+        <div className="grid w-full grid-cols-7 items-center gap-0.5 rounded-xl border border-[var(--color-border)] bg-white p-1">
           {weekDays.map((day, index) => {
             const isActive = selectedDayIndex === index;
             const warningEntries = warningEntriesByDate?.[day.iso] ?? [];
@@ -463,13 +466,14 @@ function MobileDaySelector({ weekDays, selectedDayIndex, onSelect, warningEntrie
                     setOpenWarningDay(null);
                     onSelect(index);
                   }}
-                  className={`min-w-[96px] rounded-[1.15rem] px-4 py-3 text-center transition ${warningEntries.length ? "pr-10" : ""} ${isActive ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-[inset_0_0_0_1px_rgba(47,111,237,0.12)]" : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"}`}
+                  aria-pressed={isActive}
+                  className={`w-full min-w-0 rounded-lg px-0.5 py-2 text-center transition ${isActive ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-[inset_0_0_0_1px_rgba(47,111,237,0.12)]" : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"}`}
                 >
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em]">{day.title}</p>
-                  <p className="mt-1 text-base font-semibold">{day.caption}</p>
+                  <p className="text-[11px] font-semibold uppercase">{day.title.slice(0, 3)}</p>
+                  <p className="mt-0.5 text-sm font-semibold">{day.caption.split(".")[0]}</p>
                 </button>
                 {warningEntries.length && t ? (
-                  <div className="absolute right-2 top-2">
+                  <div className="absolute -right-1 -top-1">
                     <DayWarningPopover
                       warningEntries={warningEntries}
                       isOpen={isWarningOpen}
@@ -2239,6 +2243,20 @@ export function SchedulePage() {
     return map;
   }, [teamAvailabilityQuery.data, weekDays]);
 
+  // Live totals for the draft: recomputed whenever the stored draft changes.
+  const draftSummaryQuery = useQuery({
+    queryKey: ["draft-summary", weekStart, locationFilter, weeklyOverridesQuery.dataUpdatedAt],
+    queryFn: () => api.previewSchedule(token!, weekStart, locationFilter || undefined),
+    enabled: Boolean(token) && isManagerView && scheduleStage === "preview" && Boolean(locationFilter),
+  });
+
+  const hasSavedDraft = useMemo(
+    () =>
+      !weeklyOverridesQuery.isPlaceholderData &&
+      (weeklyOverridesQuery.data ?? []).some((item) => item.location_id === locationFilter && !item.is_deleted),
+    [weeklyOverridesQuery.data, weeklyOverridesQuery.isPlaceholderData, locationFilter],
+  );
+
   useEffect(() => {
     if (!isManagerView || !locationFilter) return;
     if (managerShifts.length > 0 && scheduleStage === "idle") {
@@ -2247,7 +2265,11 @@ export function SchedulePage() {
     if (managerShifts.length === 0 && scheduleStage === "applied") {
       setScheduleStage("idle");
     }
-  }, [isManagerView, locationFilter, managerShifts.length, scheduleStage]);
+    // A generated draft is stored on the server; reopen it after a reload instead of losing the work.
+    if (managerShifts.length === 0 && scheduleStage === "idle" && hasSavedDraft) {
+      setScheduleStage("preview");
+    }
+  }, [isManagerView, locationFilter, managerShifts.length, scheduleStage, hasSavedDraft]);
 
   const hasAppliedLocationShifts = useMemo(
     () => managerShifts.some((shift) => shift.location_id === locationFilter),
@@ -2743,6 +2765,9 @@ export function SchedulePage() {
               </div>
             </CardHeader>
             <CardContent className="min-h-0 max-w-full overflow-x-hidden">
+              <div className="mb-4">
+                <MyWeekShifts days={staffCalendarQuery.data ?? []} onReportHours={timesheetsEnabled ? openShiftTimesheetModal : undefined} />
+              </div>
               <MobileDaySelector className="mb-3 2xl:hidden" weekDays={weekDays} selectedDayIndex={selectedDayIndex} onSelect={setSelectedDayIndex} />
               <div className="space-y-3 2xl:hidden">
                 {(() => {
@@ -2916,123 +2941,8 @@ export function SchedulePage() {
 
           <section className="min-w-0 space-y-5">
 
-            {!isTimesheetsRoute && availabilityCard ? (
-              <div className="stagger-item">{availabilityCard}</div>
-            ) : null}
-            {!isTimesheetsRoute && teamAvailabilityCard ? <div className="stagger-item">{teamAvailabilityCard}</div> : null}
-
-            <Card>
-
-              <CardHeader>
-
-                <div className="flex flex-wrap items-start justify-between gap-3">
-
-                  <div>
-
-                    <CardTitle>{t("schedule.timesheet_approvals")}</CardTitle>
-
-                    <CardDescription>{t("schedule.timesheet_approvals_description")}</CardDescription>
-
-                  </div>
-                  {visiblePendingTimesheets.length ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-9 rounded-[0.85rem] border-0 bg-transparent px-0 text-[var(--color-primary)] shadow-none hover:bg-transparent"
-                      onClick={() => approveVisibleTimesheetsMutation.mutate(visiblePendingTimesheets)}
-                      disabled={approveVisibleTimesheetsMutation.isPending || reviewTimesheetMutation.isPending}
-                    >
-                      <CheckCircle2 className="size-4" /> {t("schedule.approve_all_visible")}
-                    </Button>
-                  ) : null}
-
-                </div>
-
-              </CardHeader>
-
-              <CardContent className="space-y-3 overflow-hidden">
-                {visiblePendingTimesheets.length ? (
-                  <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-3">
-                    <p className="text-sm font-medium text-[var(--color-heading)]">{t("schedule.pending_reports_in_week", { count: visiblePendingTimesheets.length })}</p>
-                    <span className="text-xs text-[var(--color-text-muted)]">{t("schedule.scrollable_list")}</span>
-                  </div>
-                ) : null}
-                <div className="max-h-[520px] space-y-3 overflow-y-auto pr-1">
-
-                {visiblePendingTimesheets.map((entry) => {
-                  const shift = entry.shift_id ? shiftsById[entry.shift_id] : null;
-                  const employeeName = timesheetUserNameById[entry.user_id] ?? entry.user_id.slice(0, 8);
-                  const deltaLabel = deltaText(shift, entry);
-                  return (
-                    <div key={entry.id} className="surface-muted rounded-[1.2rem] px-4 py-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="font-medium text-[var(--color-heading)]">{employeeName}</p>
-                          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                            {workDateLabel(entry.work_date)} • {formatTime(entry.arrived_at)}-{formatTime(entry.left_at)}
-                          </p>
-                          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                            {shift
-                              ? `${shift.staff_position ?? shift.required_role} • ${shift.date} ${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`
-                              : t("schedule.extra_hours_without_shift")}
-                          </p>
-                          <p className={`mt-1 text-xs font-semibold ${deltaLabel.startsWith("+") ? "text-amber-700" : deltaLabel.startsWith("-") ? "text-sky-700" : "text-emerald-700"}`}>
-                            {deltaLabel === t("schedule.extra_entry") ? t("schedule.extra_entry") : t("schedule.delta_vs_plan", { delta: deltaLabel })}
-                          </p>
-                          {entry.note ? <p className="mt-2 text-sm text-[var(--color-heading)]">{entry.note}</p> : null}
-                        </div>
-                        <Badge className={timesheetStatusClass(entry.status)}>{statusText(entry.status)}</Badge>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => reviewTimesheetMutation.mutate({ entry, payload: { action: "approve" } })}
-                          disabled={reviewTimesheetMutation.isPending}
-                        >
-                          <CheckCircle2 className="size-4" /> {t("schedule.approve")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() =>
-                            setReviewModal({
-                              entry,
-                              arrived_at: toTimeInput(entry.arrived_at),
-                              left_at: toTimeInput(entry.left_at),
-                              review_note: entry.review_note ?? "",
-                            })
-                          }
-                        >
-                          {t("schedule.correct")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => reviewTimesheetMutation.mutate({ entry, payload: { action: "reject" } })}
-                          disabled={reviewTimesheetMutation.isPending}
-                        >
-                          <XCircle className="size-4" /> {t("schedule.reject")}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-                </div>
-
-                {!visiblePendingTimesheets.length ? (
-
-                  <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-
-                    {t("schedule.no_pending_timesheets")}
-
-                  </div>
-
-                ) : null}
-
-              </CardContent>
-
-            </Card>
+            {me?.role === "ADMIN" && !isTimesheetsRoute ? <OnboardingChecklist /> : null}
+            <ScheduleTabs pendingCount={pendingTimesheetsQuery.data?.length ?? 0} />
 
             {!isTimesheetsRoute ? (
             <Card>
@@ -3042,11 +2952,34 @@ export function SchedulePage() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
 
                   <div>
-
-                    <CardTitle>{t("schedule.calendar_title")}</CardTitle>
-
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CardTitle>{t("schedule.calendar_title")}</CardTitle>
+                      {scheduleStage === "preview" ? (
+                        <Badge className="border-amber-200 bg-amber-50 text-amber-800">{t("schedule.draft_badge")}</Badge>
+                      ) : null}
+                      {scheduleStage === "applied" ? (
+                        <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">{t("schedule.published_badge")}</Badge>
+                      ) : null}
+                    </div>
                     <CardDescription>{t("schedule.calendar_description")}</CardDescription>
-
+                    {scheduleStage === "preview" && draftSummaryQuery.data ? (
+                      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-[var(--color-heading)]">
+                        <span>
+                          {t("schedule.summary_coverage", {
+                            filled: draftSummaryQuery.data.coverage_summary.filled_slots,
+                            total: draftSummaryQuery.data.coverage_summary.total_slots,
+                          })}
+                        </span>
+                        {draftSummaryQuery.data.coverage_summary.total_slots > draftSummaryQuery.data.coverage_summary.filled_slots ? (
+                          <span className="text-amber-700">
+                            {t("schedule.summary_open", {
+                              count: draftSummaryQuery.data.coverage_summary.total_slots - draftSummaryQuery.data.coverage_summary.filled_slots,
+                            })}
+                          </span>
+                        ) : null}
+                        <span>{t("schedule.summary_cost", { cost: Math.round(Number(draftSummaryQuery.data.labor_cost_summary.total_pln)) })}</span>
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="hidden flex-wrap items-center gap-2 lg:flex">
@@ -3069,7 +3002,7 @@ export function SchedulePage() {
                     {scheduleStage === "preview" ? (
                       <>
                         <Button className="bg-emerald-500 text-white hover:bg-emerald-600" onClick={() => applyMutation.mutate()} disabled={applyMutation.isPending}>
-                          <ClipboardCheck className="size-4" /> {t("schedule.apply")}
+                          <ClipboardCheck className="size-4" /> {t("schedule.publish")}
                         </Button>
                         <Button onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
                           <Sparkles className="size-4" /> {t("schedule.regenerate")}
@@ -3116,7 +3049,7 @@ export function SchedulePage() {
                     {scheduleStage === "preview" ? (
                       <>
                         <Button className="w-full justify-center bg-emerald-500 text-white hover:bg-emerald-600" onClick={() => applyMutation.mutate()} disabled={applyMutation.isPending}>
-                          <ClipboardCheck className="size-4" /> {t("schedule.apply")}
+                          <ClipboardCheck className="size-4" /> {t("schedule.publish")}
                         </Button>
                         <Button className="w-full justify-center" onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
                           <Sparkles className="size-4" /> {t("schedule.regenerate")}
@@ -3391,6 +3324,126 @@ export function SchedulePage() {
                   <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
 
                     {t("schedule.no_incoming_requests")}
+
+                  </div>
+
+                ) : null}
+
+              </CardContent>
+
+            </Card>
+            ) : null}
+
+            {!isTimesheetsRoute && availabilityCard ? (
+              <div className="stagger-item">{availabilityCard}</div>
+            ) : null}
+            {!isTimesheetsRoute && teamAvailabilityCard ? <div className="stagger-item">{teamAvailabilityCard}</div> : null}
+
+            {isTimesheetsRoute ? (
+            <Card>
+
+              <CardHeader>
+
+                <div className="flex flex-wrap items-start justify-between gap-3">
+
+                  <div>
+
+                    <CardTitle>{t("schedule.timesheet_approvals")}</CardTitle>
+
+                    <CardDescription>{t("schedule.timesheet_approvals_description")}</CardDescription>
+
+                  </div>
+                  {visiblePendingTimesheets.length ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-9 rounded-[0.85rem] border-0 bg-transparent px-0 text-[var(--color-primary)] shadow-none hover:bg-transparent"
+                      onClick={() => approveVisibleTimesheetsMutation.mutate(visiblePendingTimesheets)}
+                      disabled={approveVisibleTimesheetsMutation.isPending || reviewTimesheetMutation.isPending}
+                    >
+                      <CheckCircle2 className="size-4" /> {t("schedule.approve_all_visible")}
+                    </Button>
+                  ) : null}
+
+                </div>
+
+              </CardHeader>
+
+              <CardContent className="space-y-3 overflow-hidden">
+                {visiblePendingTimesheets.length ? (
+                  <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-3">
+                    <p className="text-sm font-medium text-[var(--color-heading)]">{t("schedule.pending_reports_in_week", { count: visiblePendingTimesheets.length })}</p>
+                    <span className="text-xs text-[var(--color-text-muted)]">{t("schedule.scrollable_list")}</span>
+                  </div>
+                ) : null}
+                <div className="max-h-[520px] space-y-3 overflow-y-auto pr-1">
+
+                {visiblePendingTimesheets.map((entry) => {
+                  const shift = entry.shift_id ? shiftsById[entry.shift_id] : null;
+                  const employeeName = timesheetUserNameById[entry.user_id] ?? entry.user_id.slice(0, 8);
+                  const deltaLabel = deltaText(shift, entry);
+                  return (
+                    <div key={entry.id} className="surface-muted rounded-[1.2rem] px-4 py-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-[var(--color-heading)]">{employeeName}</p>
+                          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                            {workDateLabel(entry.work_date)} • {formatTime(entry.arrived_at)}-{formatTime(entry.left_at)}
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                            {shift
+                              ? `${shift.staff_position ?? shift.required_role} • ${shift.date} ${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`
+                              : t("schedule.extra_hours_without_shift")}
+                          </p>
+                          <p className={`mt-1 text-xs font-semibold ${deltaLabel.startsWith("+") ? "text-amber-700" : deltaLabel.startsWith("-") ? "text-sky-700" : "text-emerald-700"}`}>
+                            {deltaLabel === t("schedule.extra_entry") ? t("schedule.extra_entry") : t("schedule.delta_vs_plan", { delta: deltaLabel })}
+                          </p>
+                          {entry.note ? <p className="mt-2 text-sm text-[var(--color-heading)]">{entry.note}</p> : null}
+                        </div>
+                        <Badge className={timesheetStatusClass(entry.status)}>{statusText(entry.status)}</Badge>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => reviewTimesheetMutation.mutate({ entry, payload: { action: "approve" } })}
+                          disabled={reviewTimesheetMutation.isPending}
+                        >
+                          <CheckCircle2 className="size-4" /> {t("schedule.approve")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            setReviewModal({
+                              entry,
+                              arrived_at: toTimeInput(entry.arrived_at),
+                              left_at: toTimeInput(entry.left_at),
+                              review_note: entry.review_note ?? "",
+                            })
+                          }
+                        >
+                          {t("schedule.correct")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => reviewTimesheetMutation.mutate({ entry, payload: { action: "reject" } })}
+                          disabled={reviewTimesheetMutation.isPending}
+                        >
+                          <XCircle className="size-4" /> {t("schedule.reject")}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+                </div>
+
+                {!visiblePendingTimesheets.length ? (
+
+                  <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+
+                    {t("schedule.no_pending_timesheets")}
 
                   </div>
 

@@ -38,6 +38,7 @@ import { imageFileToDataUrl } from "@/lib/file";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
 
 type PeriodMode = "weekly" | "monthly";
 type Tone = "emerald" | "rose" | "blue" | "violet" | "amber";
@@ -453,6 +454,7 @@ export function DashboardPage() {
         ) : undefined
       }
     >
+      <OnboardingChecklist />
       <div className="space-y-4 sm:space-y-5 lg:space-y-6">
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <DashboardStatCard label={t("dashboard.revenue_today")} value={formatMoneyShort(todayRevenue)} unit="PLN" change={revenueChange} tone="emerald" icon={Coins} delay={0} noChangeLabel={t("dashboard.no_comparison")} vsYesterdayLabel={t("dashboard.vs_yesterday")} />

@@ -6,6 +6,7 @@ import { LandingPage } from "@/pages/landing-page";
 import { LoginPage } from "@/pages/login-page";
 import { PendingLinkPage } from "@/pages/pending-link-page";
 import { useAuth } from "@/lib/auth";
+import { getHomeRoute } from "@/lib/navigation";
 import { useLanguage } from "@/lib/i18n";
 
 // App pages load on demand so the landing and login stay small.
@@ -103,15 +104,7 @@ export function App() {
   const effectiveToken = hasExplicitLogoutGuard ? null : token;
   const effectiveMe = hasExplicitLogoutGuard ? null : me;
   const hasUnresolvedSession = Boolean(effectiveToken && !effectiveMe);
-  const linkedDefaultRoute = effectiveMe?.is_linked
-    ? canViewOverview(effectiveMe)
-      ? "/overview"
-      : effectiveMe.role === "MANAGER" && canAccessReport(effectiveMe)
-        ? "/report"
-        : "/schedule"
-    : effectiveMe
-      ? "/pending-link"
-      : "/login";
+  const linkedDefaultRoute = effectiveMe?.is_linked ? getHomeRoute(effectiveMe) : effectiveMe ? "/pending-link" : "/login";
 
   if (isLoading) {
     return <AuthBootstrapScreen />;
