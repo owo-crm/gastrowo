@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   ChevronLeft,
@@ -28,6 +28,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import { ListRow, ListSection } from "@/components/ui/list";
+import { Segmented } from "@/components/ui/segmented";
+import { DayList, DayStrip, WeekGrid, type GridDay, type GridPerson, type GridShift } from "@/components/schedule/week-grid";
+import { currencyOf, formatDate, formatMoney } from "@/lib/format";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OverlayPortal } from "@/components/ui/overlay-portal";
 
@@ -47,7 +51,7 @@ import { useLanguage } from "@/lib/i18n";
 import type { Lang } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 
-import { formatTime, getMonday } from "@/lib/date";
+import { formatTime, getMonday, toLocalIso } from "@/lib/date";
 
 import type {
   AvailabilityPreferenceSlot,
@@ -1336,6 +1340,9 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
   const toast = useToast();
   const queryClient = useQueryClient();
   const isTimesheetsRoute = section === "hours";
+  const navigate = useNavigate();
+  const [calendarView, setCalendarView] = useState<"grid" | "timeline">("grid");
+  const isPhone = useMediaQuery("(max-width: 767px)");
 
 
 
@@ -1422,6 +1429,11 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
 
 
 
+  const positionsCatalogQuery = useQuery({
+    queryKey: ["positions"],
+    queryFn: () => api.listPositions(token!),
+    enabled: Boolean(token) && me?.role !== "STAFF",
+  });
   const locationsQuery = useQuery({
 
     queryKey: ["locations"],
@@ -1553,7 +1565,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
     [dayShortNames, weekStart],
   );
   const weekRangeCompactLabel = useMemo(() => formatWeekRangeCompact(weekStart), [weekStart]);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = toLocalIso(new Date());
   const selectedDay = weekDays[selectedDayIndex] ?? weekDays[0];
   const mobileAppliedViewStorageKey = useMemo(
     () => (me?.id ? `schedule:applied-view:${me.id}:${locationFilter || "default"}` : null),
@@ -2787,6 +2799,205 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
       </div>
     );
 
+  // ---- Full-screen week grid (manager calendar) ----
+  const positionOrder = (positionsCatalogQuery.data ?? []).map((item) => item.name);
+  const gridDays: GridDay[] = weekDays.map((day) => ({
+    iso: day.iso,
+    weekday: formatDate(day.iso, lang, { weekday: "short" }),
+    dayNumber: String(Number(day.iso.slice(8, 10))),
+    isToday: day.iso === todayIso,
+  }));
+  const gridPeople: GridPerson[] = (locationMembersQuery.data ?? [])
+    .filter((member) => member.role !== "ADMIN")
+    .map((member) => ({ id: member.id, name: member.full_name, position: member.staff_position ?? (member.role === "MANAGER" ? t("shell.role.MANAGER") : null), maxHours: member.max_hours_per_week }));
+  const gridShifts: GridShift[] =
+    scheduleStage === "preview"
+      ? previewOverridesForLocation.map((item) => {
+          const entry = previewEntriesByDate[weekDays[item.day_of_week]?.iso ?? ""]?.find((candidate) => candidate.overrideId === item.id);
+          return {
+            key: item.id,
+            dayIndex: item.day_of_week,
+            start: item.start_time,
+            end: item.end_time,
+            position: item.staff_position ?? (item.required_role === "MANAGER" ? t("shell.role.MANAGER") : null),
+            personId: item.assigned_user_id ?? null,
+            missing: item.assigned_user_id ? 0 : 1,
+            onClick: entry
+              ? () => openPreviewEditModal(entry)
+              : () =>
+                  setPreviewEditorModal({
+                    mode: "edit",
+                    dayIso: weekDays[item.day_of_week]?.iso ?? weekStart,
+                    dayIndex: item.day_of_week,
+                    overrideId: item.id,
+                    userId: sortedLocationMembers.find((member) => member.role !== "ADMIN")?.id ?? "",
+                    startTime: item.start_time.slice(0, 5),
+                    endTime: item.end_time.slice(0, 5),
+                  }),
+          };
+        })
+      : managerShifts.flatMap((shift) => {
+          const dayIndex = weekDays.findIndex((day) => day.iso === shift.date);
+          const position = shift.staff_position ?? (shift.required_role === "MANAGER" ? t("shell.role.MANAGER") : null);
+          const assigned = shift.assignments.map((assignment) => ({
+            key: `${shift.id}:${assignment.id}`,
+            dayIndex,
+            start: shift.start_time,
+            end: shift.end_time,
+            position,
+            personId: assignment.user_id,
+          }));
+          const missing = Math.max(0, shift.required_count - shift.assignments.length);
+          return missing ? [...assigned, { key: `${shift.id}:open`, dayIndex, start: shift.start_time, end: shift.end_time, position, personId: null, missing }] : assigned;
+        });
+  const visibleDays = isPhone ? [gridDays[selectedDayIndex] ?? gridDays[0]] : gridDays;
+  const visibleShifts = isPhone
+    ? gridShifts.filter((shift) => shift.dayIndex === selectedDayIndex).map((shift) => ({ ...shift, dayIndex: 0 }))
+    : gridShifts;
+  const summary = draftSummaryQuery.data;
+  const openCount = gridShifts.reduce((sum, shift) => sum + (shift.missing ?? 0), 0);
+  const locations = locationsQuery.data ?? [];
+
+  const managerCalendar = (
+    <div className="flex flex-col md:h-[calc(100dvh-var(--nav-height)-1px)]">
+      {me?.role === "ADMIN" ? <OnboardingChecklist /> : null}
+      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-separator)] px-3 py-2 sm:px-4">
+        <div className="flex items-center">
+          <Button size="icon" variant="ghost" aria-label={t("schedule.previous_week")} onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
+            <ChevronLeft className="size-5" />
+          </Button>
+          <span className="min-w-[128px] text-center text-[15px] font-semibold tabular-nums text-black">{`${formatDate(weekDays[0]?.iso ?? weekStart, lang, { month: "short", day: "numeric" })} – ${formatDate(weekDays[6]?.iso ?? weekStart, lang, { month: "short", day: "numeric" })}`}</span>
+          <Button size="icon" variant="ghost" aria-label={t("schedule.next_week")} onClick={() => setWeekStart((current) => shiftWeek(current, 7))}>
+            <ChevronRight className="size-5" />
+          </Button>
+        </div>
+        {locations.length > 1 ? (
+          <div className="w-44">
+            <Select options={locations.map((location) => ({ label: location.name, value: location.id }))} value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} />
+          </div>
+        ) : null}
+        {scheduleStage === "preview" ? (
+          <Badge tone="orange">{t("schedule.draft_badge")}</Badge>
+        ) : scheduleStage === "applied" ? (
+          <Badge tone="green">{t("schedule.published_badge")}</Badge>
+        ) : (
+          <Badge tone="neutral">{t("schedule.not_generated")}</Badge>
+        )}
+        {scheduleStage === "preview" && summary ? (
+          <span className="hidden text-[14px] text-[#3c3c43] xl:inline">
+            {t("schedule.summary_coverage", { filled: summary.coverage_summary.filled_slots, total: summary.coverage_summary.total_slots })}
+            {" · "}
+            {formatMoney(summary.labor_cost_summary.total_pln, currencyOf(me), lang, { decimals: 0 })}
+          </span>
+        ) : null}
+        {openCount > 0 ? <Badge tone="red" className="max-md:hidden">{t("schedule.grid_open_count", { count: openCount })}</Badge> : null}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {scheduleStage === "applied" && !isPhone ? (
+            <Segmented
+              ariaLabel={t("schedule.view")}
+              value={calendarView}
+              onChange={setCalendarView}
+              options={[
+                { value: "grid", label: t("schedule.view_grid") },
+                { value: "timeline", label: t("schedule.view_timeline") },
+              ]}
+            />
+          ) : null}
+          <Button size="sm" variant="ghost" className="max-md:hidden" onClick={() => navigate("/team/templates")}>
+            {t("sub.templates")}
+          </Button>
+          {scheduleStage === "preview" ? (
+            <>
+              <Button size="sm" variant="ghost" onClick={exitPreviewMode}>
+                {t("schedule.close_draft")}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
+                <Sparkles className="size-4" /> {t("schedule.regenerate")}
+              </Button>
+              <Button size="sm" onClick={() => applyMutation.mutate()} disabled={applyMutation.isPending}>
+                <ClipboardCheck className="size-4" /> {t("schedule.publish")}
+              </Button>
+            </>
+          ) : scheduleStage === "applied" ? (
+            <Button size="sm" onClick={() => previewMutation.mutate({ mode: "edit-from-applied" })} disabled={previewMutation.isPending || !locationFilter || shiftsQuery.isLoading}>
+              <Pencil className="size-4" /> {t("schedule.edit_week")}
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => previewMutation.mutate({ resetOverrides: false, mode: "generate" })} disabled={previewMutation.isPending || !locationFilter}>
+              <Sparkles className="size-4" /> {t("schedule.generate")}
+            </Button>
+          )}
+        </div>
+      </div>
+      {isPhone && (scheduleStage !== "idle" || gridShifts.length) ? (
+        <div className="border-b border-[var(--color-separator)]">
+          <DayStrip
+            days={gridDays}
+            selected={selectedDayIndex}
+            onSelect={setSelectedDayIndex}
+            openByDay={gridDays.map((_day, index) => gridShifts.filter((shift) => shift.dayIndex === index && shift.missing).length)}
+          />
+        </div>
+      ) : null}
+      <div className="min-h-0 flex-1">
+        {scheduleStage === "idle" && !gridShifts.length ? (
+          <div className="grid h-full place-items-center px-6 text-center">
+            <div className="max-w-md">
+              <p className="text-[20px] font-bold text-black">{t("schedule.empty_title")}</p>
+              <p className="mt-2 text-[15px] text-[var(--color-text-muted)]">{t("schedule.empty_body")}</p>
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                <Button onClick={() => previewMutation.mutate({ resetOverrides: false, mode: "generate" })} disabled={previewMutation.isPending || !locationFilter}>
+                  <Sparkles className="size-4" /> {t("schedule.generate")}
+                </Button>
+                <Button variant="secondary" onClick={() => navigate("/team/templates")}>
+                  {t("sub.templates")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : scheduleStage === "applied" && calendarView === "timeline" && !isPhone ? (
+          <div className="h-full overflow-auto">
+            <AppliedTimetableBoard
+              compact={isPhone}
+              weekDays={weekDays}
+              entriesByDate={appliedTimetableByDate}
+              warningEntriesByDate={appliedWarningEntriesByDate}
+              timeSlots={appliedTimetableSlots}
+              startMinutes={appliedTimetableStartMinutes}
+              todayIso={todayIso}
+              t={t}
+            />
+          </div>
+        ) : isPhone ? (
+          <DayList
+            shifts={visibleShifts}
+            people={gridPeople}
+            positionOrder={positionOrder}
+            t={t}
+            onAdd={scheduleStage === "preview" ? () => openPreviewCreateModal(weekDays[selectedDayIndex]?.iso ?? weekStart) : undefined}
+          />
+        ) : (
+          <WeekGrid
+            days={visibleDays}
+            people={gridPeople}
+            shifts={visibleShifts}
+            positionOrder={positionOrder}
+            t={t}
+            onAdd={
+              scheduleStage === "preview"
+                ? (dayIndex, personId) => {
+                    const realDay = isPhone ? selectedDayIndex : dayIndex;
+                    openPreviewCreateModal(weekDays[realDay]?.iso ?? weekStart);
+                    if (personId) setPreviewEditorModal((current) => (current ? { ...current, userId: personId } : current));
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
+    </div>
+  );
+
   const pageTitle = section === "calendar" ? (isStaff ? t("sub.my_week") : t("schedule.title")) : t(`sub.${section}`);
 
   return (
@@ -2995,333 +3206,14 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
           </Card>
         </div>
 
+      ) : section === "calendar" ? (
+        managerCalendar
       ) : (
+
 
         <div className="stagger-grid grid gap-5">
 
           <section className="min-w-0 space-y-5">
-
-            {me?.role === "ADMIN" && section === "calendar" ? <OnboardingChecklist /> : null}
-
-            {section === "calendar" ? (
-            <Card>
-
-              <CardHeader>
-
-                <div className="flex flex-wrap items-start justify-between gap-4">
-
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <CardTitle>{t("schedule.calendar_title")}</CardTitle>
-                      {scheduleStage === "preview" ? (
-                        <Badge className="border-amber-200 bg-amber-50 text-amber-800">{t("schedule.draft_badge")}</Badge>
-                      ) : null}
-                      {scheduleStage === "applied" ? (
-                        <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">{t("schedule.published_badge")}</Badge>
-                      ) : null}
-                    </div>
-                    <CardDescription>{t("schedule.calendar_description")}</CardDescription>
-                    {scheduleStage === "preview" && draftSummaryQuery.data ? (
-                      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-[var(--color-heading)]">
-                        <span>
-                          {t("schedule.summary_coverage", {
-                            filled: draftSummaryQuery.data.coverage_summary.filled_slots,
-                            total: draftSummaryQuery.data.coverage_summary.total_slots,
-                          })}
-                        </span>
-                        {draftSummaryQuery.data.coverage_summary.total_slots > draftSummaryQuery.data.coverage_summary.filled_slots ? (
-                          <span className="text-amber-700">
-                            {t("schedule.summary_open", {
-                              count: draftSummaryQuery.data.coverage_summary.total_slots - draftSummaryQuery.data.coverage_summary.filled_slots,
-                            })}
-                          </span>
-                        ) : null}
-                        <span>{t("schedule.summary_cost", { cost: Math.round(Number(draftSummaryQuery.data.labor_cost_summary.total_pln)) })}</span>
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="hidden flex-wrap items-center gap-2 lg:flex">
-                    <WeekRangeNavigator
-                      label={weekRangeCompactLabel}
-                      onPrevious={() => setWeekStart((current) => shiftWeek(current, -7))}
-                      onNext={() => setWeekStart((current) => shiftWeek(current, 7))}
-                      className="min-w-[360px]"
-                    />
-                    <Button variant="secondary" onClick={() => window.location.assign("/team")}>
-                      {t("schedule.edit_template_for_location")}
-                    </Button>
-
-                    {scheduleStage === "idle" ? (
-                      <Button onClick={() => previewMutation.mutate({ resetOverrides: false, mode: "generate" })} disabled={previewMutation.isPending || !locationFilter}>
-                        <Sparkles className="size-4" /> {t("schedule.generate_from_template")}
-                      </Button>
-                    ) : null}
-
-                    {scheduleStage === "preview" ? (
-                      <>
-                        <Button className="bg-emerald-500 text-white hover:bg-emerald-600" onClick={() => applyMutation.mutate()} disabled={applyMutation.isPending}>
-                          <ClipboardCheck className="size-4" /> {t("schedule.publish")}
-                        </Button>
-                        <Button onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
-                          <Sparkles className="size-4" /> {t("schedule.regenerate")}
-                        </Button>
-                      </>
-                    ) : null}
-
-                    {scheduleStage === "applied" ? (
-                      <>
-                        <Button onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
-                          <Sparkles className="size-4" /> {t("schedule.regenerate")}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            previewMutation.mutate({ mode: "edit-from-applied" });
-                          }}
-                          disabled={previewMutation.isPending || !locationFilter || shiftsQuery.isLoading}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="space-y-4 lg:hidden">
-                  <WeekRangeNavigator
-                    label={weekRangeCompactLabel}
-                    onPrevious={() => setWeekStart((current) => shiftWeek(current, -7))}
-                    onNext={() => setWeekStart((current) => shiftWeek(current, 7))}
-                  />
-                  <Button variant="secondary" className="w-full justify-center" onClick={() => window.location.assign("/team")}>
-                    {t("schedule.edit_template_for_location")}
-                  </Button>
-
-                  <div className={`grid gap-3 ${scheduleStage === "idle" ? "grid-cols-1" : "grid-cols-2"}`}>
-                    {scheduleStage === "idle" ? (
-                      <Button className="w-full justify-center" onClick={() => previewMutation.mutate({ resetOverrides: false, mode: "generate" })} disabled={previewMutation.isPending || !locationFilter}>
-                        <Sparkles className="size-4" /> {t("schedule.generate_from_template")}
-                      </Button>
-                    ) : null}
-
-                    {scheduleStage === "preview" ? (
-                      <>
-                        <Button className="w-full justify-center bg-emerald-500 text-white hover:bg-emerald-600" onClick={() => applyMutation.mutate()} disabled={applyMutation.isPending}>
-                          <ClipboardCheck className="size-4" /> {t("schedule.publish")}
-                        </Button>
-                        <Button className="w-full justify-center" onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
-                          <Sparkles className="size-4" /> {t("schedule.regenerate")}
-                        </Button>
-                      </>
-                    ) : null}
-
-                    {scheduleStage === "applied" ? (
-                      <>
-                        <Button className="w-full justify-center" onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
-                          <Sparkles className="size-4" /> {t("schedule.regenerate")}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          className="w-full justify-center"
-                          onClick={() => {
-                            previewMutation.mutate({ mode: "edit-from-applied" });
-                          }}
-                          disabled={previewMutation.isPending || !locationFilter || shiftsQuery.isLoading}
-                        >
-                          <Pencil className="size-4" /> {t("common.edit")}
-                        </Button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="mt-2 grid gap-3 lg:mt-0 lg:flex lg:flex-wrap lg:items-center">
-                  <Select
-                    className="w-full min-w-0 lg:min-w-[220px] border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary-strong)]"
-                    options={((locationsQuery.data ?? []).map((location) => ({ label: location.name, value: location.id })))}
-                    value={locationFilter}
-                    onChange={(event) => setLocationFilter(event.target.value)}
-                  />
-
-                  {scheduleStage === "preview" ? (
-                    <>
-                      <div className="hidden lg:block lg:min-w-[140px]">
-                        <Select className="w-full min-w-0" options={dayOptions} value={bulkDay} onChange={(event) => setBulkDay(event.target.value)} />
-                      </div>
-                      <Button className="hidden lg:inline-flex lg:w-auto" variant="secondary" onClick={() => bulkClearDayMutation.mutate({})} disabled={bulkClearDayMutation.isPending || !locationFilter}>
-                        <Trash2 className="size-4" /> {t("schedule.clear_day")}
-                      </Button>
-                      <Button className="w-full lg:hidden" variant="secondary" onClick={() => bulkClearDayMutation.mutate({ dayIndex: selectedDayIndex })} disabled={bulkClearDayMutation.isPending || !locationFilter}>
-                        <Trash2 className="size-4" /> {t("schedule.clear_day")}
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
-
-                <div className="pt-1">
-                  {scheduleStage === "applied" ? (
-                    <div className="hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-4">
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button variant={mobileAppliedView === "cards" ? "default" : "secondary"} className="min-w-[132px]" onClick={() => setMobileAppliedView("cards")}>
-                          {t("schedule.cards_view")}
-                        </Button>
-                        <Button variant={mobileAppliedView === "timetable" ? "default" : "secondary"} className="min-w-[132px]" onClick={() => setMobileAppliedView("timetable")}>
-                          {t("schedule.timetable_view")}
-                        </Button>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                        {roleLegendItems.map((item) => (
-                          <div key={item.label} className="inline-flex items-center gap-2 text-sm text-[var(--color-heading)]">
-                            <span className="size-4 rounded-md" style={{ backgroundColor: item.accent }} />
-                            <span>{item.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                      {roleLegendItems.map((item) => (
-                        <div key={item.label} className="inline-flex items-center gap-2 text-sm text-[var(--color-heading)]">
-                          <span className="size-4 rounded-md" style={{ backgroundColor: item.accent }} />
-                          <span>{item.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-              </CardHeader>
-
-              <CardContent className="min-w-0 space-y-3">
-                {scheduleStage === "preview" ? (
-                  <div className="space-y-3 lg:hidden">
-                    <Button variant="secondary" className="h-9" onClick={exitPreviewMode}>
-                      <ChevronLeft className="size-4" /> {t("common.back")}
-                    </Button>
-                  </div>
-                ) : scheduleStage === "applied" && mobileAppliedView === "timetable" ? null : (
-                  <MobileDaySelector
-                    className="lg:hidden"
-                    weekDays={weekDays}
-                    selectedDayIndex={selectedDayIndex}
-                    onSelect={setSelectedDayIndex}
-                    warningEntriesByDate={activeMobileWarningEntriesByDate}
-                    t={t}
-                  />
-                )}
-
-                {scheduleStage === "idle" ? (
-                  <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-                    {t("schedule.generate_empty")}
-                  </div>
-                ) : null}
-
-                {scheduleStage === "preview" && previewVisibleIssueCount > 0 ? (
-                  <div className="flex flex-wrap items-start gap-3 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    <CircleAlert className="mt-0.5 size-4 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold">{t("schedule.missing_staff")}</p>
-                      <p className="mt-1 text-xs leading-5 text-amber-800">
-                        {previewVisibleIssueCount} • {t("schedule.fix_alerts")}
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-
-                {scheduleStage === "preview" ? (
-                  <PreviewCardsBoard
-                    weekDays={weekDays}
-                    entriesByDate={previewEntriesByDate}
-                    warningEntriesByDate={previewWarningEntriesByDate}
-                    todayIso={todayIso}
-                    t={t}
-                    onCreate={openPreviewCreateModal}
-                    onEdit={openPreviewEditModal}
-                    onDelete={(entry) =>
-                      patchPreviewEditMutation.mutate({
-                        action: "delete",
-                        shift_key: `override:${entry.overrideId}`,
-                      })
-                    }
-                  />
-                ) : null}
-
-                {scheduleStage === "applied" ? (
-                  <>
-                  <div className="space-y-3 lg:hidden">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant={mobileAppliedView === "cards" ? "default" : "secondary"} className="w-full" onClick={() => setMobileAppliedView("cards")}>
-                        {t("schedule.cards_view")}
-                      </Button>
-                      <Button variant={mobileAppliedView === "timetable" ? "default" : "secondary"} className="w-full" onClick={() => setMobileAppliedView("timetable")}>
-                        {t("schedule.timetable_view")}
-                      </Button>
-                    </div>
-                    <div className="overflow-x-auto pb-1">
-                      <div className="inline-flex min-w-max items-center gap-x-5 gap-y-2">
-                        {roleLegendItems.map((item) => (
-                          <div key={`mobile-${item.label}`} className="inline-flex items-center gap-2 text-sm text-[var(--color-heading)]">
-                            <span className="size-4 rounded-md" style={{ backgroundColor: item.accent }} />
-                            <span>{item.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {mobileAppliedView === "cards" ? (
-                      selectedAppliedEntries.length ? (
-                        selectedAppliedEntries.map((entry) => (
-                          <AppliedShiftCard key={`applied-mobile-${entry.key}`} entry={entry} t={t} />
-                        ))
-                      ) : (
-                        <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-                          {t("schedule.no_shifts_this_day")}
-                        </div>
-                      )
-                    ) : (
-                      <div className="rounded-[12px] border border-[var(--color-separator)] bg-white">
-                        <AppliedTimetableBoard
-                          compact
-                          weekDays={weekDays}
-                          entriesByDate={appliedTimetableByDate}
-                          warningEntriesByDate={appliedWarningEntriesByDate}
-                          timeSlots={appliedTimetableSlots}
-                          startMinutes={appliedTimetableStartMinutes}
-                          todayIso={todayIso}
-                          t={t}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {mobileAppliedView === "cards" ? (
-                    <div className="hidden lg:block">
-                      <AppliedCardsBoard
-                        weekDays={weekDays}
-                        entriesByDate={appliedEntriesByDate}
-                        warningEntriesByDate={appliedWarningEntriesByDate}
-                        todayIso={todayIso}
-                        t={t}
-                      />
-                    </div>
-                  ) : (
-                    <div className="hidden rounded-[12px] border border-[var(--color-separator)] bg-white lg:block">
-                      <AppliedTimetableBoard
-                        weekDays={weekDays}
-                        entriesByDate={appliedTimetableByDate}
-                        warningEntriesByDate={appliedWarningEntriesByDate}
-                        timeSlots={appliedTimetableSlots}
-                        startMinutes={appliedTimetableStartMinutes}
-                        todayIso={todayIso}
-                        t={t}
-                      />
-                    </div>
-                  )}
-                  </>
-                ) : null}
-              </CardContent>
-            </Card>
-            ) : null}
 
             {section === "requests" ? (
             <Card>
