@@ -1,22 +1,29 @@
+import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { canAccessNotes, canAccessReport, canManageTeam, canViewOverview, canViewPayroll, hasPlanFeature } from "@/lib/access";
-import { DashboardPage } from "@/pages/dashboard-page";
-import { BillingPage } from "@/pages/billing-page";
 import { LandingPage } from "@/pages/landing-page";
-import { CookiesPolicyPage, PrivacyPolicyPage, TermsPage } from "@/pages/legal-pages";
 import { LoginPage } from "@/pages/login-page";
-import { NotesDocumentsPage } from "@/pages/notes-documents-page";
 import { PendingLinkPage } from "@/pages/pending-link-page";
-import { PayrollPage } from "@/pages/payroll-page";
-import { ProfilePage } from "@/pages/profile-page";
-import { ReportPage } from "@/pages/report-page";
-import { SchedulePage } from "@/pages/schedule-page";
-import { TasksPage } from "@/pages/tasks-page";
-import { TeamPage } from "@/pages/team-page";
-import { WaitlistPage } from "@/pages/waitlist-page";
 import { useAuth } from "@/lib/auth";
+import { getHomeRoute } from "@/lib/navigation";
 import { useLanguage } from "@/lib/i18n";
+
+// App pages load on demand so the landing and login stay small.
+const DashboardPage = lazy(() => import("@/pages/dashboard-page").then((module) => ({ default: module.DashboardPage })));
+const BillingPage = lazy(() => import("@/pages/billing-page").then((module) => ({ default: module.BillingPage })));
+const NotesDocumentsPage = lazy(() => import("@/pages/notes-documents-page").then((module) => ({ default: module.NotesDocumentsPage })));
+const PayrollPage = lazy(() => import("@/pages/payroll-page").then((module) => ({ default: module.PayrollPage })));
+const ProfilePage = lazy(() => import("@/pages/profile-page").then((module) => ({ default: module.ProfilePage })));
+const ReportPage = lazy(() => import("@/pages/report-page").then((module) => ({ default: module.ReportPage })));
+const SchedulePage = lazy(() => import("@/pages/schedule-page").then((module) => ({ default: module.SchedulePage })));
+const TasksPage = lazy(() => import("@/pages/tasks-page").then((module) => ({ default: module.TasksPage })));
+const TeamPage = lazy(() => import("@/pages/team-page").then((module) => ({ default: module.TeamPage })));
+const WaitlistPage = lazy(() => import("@/pages/waitlist-page").then((module) => ({ default: module.WaitlistPage })));
+const TermsPage = lazy(() => import("@/pages/legal-pages").then((module) => ({ default: module.TermsPage })));
+const PrivacyPolicyPage = lazy(() => import("@/pages/legal-pages").then((module) => ({ default: module.PrivacyPolicyPage })));
+const CookiesPolicyPage = lazy(() => import("@/pages/legal-pages").then((module) => ({ default: module.CookiesPolicyPage })));
+
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { token, me, isLoading, hasExplicitLogoutGuard } = useAuth();
@@ -37,6 +44,14 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
   }
 
   return children;
+}
+
+function PageLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center" role="status" aria-label="Loading">
+      <span className="size-8 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-primary)]" />
+    </div>
+  );
 }
 
 function AuthBootstrapScreen() {
@@ -89,21 +104,14 @@ export function App() {
   const effectiveToken = hasExplicitLogoutGuard ? null : token;
   const effectiveMe = hasExplicitLogoutGuard ? null : me;
   const hasUnresolvedSession = Boolean(effectiveToken && !effectiveMe);
-  const linkedDefaultRoute = effectiveMe?.is_linked
-    ? canViewOverview(effectiveMe)
-      ? "/overview"
-      : effectiveMe.role === "MANAGER" && canAccessReport(effectiveMe)
-        ? "/report"
-        : "/schedule"
-    : effectiveMe
-      ? "/pending-link"
-      : "/login";
+  const linkedDefaultRoute = effectiveMe?.is_linked ? getHomeRoute(effectiveMe) : effectiveMe ? "/pending-link" : "/login";
 
   if (isLoading) {
     return <AuthBootstrapScreen />;
   }
 
   return (
+    <Suspense fallback={<PageLoading />}>
     <Routes>
       <Route
         path="/"
@@ -249,6 +257,7 @@ export function App() {
       <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
       <Route path="*" element={<Navigate to={effectiveToken ? linkedDefaultRoute : "/"} replace />} />
     </Routes>
+    </Suspense>
   );
 }
 

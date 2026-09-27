@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Building2, CalendarDays, Coins, MailPlus, MapPin, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 
@@ -467,6 +467,7 @@ export function TeamPage() {
       }
       setLinkEmail("");
       setLinkEmailError(null);
+      void queryClient.invalidateQueries({ queryKey: ["invites"] });
       void queryClient.invalidateQueries({ queryKey: ["users"] });
       void queryClient.invalidateQueries({ queryKey: ["worker-setup"] });
     },
@@ -474,6 +475,19 @@ export function TeamPage() {
       setLinkEmailError(error instanceof Error ? error.message : "Failed to link by email");
       toast.error("Failed to link by email", error instanceof Error ? error.message : undefined);
     },
+  });
+  const invitesQuery = useQuery({ queryKey: ["invites"], queryFn: () => api.listInvites(token!), enabled: Boolean(token) && canEditWorkers });
+  const cancelInviteMutation = useMutation({
+    mutationFn: (inviteId: string) => api.cancelInvite(token!, inviteId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["invites"] }),
+  });
+  const resendInviteMutation = useMutation({
+    mutationFn: (email: string) => api.linkMemberByEmail(token!, { email }),
+    onSuccess: (_data, email) => {
+      toast.success("Invite sent", email);
+      void queryClient.invalidateQueries({ queryKey: ["invites"] });
+    },
+    onError: (error) => toast.error("Failed to send invite", error instanceof Error ? error.message : undefined),
   });
   const saveWorkerSetupMutation = useMutation({
     mutationFn: async () => {
@@ -683,7 +697,7 @@ export function TeamPage() {
     for (const item of templatesQuery.data ?? []) {
       const hasName = Boolean(item.template_name?.trim());
       const hasPosition = item.required_role !== "STAFF" || Boolean(item.staff_position?.trim());
-      const hasWindow = item.end_time > item.start_time;
+      const hasWindow = item.end_time !== item.start_time;
       if (hasName && hasPosition && hasWindow) completed.add(item.day_of_week);
     }
     return completed;
@@ -694,12 +708,12 @@ export function TeamPage() {
   const templateValidationIssues: string[] = [];
   if (templateInput.template_name.trim().length < 2) templateValidationIssues.push("Template name must be at least 2 characters.");
   if (Number(templateInput.required_count) < 1) templateValidationIssues.push("People per shift must be at least 1.");
-  if (templateInput.shift_1_end <= templateInput.shift_1_start) templateValidationIssues.push("Shift 1 end must be later than shift 1 start.");
+  if (templateInput.shift_1_end === templateInput.shift_1_start) templateValidationIssues.push("Shift 1 start and end must differ.");
   if (templateInput.required_role === "STAFF" && !templateInput.staff_position.trim()) {
     templateValidationIssues.push("Position is required for staff templates.");
   }
-  if (templateInput.shift_count === "2" && templateInput.shift_2_end <= templateInput.shift_2_start) {
-    templateValidationIssues.push("Shift 2 end must be later than shift 2 start.");
+  if (templateInput.shift_count === "2" && templateInput.shift_2_end === templateInput.shift_2_start) {
+    templateValidationIssues.push("Shift 2 start and end must differ.");
   }
   const templateInputValid = templateValidationIssues.length === 0;
 
@@ -824,14 +838,14 @@ export function TeamPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {canEditWorkers ? (
-                  <div className="rounded-[1.25rem] border border-emerald-100 bg-emerald-50/65 px-4 py-4">
+                  <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-4">
                     <div className="flex items-start gap-3">
-                      <div className="grid size-11 place-items-center rounded-[1rem] bg-emerald-700 text-white">
+                      <div className="grid size-10 place-items-center rounded-lg bg-[var(--color-primary)] text-white">
                         <MailPlus className="size-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-[var(--color-heading)]">Add worker by email</p>
-                        <p className="mt-1 text-sm leading-6 text-[var(--color-text-muted)]">Use the email the worker used to create their account.</p>
+                        <p className="font-semibold text-[var(--color-heading)]">{t("team.add_worker_title")}</p>
+                        <p className="mt-1 text-sm leading-6 text-[var(--color-text-muted)]">{t("team.add_by_email_body")}</p>
                       </div>
                     </div>
                     <div className="mt-4 grid gap-3">
@@ -844,16 +858,43 @@ export function TeamPage() {
                           if (linkEmailError) setLinkEmailError(null);
                         }}
                       />
-                      <Button className="bg-emerald-700 text-white hover:bg-emerald-800" onClick={() => linkByEmailMutation.mutate()} disabled={!linkEmail || linkByEmailMutation.isPending}>
-                        <MailPlus className="size-4" /> Add by email
+                      <Button onClick={() => linkByEmailMutation.mutate()} disabled={!linkEmail || linkByEmailMutation.isPending}>
+                        <MailPlus className="size-4" /> {t("team.send_invite")}
                       </Button>
                       {linkEmailError ? <p className="text-sm text-rose-600">{linkEmailError}</p> : null}
                     </div>
                   </div>
                 ) : null}
+                {canEditWorkers && (invitesQuery.data?.length ?? 0) > 0 ? (
+                  <div className="rounded-xl border border-[var(--color-border)] px-4 py-3">
+                    <p className="text-sm font-semibold text-[var(--color-heading)]">
+                      {t("team.pending_invites")} ({invitesQuery.data?.length})
+                    </p>
+                    <ul className="mt-2 divide-y divide-[var(--color-border)]">
+                      {invitesQuery.data?.map((invite) => (
+                        <li key={invite.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm text-[var(--color-heading)]">{invite.email}</p>
+                            <p className="text-xs text-[var(--color-text-muted)]">
+                              {t("team.invite_expires", { date: new Date(invite.expires_at).toLocaleDateString() })}
+                            </p>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => resendInviteMutation.mutate(invite.email)} disabled={resendInviteMutation.isPending}>
+                              {t("team.invite_resend")}
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-[var(--color-danger)]" onClick={() => cancelInviteMutation.mutate(invite.id)} disabled={cancelInviteMutation.isPending}>
+                              {t("team.invite_cancel")}
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
                 {[
                   { icon: ShieldCheck, title: "Permissions", body: "Access level is managed after joining, not during invite." },
-                  { icon: Building2, title: "Location priority", body: "Priority 0 means unavailable; 5 means preferred for that location." },
+                  { icon: Building2, title: "Location priority", body: "New people start at 3. 0 keeps someone out of a location; 5 means preferred." },
                   { icon: Coins, title: "Rates", body: "Hourly rate is configured per location and feeds labor cost." },
                 ].map((item) => (
                   <div key={item.title} className="flex items-start gap-3 rounded-[1.15rem] border border-[var(--color-border)] bg-white px-4 py-3">
@@ -1103,10 +1144,10 @@ export function TeamPage() {
                           onChange={(event) => setWorkerPositionDraft(event.target.value)}
                         />
                       ) : (
-                        <p className="text-sm font-medium text-[var(--color-heading)]">{workerPositionDraft || t("team.position_not_used")}</p>
+                        <p className="text-sm font-medium text-[var(--color-heading)]">{workerPositionDraft || t("team.position_none")}</p>
                       )
                     ) : (
-                      <p className="text-[13px] text-[var(--color-text-muted)]">{t("team.position_not_used")}</p>
+                      <p className="text-[13px] text-[var(--color-text-muted)]">{t("team.position_none")}</p>
                     )}
                   </div>
                 </div>

@@ -598,8 +598,9 @@ export function NotesDocumentsPage() {
                   type="file"
                   className="hidden"
                   onChange={async (event) => {
-                    await handleAttachmentSelected(event.target.files?.[0]);
-                    event.currentTarget.value = "";
+                    const input = event.currentTarget;
+                    await handleAttachmentSelected(input.files?.[0]);
+                    input.value = "";
                   }}
                 />
               </label>

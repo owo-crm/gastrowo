@@ -18,6 +18,8 @@ from app.schemas import SubscriptionSummaryOut
 logger = logging.getLogger("gastrowo.billing")
 
 FREE_MEMBER_LIMIT = 5
+# New team members start as schedulable in every location (0 would exclude them from auto-planning).
+DEFAULT_LOCATION_PRIORITY = 3
 
 # Legacy Business/Enterprise subscriptions keep everything Pro has.
 _PLAN_RANK = {

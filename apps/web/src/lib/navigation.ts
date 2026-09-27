@@ -1,68 +1,47 @@
-import { CalendarDays, CreditCard, FileClock, FileText, FileUp, House, ListTodo, Mailbox, Users, Wallet, type LucideIcon } from "lucide-react";
+import { CalendarDays, CreditCard, FileUp, House, ListTodo, Mailbox, Users, Wallet, type LucideIcon } from "lucide-react";
 
-import { canAccessNotes, canAccessReport, canManageTeam, canViewOverview, canViewPayroll, hasPlanFeature } from "@/lib/access";
+import { canAccessReport, canManageTeam, canViewOverview, canViewPayroll, hasPlanFeature } from "@/lib/access";
 import type { MeResponse } from "@/lib/types";
+
+export type NavGroup = "daily" | "business" | "manage";
 
 export type NavItem = {
   to: string;
   key: string;
   icon: LucideIcon;
+  group: NavGroup;
+  /** The plan doesn't include this section: the owner still sees it, and it leads to billing. */
+  locked?: boolean;
 };
 
+export const NAV_GROUP_ORDER: NavGroup[] = ["daily", "business", "manage"];
+
+/**
+ * One short menu per role. Timesheets live as a tab inside the schedule, revenue entry lives on the
+ * overview for admins, and preview-only modules (documents, inventory) stay out until they are real.
+ */
 export function getNavItems(me?: MeResponse | null): NavItem[] {
-  return filterByPlan(me, getRoleNavItems(me));
+  const items: NavItem[] = [];
+  const isStaff = me?.role === "STAFF";
+
+  const isAdmin = me?.role === "ADMIN";
+  // Owners see every section; ones their plan lacks show a lock instead of silently disappearing.
+  if (canViewOverview(me)) items.push({ to: "/overview", key: "overview", icon: House, group: "business" });
+  else if (isAdmin) items.push({ to: "/billing", key: "overview", icon: House, group: "business", locked: true });
+  items.push({ to: "/schedule", key: "schedule", icon: CalendarDays, group: "daily" });
+  items.push({ to: "/tasks", key: "tasks", icon: ListTodo, group: "daily" });
+  // Admins enter revenue on the overview; others get the report page only when allowed.
+  if (me?.role !== "ADMIN" && canAccessReport(me)) items.push({ to: "/report", key: "report", icon: FileUp, group: isStaff ? "daily" : "business" });
+  if (isStaff ? hasPlanFeature(me, "payroll") : canViewPayroll(me)) items.push({ to: "/payroll", key: "payroll", icon: CreditCard, group: isStaff ? "daily" : "business" });
+  else if (isAdmin) items.push({ to: "/billing", key: "payroll", icon: CreditCard, group: "business", locked: true });
+  if (me?.role !== "STAFF" && canManageTeam(me)) items.push({ to: "/team", key: "team", icon: Users, group: "manage" });
+  if (me?.role === "ADMIN") items.push({ to: "/billing", key: "billing", icon: Wallet, group: "manage" });
+  if (me?.is_platform_admin) items.push({ to: "/waitlist", key: "waitlist", icon: Mailbox, group: "manage" });
+
+  return items.sort((a, b) => NAV_GROUP_ORDER.indexOf(a.group) - NAV_GROUP_ORDER.indexOf(b.group));
 }
 
-// Hide sections the workspace plan doesn't include instead of showing pages that fail with 402.
-function filterByPlan(me: MeResponse | null | undefined, items: NavItem[]): NavItem[] {
-  return items.filter((item) => {
-    if (item.key === "timesheets") return hasPlanFeature(me, "timesheets");
-    if (item.key === "payroll") return me?.role === "STAFF" ? hasPlanFeature(me, "payroll") : canViewPayroll(me);
-    if (item.key === "overview") return canViewOverview(me);
-    if (item.key === "report") return canAccessReport(me);
-    return true;
-  });
-}
-
-function getRoleNavItems(me?: MeResponse | null): NavItem[] {
-  const workerBase: NavItem[] = [
-    { to: "/schedule", key: "schedule", icon: CalendarDays },
-    { to: "/payroll", key: "payroll", icon: CreditCard },
-    { to: "/tasks", key: "tasks", icon: ListTodo },
-  ];
-  const managerBase: NavItem[] = [
-    { to: "/schedule", key: "schedule", icon: CalendarDays },
-    { to: "/payroll", key: "payroll", icon: CreditCard },
-    { to: "/tasks", key: "tasks", icon: ListTodo },
-  ];
-
-  if (me?.role === "ADMIN") {
-    const items: NavItem[] = [
-      { to: "/overview", key: "overview", icon: House },
-      { to: "/report", key: "report", icon: FileUp },
-      { to: "/schedule", key: "schedule", icon: CalendarDays },
-      { to: "/timesheets", key: "timesheets", icon: FileClock },
-      { to: "/payroll", key: "payroll", icon: CreditCard },
-      { to: "/tasks", key: "tasks", icon: ListTodo },
-      { to: "/team", key: "team", icon: Users },
-      { to: "/notes", key: "notes", icon: FileText },
-      { to: "/billing", key: "billing", icon: Wallet },
-    ];
-    // Waitlist leads are GastrOWO-internal, not restaurant data.
-    if (me.is_platform_admin) items.push({ to: "/waitlist", key: "waitlist", icon: Mailbox });
-    return items;
-  }
-
-  if (me?.role === "MANAGER") {
-    const items: NavItem[] = [];
-    if (canViewOverview(me)) items.push({ to: "/overview", key: "overview", icon: House });
-    items.push({ to: "/report", key: "report", icon: FileUp }, { to: "/timesheets", key: "timesheets", icon: FileClock }, ...managerBase);
-    if (canManageTeam(me)) items.push({ to: "/team", key: "team", icon: Users });
-    if (canAccessNotes(me)) items.push({ to: "/notes", key: "notes", icon: FileText });
-    return items;
-  }
-
-  const items = [...workerBase];
-  if (canAccessReport(me)) items.push({ to: "/report", key: "report", icon: FileUp });
-  return items;
+/** Where a user lands after login: the most useful screen their plan and role allow. */
+export function getHomeRoute(me?: MeResponse | null): string {
+  return canViewOverview(me) ? "/overview" : "/schedule";
 }

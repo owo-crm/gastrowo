@@ -34,10 +34,11 @@ import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { parseLocalIso, toLocalIso } from "@/lib/date";
-import { fileToDataUrl } from "@/lib/file";
+import { imageFileToDataUrl } from "@/lib/file";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
 
 type PeriodMode = "weekly" | "monthly";
 type Tone = "emerald" | "rose" | "blue" | "violet" | "amber";
@@ -453,6 +454,7 @@ export function DashboardPage() {
         ) : undefined
       }
     >
+      <OnboardingChecklist />
       <div className="space-y-4 sm:space-y-5 lg:space-y-6">
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <DashboardStatCard label={t("dashboard.revenue_today")} value={formatMoneyShort(todayRevenue)} unit="PLN" change={revenueChange} tone="emerald" icon={Coins} delay={0} noChangeLabel={t("dashboard.no_comparison")} vsYesterdayLabel={t("dashboard.vs_yesterday")} />
@@ -548,7 +550,7 @@ export function DashboardPage() {
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-lg font-bold tracking-[-0.04em] text-slate-950">{t("dashboard.revenue_trend")}</p>
-                    <p className="text-sm text-slate-500">{t("dashboard.revenue_trend_description")}</p>
+                    <p className="text-sm text-slate-500">{t(periodMode === "monthly" ? "dashboard.revenue_trend_description_monthly" : "dashboard.revenue_trend_description_weekly")}</p>
                   </div>
                   <div className="flex items-center gap-4 text-sm">
                     <span className="inline-flex items-center gap-2 text-slate-600"><span className="size-2.5 rounded-full bg-[#2563eb]" /> {t("dashboard.revenue")}</span>
@@ -697,7 +699,7 @@ export function DashboardPage() {
                     onChange={async (event) => {
                       const file = event.target.files?.[0];
                       if (!file) return;
-                      const dataUrl = await fileToDataUrl(file);
+                      const dataUrl = await imageFileToDataUrl(file);
                       setReport((current) => ({ ...current, photo_url: dataUrl }));
                       setReportPhotoName(file.name);
                     }}

@@ -786,3 +786,64 @@ def test_timesheet_restricted_entry_requires_review_and_staff_scope_limits(clien
     )
     assert corrected.status_code == 200
     assert corrected.json()["data"]["status"] == "corrected"
+
+
+def test_rematerializing_preview_does_not_duplicate_or_resurrect_shifts(client):
+    ADMIN_token, location_id = signup_ADMIN(client, organization_name="Rematerialize Org", email="ADMIN@remat.com")
+    monday = current_monday()
+    create_template(client, ADMIN_token=ADMIN_token, location_id=location_id, day_of_week=0, required_count=2)
+    create_template(client, ADMIN_token=ADMIN_token, location_id=location_id, day_of_week=1, required_count=1)
+    body = {"week_start": monday.isoformat(), "location_id": location_id}
+
+    def active_slots() -> list[dict]:
+        rows = client.get("/schedule/overrides", headers=auth_header(ADMIN_token), params={"week_start": monday.isoformat()}).json()["data"]
+        return [row for row in rows if not row["is_deleted"]]
+
+    for _ in range(3):
+        assert client.post("/schedule/preview/materialize", headers=auth_header(ADMIN_token), json=body).status_code == 200
+        assert len(active_slots()) == 3
+
+    tuesday = next(row for row in active_slots() if row["day_of_week"] == 1)
+    deleted = client.patch(
+        "/schedule/preview/edits",
+        headers=auth_header(ADMIN_token),
+        json={"week_start": monday.isoformat(), "action": "delete", "shift_key": f"override:{tuesday['id']}"},
+    )
+    assert deleted.status_code == 200, deleted.text
+    assert client.post("/schedule/preview/materialize", headers=auth_header(ADMIN_token), json=body).status_code == 200
+    assert [row["day_of_week"] for row in active_slots()] == [0, 0]
+
+
+def test_pending_invites_list_cancel_and_join_with_name(client):
+    ADMIN_token, location_id = signup_ADMIN(client, organization_name="Invites Org", email="ADMIN@invites.com")
+    for _ in range(2):
+        sent = client.post("/organizations/members/link-by-email", headers=auth_header(ADMIN_token), json={"email": "new@invites.com"})
+        assert sent.status_code == 200
+    client.post("/organizations/members/link-by-email", headers=auth_header(ADMIN_token), json={"email": "other@invites.com"})
+
+    pending = client.get("/organizations/invites", headers=auth_header(ADMIN_token)).json()["data"]
+    assert sorted(item["email"] for item in pending) == ["new@invites.com", "other@invites.com"]
+
+    other = next(item for item in pending if item["email"] == "other@invites.com")
+    assert client.delete(f"/organizations/invites/{other['id']}", headers=auth_header(ADMIN_token)).status_code == 200
+
+    invite_link = client.post("/organizations/members/link-by-email", headers=auth_header(ADMIN_token), json={"email": "new@invites.com"})
+    token = invite_link.json()["data"]["debug_join_link"].split("token=")[1]
+    client.post("/auth/otp/send", json={"email": "new@invites.com", "purpose": "invite_join", "invite_token": token})
+    joined = client.post(
+        "/auth/invites/join/verify",
+        json={"email": "new@invites.com", "code": sent_code("new@invites.com"), "invite_token": token, "full_name": "Nowa Kelnerka"},
+    )
+    assert joined.status_code == 200
+    users = client.get("/users", headers=auth_header(ADMIN_token)).json()["data"]
+    assert any(user["full_name"] == "Nowa Kelnerka" for user in users)
+    assert client.get("/organizations/invites", headers=auth_header(ADMIN_token)).json()["data"] == []
+    members = client.get(f"/locations/{location_id}/members", headers=auth_header(ADMIN_token)).json()["data"]
+    new_member = next(item for item in members if item.get("full_name") == "Nowa Kelnerka")
+    assert new_member["priority"] == 3
+
+
+def test_session_bootstrap_without_cookie_is_not_an_error(client):
+    response = client.get("/auth/session")
+    assert response.status_code == 200
+    assert response.json()["data"] is None

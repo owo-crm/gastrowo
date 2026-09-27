@@ -24,7 +24,7 @@ type AuthContextValue = {
     password: string;
     source: string;
   }) => Promise<void>;
-  verifyInviteJoin: (payload: { email: string; code: string; invite_token: string }) => Promise<void>;
+  verifyInviteJoin: (payload: { email: string; code: string; invite_token: string; full_name?: string }) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -104,6 +104,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isStale() || sessionStorage.getItem(EXPLICIT_LOGOUT_STORAGE_KEY) === "1") {
           return;
         }
+        if (!session) {
+          clearLocalSession();
+          return;
+        }
         applyLocalSession(session.access_token);
         try {
           await hydrateMe(session.access_token);
@@ -130,19 +134,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token) return;
+    // Refresh permissions/plan when the tab is in use; hidden tabs don't poll.
     const sync = () => {
+      if (document.visibilityState !== "visible") return;
       void hydrateMe(token).catch(() => undefined);
     };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") sync();
-    };
-    const interval = window.setInterval(sync, 60000);
-    window.addEventListener("focus", sync);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    const interval = window.setInterval(sync, 120000);
+    document.addEventListener("visibilitychange", sync);
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", sync);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", sync);
     };
   }, [token]);
 
@@ -177,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await applySession(response.access_token);
   };
 
-  const verifyInviteJoin = async (payload: { email: string; code: string; invite_token: string }) => {
+  const verifyInviteJoin = async (payload: { email: string; code: string; invite_token: string; full_name?: string }) => {
     const response = await api.verifyInviteJoin(payload);
     await applySession(response.access_token);
   };

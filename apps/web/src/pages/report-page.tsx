@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toLocalIso } from "@/lib/date";
-import { fileToDataUrl } from "@/lib/file";
+import { imageFileToDataUrl } from "@/lib/file";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 
@@ -119,7 +119,7 @@ export function ReportPage() {
                   onChange={async (event) => {
                     const file = event.target.files?.[0];
                     if (!file) return;
-                    const dataUrl = await fileToDataUrl(file);
+                    const dataUrl = await imageFileToDataUrl(file);
                     setReport((current) => ({ ...current, photo_url: dataUrl }));
                     setPhotoName(file.name);
                   }}

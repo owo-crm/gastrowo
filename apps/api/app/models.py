@@ -412,7 +412,7 @@ class TaskPhoto(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     task_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("tasks.id", ondelete="CASCADE"), index=True)
-    photo_url: Mapped[str] = mapped_column(String(512))
+    photo_url: Mapped[str] = mapped_column(Text)
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
@@ -426,7 +426,7 @@ class RevenueReport(Base):
     report_date: Mapped[datetime.date] = mapped_column(Date, index=True)
     revenue: Mapped[float] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(8), default="PLN")
-    photo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 

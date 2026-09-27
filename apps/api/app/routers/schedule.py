@@ -192,6 +192,44 @@ def _replace_location_overrides(
     return created
 
 
+def _template_tombstones(
+    db: Session,
+    organization_id: UUID,
+    location_id: UUID,
+    week_start: date,
+    drafts: list[ScheduleWeeklyOverride],
+    created_by: UUID,
+) -> list[ScheduleWeeklyOverride]:
+    """Deleted-override markers for active templates that no draft covers, so they stay removed this week."""
+    covered = {item.source_template_id for item in drafts if item.source_template_id is not None}
+    templates = db.scalars(
+        select(ShiftTemplate).where(
+            ShiftTemplate.organization_id == organization_id,
+            ShiftTemplate.location_id == location_id,
+            ShiftTemplate.is_active.is_(True),
+        )
+    ).all()
+    return [
+        ScheduleWeeklyOverride(
+            organization_id=UUID(int=0),
+            week_start=week_start,
+            source_template_id=template.id,
+            location_id=template.location_id,
+            day_of_week=template.day_of_week,
+            start_time=template.start_time,
+            end_time=template.end_time,
+            required_role=template.required_role,
+            staff_position=template.staff_position,
+            required_count=0,
+            is_deleted=True,
+            assigned_user_id=None,
+            created_by=created_by,
+        )
+        for template in templates
+        if template.id not in covered
+    ]
+
+
 def _build_materialized_preview_overrides(
     *,
     plan,
@@ -209,7 +247,9 @@ def _build_materialized_preview_overrides(
     for demand in plan.demand_specs:
         if demand.location_id != location_id:
             continue
-        source_template_id = demand.template_id if demand.source == "template" else None
+        # Keep the link to the template, otherwise re-materializing turns template slots into custom
+        # overrides and the template gets planned again on top of them (every shift duplicated).
+        source_template_id = demand.source_template_id
         demand_assignments = assignments_by_shift.get(demand.shift_key, [])
         for assignment in demand_assignments:
             created.append(
@@ -680,20 +720,22 @@ def materialize_generated_preview(
         week_start=payload.week_start,
         location_id=payload.location_id,
     )
+    drafts = _build_materialized_preview_overrides(
+        plan=plan,
+        week_start=payload.week_start,
+        location_id=payload.location_id,
+        created_by=context.user.id,
+    )
+    drafts += _template_tombstones(db, organization_id, payload.location_id, payload.week_start, drafts, context.user.id)
     created = _replace_location_overrides(
         db,
         organization_id=organization_id,
         week_start=payload.week_start,
         location_id=payload.location_id,
         created_by=context.user.id,
-        overrides=_build_materialized_preview_overrides(
-            plan=plan,
-            week_start=payload.week_start,
-            location_id=payload.location_id,
-            created_by=context.user.id,
-        ),
+        overrides=drafts,
     )
-    return ok([_serialize_override(item) for item in created])
+    return ok([_serialize_override(item) for item in created if not item.is_deleted])
 
 
 @router.get("/overrides")
@@ -834,31 +876,7 @@ def freeze_applied_week_into_preview(
 
     # The frozen week fully describes this location, so suppress its templates for the week;
     # otherwise template demand is planned on top of the frozen slots and shows phantom open shifts.
-    templates = db.scalars(
-        select(ShiftTemplate).where(
-            ShiftTemplate.organization_id == organization_id,
-            ShiftTemplate.location_id == payload.location_id,
-            ShiftTemplate.is_active.is_(True),
-        )
-    ).all()
-    for template in templates:
-        created_drafts.append(
-            ScheduleWeeklyOverride(
-                organization_id=UUID(int=0),
-                week_start=payload.week_start,
-                source_template_id=template.id,
-                location_id=template.location_id,
-                day_of_week=template.day_of_week,
-                start_time=template.start_time,
-                end_time=template.end_time,
-                required_role=template.required_role,
-                staff_position=template.staff_position,
-                required_count=0,
-                is_deleted=True,
-                assigned_user_id=None,
-                created_by=context.user.id,
-            )
-        )
+    created_drafts += _template_tombstones(db, organization_id, payload.location_id, payload.week_start, created_drafts, context.user.id)
 
     created = _replace_location_overrides(
         db,
@@ -887,8 +905,8 @@ def patch_preview_edit(
             raise HTTPException(status_code=422, detail="start_time and end_time are required for create")
         if payload.required_role is None:
             raise HTTPException(status_code=422, detail="required_role is required for create")
-        if payload.end_time <= payload.start_time:
-            raise HTTPException(status_code=422, detail="end_time must be later than start_time")
+        if payload.end_time == payload.start_time:
+            raise HTTPException(status_code=422, detail="end_time must differ from start_time")
 
         required_count = payload.required_count or 1
         if required_count <= 0:
@@ -1007,8 +1025,8 @@ def patch_preview_edit(
         target.start_time = payload.start_time
     if payload.end_time is not None:
         target.end_time = payload.end_time
-    if target.end_time <= target.start_time:
-        raise HTTPException(status_code=422, detail="end_time must be later than start_time")
+    if target.end_time == target.start_time:
+        raise HTTPException(status_code=422, detail="end_time must differ from start_time")
 
     if payload.required_role is not None:
         target.required_role = payload.required_role

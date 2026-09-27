@@ -39,7 +39,7 @@ def list_locations(
     context: OrgContext = Depends(require_org_context()),
     db: Session = Depends(get_db),
 ):
-    _require_team_access(context, db)
+    # Every member needs location names (schedule, revenue report); only changes require team access.
     locations = db.scalars(
         select(Location).where(Location.organization_id == context.membership.organization_id)
     ).all()

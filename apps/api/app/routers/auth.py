@@ -48,7 +48,7 @@ from app.schemas import (
     SessionBootstrapResponse,
 )
 from app.services.auth_email import send_otp_email
-from app.services.billing import build_subscription_summary, sync_stripe_seats
+from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, sync_stripe_seats
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -440,7 +440,8 @@ def verify_invite_join(payload: InviteJoinVerifyRequest, response: Response, db:
 
     user = db.scalar(select(User).where(User.email == email))
     if user is None:
-        user = User(email=email, full_name=_pretty_name_from_email(email), password_hash="")
+        name = (payload.full_name or "").strip() or _pretty_name_from_email(email)
+        user = User(email=email, full_name=name[:120], password_hash="")
         db.add(user)
         db.flush()
     else:
@@ -464,7 +465,7 @@ def verify_invite_join(payload: InviteJoinVerifyRequest, response: Response, db:
             select(LocationMembership).where(LocationMembership.location_id == location_id, LocationMembership.user_id == user.id)
         )
         if exists is None:
-            db.add(LocationMembership(location_id=location_id, user_id=user.id, priority=0, hourly_rate_pln=0))
+            db.add(LocationMembership(location_id=location_id, user_id=user.id, priority=DEFAULT_LOCATION_PRIORITY, hourly_rate_pln=0))
 
     db.delete(invite)
     db.add(
@@ -492,14 +493,16 @@ def bootstrap_session(
     session_token: str | None = Cookie(default=None, alias=settings.auth_session_cookie_name),
     db: Session = Depends(get_db),
 ):
+    # Not being signed in is the normal state for a visitor, so answer 200 with no data instead of 401.
     session = _get_session_from_cookie(db, session_token)
     if session is None:
-        _clear_auth_session_cookie(response)
-        raise HTTPException(status_code=401, detail="No remembered session")
+        if session_token:
+            _clear_auth_session_cookie(response)
+        return ok(None)
     user = db.get(User, session.user_id)
     if user is None:
         _clear_auth_session_cookie(response)
-        raise HTTPException(status_code=401, detail="User not found")
+        return ok(None)
     memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)).all()
     session.last_seen_at = utc_now()
     session.expires_at = utc_now() + timedelta(days=settings.auth_session_ttl_days)

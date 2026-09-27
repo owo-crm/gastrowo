@@ -10,7 +10,12 @@ import { LanguageProvider } from "@/lib/i18n";
 import { ToastProvider } from "@/lib/toast";
 import "@/styles.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    // Data stays fresh for 30 s, so moving between tabs doesn't refetch everything every time.
+    queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 },
+  },
+});
 
 captureTestLoginKey();
 

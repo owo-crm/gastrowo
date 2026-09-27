@@ -89,3 +89,41 @@ def test_features_follow_the_plan(client, db_session):
 
     features = client.get("/organizations/current/subscription", headers=standard).json()["data"]["features"]
     assert features == ["auto_schedule", "timesheets"]
+
+
+def test_notifications_list_and_staff_can_read_locations(client, db_session):
+    from uuid import UUID
+
+    from app.models import InAppNotification, NotificationTypeEnum
+
+    headers = _workspace(db_session, members=2, plan=SubscriptionPlanEnum.PRO, status=SubscriptionStatusEnum.ACTIVE)
+    me = client.get("/auth/me", headers=headers).json()["data"]
+    db_session.add(
+        InAppNotification(
+            organization_id=UUID(me["active_organization_id"]),
+            user_id=UUID(me["id"]),
+            type=NotificationTypeEnum.TEAM,
+            title="Invite accepted",
+            body="Kamil joined your business",
+        )
+    )
+    db_session.commit()
+    listed = client.get("/notifications", headers=headers)
+    assert listed.status_code == 200
+    assert listed.json()["data"]["items"][0]["type"] == "team"
+    staff_locations = client.get("/locations", headers=headers)
+    assert staff_locations.status_code == 200
+
+
+def test_staff_sees_coworkers_without_private_fields(client, db_session):
+    from sqlalchemy import select
+
+    _workspace(db_session, members=3, plan=SubscriptionPlanEnum.PRO, status=SubscriptionStatusEnum.ACTIVE)
+    staff = db_session.scalar(select(OrganizationMembership).where(OrganizationMembership.role == RoleEnum.STAFF))
+    headers = {"Authorization": f"Bearer {create_access_token(str(staff.user_id), str(staff.organization_id))}"}
+
+    users = client.get("/users", headers=headers)
+    assert users.status_code == 200
+    assert len(users.json()["data"]) == 3
+    assert all("email" not in row and "hourly_rate_pln" not in row for row in users.json()["data"])
+    assert client.get("/locations", headers=headers).status_code == 200
