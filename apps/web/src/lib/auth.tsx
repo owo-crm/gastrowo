@@ -130,19 +130,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token) return;
+    // Refresh permissions/plan when the tab is in use; hidden tabs don't poll.
     const sync = () => {
+      if (document.visibilityState !== "visible") return;
       void hydrateMe(token).catch(() => undefined);
     };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") sync();
-    };
-    const interval = window.setInterval(sync, 60000);
-    window.addEventListener("focus", sync);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    const interval = window.setInterval(sync, 120000);
+    document.addEventListener("visibilitychange", sync);
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", sync);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", sync);
     };
   }, [token]);
 
