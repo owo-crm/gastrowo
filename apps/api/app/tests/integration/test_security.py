@@ -106,3 +106,35 @@ def test_dev_login_signs_in_as_admin(client, monkeypatch):
 def test_production_rejects_dev_login():
     with pytest.raises(ValueError):
         Settings(app_env="production", secret_key="x" * 40, dev_login_enabled=True)
+
+
+def test_dev_login_with_secret_works_in_production(client, monkeypatch):
+    from app.core.config import settings
+
+    email = "owner@secretlogin.com"
+    code = _start_owner_signup(client, email)
+    verify = client.post("/auth/otp/verify", json={"email": email, "code": code, "purpose": "owner_signup"})
+    client.post(
+        "/auth/onboarding/owner/complete",
+        json={
+            "verification_token": verify.json()["data"]["verification_token"],
+            "organization_name": "Secret Login Org",
+            "full_name": "Owner",
+            "email": email,
+            "password": "Owner123!",
+            "source": "Google",
+        },
+    )
+    monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(settings, "dev_login_secret", "s" * 32)
+
+    assert client.post("/auth/dev-login").status_code == 404
+    assert client.post("/auth/dev-login", json={"secret": "wrong" * 8}).status_code == 404
+    login = client.post("/auth/dev-login", json={"secret": "s" * 32})
+    assert login.status_code == 200
+    assert login.json()["data"]["role"] == "ADMIN"
+
+
+def test_short_dev_login_secret_is_rejected():
+    with pytest.raises(ValueError):
+        Settings(dev_login_secret="short")

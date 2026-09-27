@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     # Test-only one-click login (POST /auth/dev-login). Refused in production.
     dev_login_enabled: bool = False
     dev_login_email: str = ""
+    # Secret test login that also works in production: open /?test=<secret> once in the browser.
+    dev_login_secret: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 
@@ -46,6 +48,8 @@ class Settings(BaseSettings):
             if self.database_url.startswith(prefix):
                 self.database_url = "postgresql+psycopg2://" + self.database_url[len(prefix) :]
                 break
+        if self.dev_login_secret and len(self.dev_login_secret) < 24:
+            raise ValueError("DEV_LOGIN_SECRET must be at least 24 characters")
         if self.app_env == "production":
             if self.secret_key in {"change-me-in-dev", "replace-with-a-long-random-secret"} or len(self.secret_key) < 32:
                 raise ValueError("SECRET_KEY must be set to a random value of at least 32 characters in production")

@@ -32,12 +32,14 @@ docker compose up --build
   - separate `api` and `web` services from the same monorepo
 
 ## One-click test login
-The "Wejdź jako admin (test)" button on the landing and login pages signs in as the first admin
-(or `DEV_LOGIN_EMAIL`) without a code. It is on in `docker compose up`. For a test deployment set both:
-- API: `DEV_LOGIN_ENABLED=true` (optional `DEV_LOGIN_EMAIL=...`); refused when `APP_ENV=production`
-- Web build: `VITE_DEV_LOGIN=true`
+The "Wejdź jako admin (test)" button signs in as the first admin (or `DEV_LOGIN_EMAIL`) without a code.
 
-Never enable it on the public production app: anyone could open the admin account.
+- **Production / any server:** set `DEV_LOGIN_SECRET` on the API (random, 24+ characters, e.g.
+  `python -c "import secrets; print(secrets.token_urlsafe(32))"`), then open `https://<site>/?test=<secret>`
+  once. The browser remembers the key and shows the button on the landing and login pages. Anyone with
+  the link gets admin access, so keep it private and change the secret if it leaks (old links stop working).
+- **Local / staging:** `DEV_LOGIN_ENABLED=true` on the API and `VITE_DEV_LOGIN=true` for the web build
+  (both on in `docker compose up`); refused when `APP_ENV=production`.
 
 ## Seed credentials
 - Owner: `owner@GastrOWO.app` / `Owner123!`

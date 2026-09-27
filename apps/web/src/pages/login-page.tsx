@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { DEV_LOGIN_AVAILABLE, DevLoginButton } from "@/components/dev-login-button";
+import { DevLoginButton } from "@/components/dev-login-button";
 
 type Persona = "owner" | "worker";
 type AuthMode = "onboarding" | "signin";
@@ -636,11 +636,9 @@ export function LoginPage() {
 
         <div className="flex min-h-[calc(100dvh-8.5rem)] items-center justify-center py-8 md:py-12">
           <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="w-full max-w-[38rem]">
-            {DEV_LOGIN_AVAILABLE ? (
-              <div className="mb-4 flex justify-center">
-                <DevLoginButton />
-              </div>
-            ) : null}
+            <div className="mb-4 flex justify-center empty:hidden">
+              <DevLoginButton />
+            </div>
             <Card className="w-full rounded-[1.9rem] border border-[rgba(148,163,184,0.16)] bg-white/98 p-2 shadow-[0_28px_65px_rgba(15,23,42,0.08)]">
               <CardHeader className="p-5 pb-3 md:p-6 md:pb-3">
                 <div className="mb-4 flex flex-wrap gap-2">

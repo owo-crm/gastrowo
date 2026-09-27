@@ -27,6 +27,10 @@ class APIModel(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class DevLoginRequest(BaseModel):
+    secret: str | None = Field(default=None, max_length=256)
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str

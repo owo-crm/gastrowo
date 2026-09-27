@@ -16,7 +16,7 @@ type AuthContextValue = {
   sendOtp: (payload: { email: string; purpose: OtpSendPurpose; invite_token?: string | null }) => Promise<OtpSendResponse>;
   verifyOtp: (payload: { email: string; code: string; purpose: OtpSendPurpose; full_name?: string; invite_token?: string | null }) => Promise<OtpVerifyResponse>;
   loginWithPassword: (email: string, password: string) => Promise<void>;
-  devLogin: () => Promise<void>;
+  devLogin: (secret?: string | null) => Promise<void>;
   completeOwnerOnboarding: (payload: {
     verification_token: string;
     full_name: string;
@@ -161,8 +161,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await applySession(response.access_token);
   };
 
-  const devLogin = async () => {
-    const response = await api.devLogin();
+  const devLogin = async (secret?: string | null) => {
+    const response = await api.devLogin(secret);
     await applySession(response.access_token);
   };
 
