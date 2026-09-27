@@ -14,6 +14,24 @@ import { findActive, getHomeRoute, getNavSections, type NavSection, type NavSub 
 import type { NotificationItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+/** Settings-style colored tile per section. */
+const SECTION_COLORS: Record<NavSection["key"], string> = {
+  schedule: "#ff3b30",
+  team: "#007aff",
+  business: "#34c759",
+  earnings: "#34c759",
+  tasks: "#ff9500",
+  settings: "#8e8e93",
+};
+
+function SectionTile({ section, size = 28 }: { section: NavSection; size?: number }) {
+  return (
+    <span className="grid shrink-0 place-items-center rounded-[8px] text-white" style={{ backgroundColor: SECTION_COLORS[section.key], width: size, height: size }}>
+      <section.icon className="size-[17px]" strokeWidth={2.4} aria-hidden />
+    </span>
+  );
+}
+
 function notificationPresentation(item: NotificationItem) {
   if (item.type === "billing") return { Icon: CreditCard, className: "bg-[var(--color-warning-fill)] text-[var(--color-warning)]" };
   if (item.type === "report") return { Icon: Coins, className: "bg-[var(--color-warning-fill)] text-[var(--color-warning)]" };
@@ -86,7 +104,7 @@ function NotificationsButton() {
     <div className="relative" ref={ref}>
       <button
         type="button"
-        className="relative grid size-11 place-items-center rounded-full text-[var(--color-primary-strong)] active:opacity-60"
+        className="relative grid size-11 place-items-center rounded-full bg-white text-black shadow-[0_1px_4px_rgba(0,0,0,0.08)] active:opacity-60"
         aria-label={t("common.notifications")}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
@@ -99,7 +117,7 @@ function NotificationsButton() {
         ) : null}
       </button>
       {open ? (
-        <div className="fixed inset-x-0 top-[var(--nav-height)] z-50 border-b border-[var(--color-separator)] bg-white shadow-[var(--shadow-float)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[400px] sm:rounded-[14px] sm:border">
+        <div className="fixed inset-x-3 top-[calc(var(--nav-height)+8px)] z-50 overflow-hidden rounded-[24px] bg-white shadow-[var(--shadow-float)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-14 sm:w-[400px]">
           <div className="flex items-center justify-between border-b border-[var(--color-separator)] py-1 pl-4 pr-1">
             <p className="text-[17px] font-semibold text-black">{t("common.notifications")}</p>
             <CloseButton onClick={() => setOpen(false)} label={t("common.close")} />
@@ -174,7 +192,7 @@ function UserRow() {
   return (
     <div className="relative" ref={ref}>
       {open ? (
-        <div className="absolute bottom-[calc(100%+6px)] left-0 right-0 z-50 rounded-[12px] border border-[var(--color-separator)] bg-white p-1.5 shadow-[var(--shadow-float)]">
+        <div className="absolute bottom-[calc(100%+6px)] left-0 right-0 z-50 rounded-[20px] bg-white p-1.5 shadow-[var(--shadow-float)]">
           <p className="ios-section-header px-3 pb-1 pt-1.5">{t("shell.language")}</p>
           <LanguageList />
           <div className="my-1 border-t border-[var(--color-separator)]" />
@@ -196,7 +214,7 @@ function UserRow() {
         aria-label={t("shell.user_menu")}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-center gap-3 rounded-[10px] px-2 py-2 text-left hover:bg-[var(--color-fill)]"
+        className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left hover:bg-white/60"
       >
         <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-primary-strong)] text-[13px] font-bold text-white">
           {me?.avatar_url ? <img src={me.avatar_url} alt="" className="size-full object-cover" /> : initialsOf(me?.full_name, "U")}
@@ -227,7 +245,7 @@ function WorkspaceHeader() {
   const name = me?.active_organization_name ?? t("common.workspace");
 
   return (
-    <Link to={getHomeRoute(me)} className="flex items-center gap-3 rounded-[10px] px-2 py-2 hover:bg-[var(--color-fill)]">
+    <Link to={getHomeRoute(me)} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-white/60">
       <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[9px] bg-[var(--color-primary-strong)] text-[13px] font-bold text-white">
         {logo ? <img src={logo} alt="" className="size-full object-cover" /> : initialsOf(name, "GS")}
       </span>
@@ -247,8 +265,8 @@ function SubLink({ item }: { item: NavSub }) {
       end={item.end}
       className={({ isActive }) =>
         cn(
-          "flex min-h-9 items-center gap-2 rounded-[8px] py-1.5 pl-10 pr-3 text-[15px] transition",
-          isActive && !item.locked ? "bg-[var(--color-primary-strong)] font-semibold text-white" : "text-black hover:bg-[var(--color-fill)]",
+          "flex min-h-10 items-center gap-2 rounded-xl py-1.5 pl-[50px] pr-3 text-[15px] transition",
+          isActive && !item.locked ? "bg-[var(--color-primary-strong)] font-semibold text-white shadow-[0_4px_12px_rgba(31,91,214,0.3)]" : "text-black hover:bg-white/60",
         )
       }
     >
@@ -269,12 +287,12 @@ function SidebarSection({ section, active }: { section: NavSection; active: bool
         to={first.to}
         className={({ isActive }) =>
           cn(
-            "flex min-h-10 items-center gap-3 rounded-[8px] px-3 text-[15px] font-semibold transition",
-            isActive && !first.locked ? "bg-[var(--color-primary-strong)] text-white [&_svg]:text-white" : "text-black hover:bg-[var(--color-fill)]",
+            "flex min-h-11 items-center gap-3 rounded-2xl px-2.5 text-[16px] font-semibold transition",
+            isActive && !first.locked ? "bg-white text-black shadow-[0_1px_3px_rgba(0,0,0,0.08)]" : "text-black hover:bg-white/60",
           )
         }
       >
-        <section.icon className="size-[18px] shrink-0 text-[var(--color-primary-strong)]" strokeWidth={2.2} aria-hidden />
+        <SectionTile section={section} />
         <span className="flex-1">{t(`section.${section.key}`)}</span>
         {first.locked ? <Lock className="size-3.5 shrink-0 text-[#3c3c43]" /> : null}
       </NavLink>
@@ -286,9 +304,9 @@ function SidebarSection({ section, active }: { section: NavSection; active: bool
       <Link
         to={section.subs.find((item) => !item.locked)?.to ?? first.to}
         aria-expanded={active}
-        className="flex min-h-10 items-center gap-3 rounded-[8px] px-3 text-[15px] font-semibold text-black hover:bg-[var(--color-fill)]"
+        className="flex min-h-11 items-center gap-3 rounded-2xl px-2.5 text-[16px] font-semibold text-black hover:bg-white/60"
       >
-        <section.icon className="size-[18px] shrink-0 text-[var(--color-primary-strong)]" strokeWidth={2.2} aria-hidden />
+        <SectionTile section={section} />
         <span className="flex-1">{t(`section.${section.key}`)}</span>
         <ChevronRight className={cn("size-4 text-[#3c3c43] transition", active && "rotate-90")} aria-hidden />
       </Link>
@@ -317,7 +335,7 @@ function MobileSubTabs({ section }: { section: NavSection }) {
           className={({ isActive }) =>
             cn(
               "inline-flex min-h-[34px] shrink-0 items-center gap-1 rounded-full px-3.5 text-[14px] font-semibold transition",
-              isActive && !item.locked ? "bg-black text-white" : "bg-[var(--color-fill)] text-black",
+              isActive && !item.locked ? "bg-black text-white" : "bg-white text-black shadow-[0_1px_2px_rgba(0,0,0,0.06)]",
             )
           }
         >
@@ -332,7 +350,10 @@ function MobileSubTabs({ section }: { section: NavSection }) {
 function TabBar({ sections, activeKey }: { sections: NavSection[]; activeKey?: string }) {
   const { t } = useLanguage();
   return (
-    <nav className="ios-bar fixed inset-x-0 bottom-0 z-[120] border-t border-[var(--color-separator)] pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label={t("shell.open_menu")}>
+    <nav
+      className="ios-glass fixed inset-x-3 bottom-[max(10px,env(safe-area-inset-bottom))] z-[120] rounded-full p-1 lg:hidden"
+      aria-label={t("shell.open_menu")}
+    >
       <ul className="mx-auto flex max-w-xl">
         {sections.map((section) => {
           const target = section.subs.find((item) => !item.locked) ?? section.subs[0];
@@ -343,11 +364,11 @@ function TabBar({ sections, activeKey }: { sections: NavSection[]; activeKey?: s
                 to={target.to}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-[52px] flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold",
-                  active ? "text-[var(--color-primary-strong)]" : "text-[#3c3c43]",
+                  "flex min-h-[54px] flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-semibold",
+                  active ? "bg-[rgba(0,122,255,0.12)] text-[var(--color-primary-strong)]" : "text-black",
                 )}
               >
-                <section.icon className="size-6" strokeWidth={active ? 2.4 : 2} aria-hidden />
+                <section.icon className="size-[22px]" strokeWidth={active ? 2.4 : 2} aria-hidden />
                 <span className="truncate">{t(`section.${section.key}`)}</span>
               </Link>
             </li>
@@ -386,25 +407,25 @@ export function AppShell({
   const active = findActive(sections, location.pathname);
 
   return (
-    <div className="min-h-dvh bg-white text-black">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] flex-col border-r border-[var(--color-separator)] bg-[var(--color-grouped)] px-3 pb-3 pt-3 lg:flex">
+    <div className="min-h-dvh bg-[var(--color-bg)] text-black">
+      <aside className="ios-glass fixed bottom-3 left-3 top-3 z-40 hidden w-[256px] flex-col rounded-[28px] px-2.5 pb-2.5 pt-3 lg:flex">
         <WorkspaceHeader />
         <nav className="mt-3 flex-1 space-y-1 overflow-y-auto" aria-label="Menu">
           {sections.map((section) => (
             <SidebarSection key={section.key} section={section} active={active?.section.key === section.key} />
           ))}
         </nav>
-        <div className="border-t border-[var(--color-separator)] pt-2">
+        <div className="pt-2">
           <UserRow />
         </div>
       </aside>
 
-      <div className="lg:pl-[264px]">
-        <header className="ios-bar sticky top-0 z-30 border-b border-[var(--color-separator)]">
-          <div className={cn("flex min-h-[var(--nav-height)] items-center gap-2 pl-4 pr-2 sm:pl-6", !fullBleed && "mx-auto max-w-[1180px]")}>
-            <div className="min-w-0 flex-1 py-1.5">
-              <h1 className="truncate text-[22px] font-bold leading-tight tracking-[-0.02em] text-black lg:text-[20px]">{title}</h1>
-              {subtitle ? <p className="hidden truncate text-[14px] text-[var(--color-text-muted)] md:block">{subtitle}</p> : null}
+      <div className="lg:pl-[272px]">
+        <header className="ios-bar sticky top-0 z-30">
+          <div className={cn("flex min-h-[var(--nav-height)] items-center gap-2 pl-4 pr-2 pt-1 sm:pl-6", !fullBleed && "mx-auto max-w-[1180px]")}>
+            <div className="min-w-0 flex-1 py-2">
+              <h1 className="truncate text-[30px] font-bold leading-[1.1] tracking-[-0.03em] text-black lg:text-[32px]">{title}</h1>
+              {subtitle ? <p className="hidden truncate text-[15px] text-[#3c3c43] md:block">{subtitle}</p> : null}
             </div>
             {action ? <div className="hidden shrink-0 md:block">{action}</div> : null}
             <NotificationsButton />
@@ -415,13 +436,13 @@ export function AppShell({
         <main
           className={cn(
             fullBleed
-              ? "pb-[calc(env(safe-area-inset-bottom)+60px)] lg:pb-0"
+              ? "pb-[calc(env(safe-area-inset-bottom)+84px)] lg:pb-0"
               : flush
-                ? "mx-auto max-w-[1180px] pb-28 lg:pb-12"
-                : "mx-auto max-w-[1180px] px-4 pb-28 pt-4 sm:px-6 lg:pb-12",
+                ? "mx-auto max-w-[1180px] pb-32 pt-2 lg:pb-12"
+                : "mx-auto max-w-[1180px] px-4 pb-32 pt-2 sm:px-6 lg:pb-12",
           )}
         >
-          {action ? <div className={cn("md:hidden", fullBleed || flush ? "border-b border-[var(--color-separator)] px-4 py-2" : "mb-4")}>{action}</div> : null}
+          {action ? <div className={cn("md:hidden", fullBleed || flush ? "px-4 pb-3" : "mb-4")}>{action}</div> : null}
           {children}
         </main>
       </div>

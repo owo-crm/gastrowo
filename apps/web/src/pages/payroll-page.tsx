@@ -140,7 +140,7 @@ export function PayrollPage() {
         )
       }
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-3 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4 sm:px-6">
         <Segmented
           ariaLabel={t("overview.period")}
           value={mode}
@@ -161,16 +161,16 @@ export function PayrollPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 divide-x divide-[var(--color-separator)] border-b border-[var(--color-separator)] sm:grid-cols-3">
-        <div className="px-4 py-4 sm:px-6">
+      <div className="mb-6 grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:px-6 [&>*]:ios-island">
+        <div className="px-4 py-4">
           <p className="text-[13px] font-semibold text-[var(--color-text-muted)]">{isStaff ? t("payroll.my_pay") : t("payroll.total_pay")}</p>
           <p className="mt-1 text-[28px] font-bold tabular-nums text-black">{money(isStaff ? mine?.payroll_pln ?? 0 : totalPay)}</p>
         </div>
-        <div className="px-4 py-4 sm:px-6">
+        <div className="px-4 py-4">
           <p className="text-[13px] font-semibold text-[var(--color-text-muted)]">{t("payroll.hours")}</p>
           <p className="mt-1 text-[28px] font-bold tabular-nums text-black">{hoursText(isStaff ? mine?.approved_hours ?? 0 : totalHours)}</p>
         </div>
-        <div className="col-span-2 border-t border-[var(--color-separator)] px-4 py-4 sm:col-span-1 sm:border-t-0 sm:px-6">
+        <div className="col-span-2 px-4 py-4 sm:col-span-1">
           <p className="text-[13px] font-semibold text-[var(--color-text-muted)]">{t("payroll.overtime")}</p>
           <p className="mt-1 text-[28px] font-bold tabular-nums text-black">{hoursText(isStaff ? mine?.overtime_hours ?? 0 : overtime)}</p>
           <p className="text-[13px] text-[var(--color-text-muted)]">{me?.organization_settings?.labor_rules === "PL" ? t("payroll.overtime_pl") : t("payroll.overtime_us")}</p>

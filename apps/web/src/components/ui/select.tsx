@@ -88,7 +88,7 @@ export function Select({ className, options, value, onChange, disabled, id, name
         data-name={name}
         disabled={disabled}
         className={cn(
-          "flex h-11 w-full items-center justify-between gap-3 rounded-[10px] bg-[var(--color-grouped)] px-3 text-left text-[15px] text-black outline-none transition",
+          "flex h-11 w-full items-center justify-between gap-3 rounded-xl bg-[rgba(118,118,128,0.12)] px-3 text-left text-[15px] text-black outline-none transition",
           "focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]",
           "disabled:cursor-not-allowed disabled:opacity-50",
           open && "ring-2 ring-[var(--color-primary)]",
@@ -105,7 +105,7 @@ export function Select({ className, options, value, onChange, disabled, id, name
             <div
               ref={menuRef}
               style={menuStyle}
-              className="overflow-hidden rounded-[12px] border border-[var(--color-separator)] bg-white p-1 shadow-[var(--shadow-float)]"
+              className="overflow-hidden rounded-2xl bg-white/90 p-1.5 shadow-[var(--shadow-float)] backdrop-blur-xl"
             >
               <div className="max-h-[inherit] overflow-y-auto">
                 {options.map((option) => {
@@ -115,7 +115,7 @@ export function Select({ className, options, value, onChange, disabled, id, name
                       key={option.value}
                       type="button"
                       className={cn(
-                        "flex min-h-11 w-full items-center justify-between gap-3 rounded-[8px] px-3 py-2 text-left text-[15px] transition",
+                        "flex min-h-11 w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-[15px] transition",
                         "sm:min-h-11 min-h-10",
                         isSelected
                           ? "font-semibold text-[var(--color-primary-strong)] hover:bg-[var(--color-grouped)]"

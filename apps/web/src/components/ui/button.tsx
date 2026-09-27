@@ -10,23 +10,23 @@ import { cn } from "@/lib/utils";
  * Every label clears 4.5:1 on its own fill.
  */
 const buttonVariants = cva(
-  "inline-flex max-w-full select-none items-center justify-center gap-1.5 rounded-[10px] text-center text-[15px] font-semibold leading-tight whitespace-normal transition-[background-color,opacity] duration-150 active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-40 [&_svg]:shrink-0",
+  "inline-flex max-w-full select-none items-center justify-center gap-1.5 rounded-full text-center text-[15px] font-semibold leading-tight whitespace-normal transition-[background-color,opacity] duration-150 active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-40 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default: "bg-[var(--color-primary-strong)] text-white hover:bg-[var(--color-primary-pressed)]",
-        secondary: "bg-[var(--color-fill)] text-black hover:bg-[#d8d8de]",
+        secondary: "bg-[rgba(118,118,128,0.14)] text-black hover:bg-[rgba(118,118,128,0.2)]",
         tinted: "bg-[var(--color-accent)] text-[var(--color-primary-strong)] hover:bg-[#dae6fd]",
-        ghost: "bg-transparent text-[var(--color-primary-strong)] hover:bg-[var(--color-grouped)]",
+        ghost: "bg-transparent text-[var(--color-primary-strong)] hover:bg-[rgba(118,118,128,0.12)]",
         plain: "bg-transparent px-0 text-[var(--color-primary-strong)] hover:underline",
         danger: "bg-[var(--color-danger)] text-white hover:bg-[#b80012]",
         "danger-plain": "bg-transparent text-[var(--color-danger)] hover:bg-[var(--color-danger-fill)]",
         inverse: "bg-white text-black hover:bg-[var(--color-grouped)]",
       },
       size: {
-        default: "min-h-11 px-4 py-2",
-        sm: "min-h-[34px] px-3 py-1.5 text-[14px]",
-        lg: "min-h-[50px] px-5 py-3 text-[17px]",
+        default: "min-h-11 px-5 py-2",
+        sm: "min-h-9 px-4 py-1.5 text-[14px]",
+        lg: "min-h-[52px] px-6 py-3 text-[17px]",
         icon: "size-11 p-0",
       },
     },

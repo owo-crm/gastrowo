@@ -15,7 +15,7 @@
   --color-primary-pressed: #1a4fbf;
   --color-secondary: #1f5bd6;
   --color-accent: #e8f0fe; /* tinted fills */
-  --color-bg: #ffffff;
+  --color-bg: #f2f2f7; /* iOS system grouped background */
   --color-grouped: #f2f2f7; /* sidebar, grouped backgrounds, fields */
   --color-fill: #e5e5ea; /* close buttons, segmented track */
   --color-surface: #ffffff;
@@ -35,17 +35,19 @@
   --color-danger: #d70015;
   --color-danger-fill: #ffeaec;
 
-  --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.18);
+  --shadow-float: 0 18px 50px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-glass: 0 10px 30px rgba(0, 0, 0, 0.10), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --radius-island: 20px;
   --shadow-soft: none;
   --shadow-card: none;
   --glass-card-shadow: none;
   --glass-border: var(--color-separator);
-  --glass-nav-bg: rgba(255, 255, 255, 0.86);
+  --glass-nav-bg: rgba(242, 242, 247, 0.78);
   --glass-surface-bg: #ffffff;
 
   --destructive-foreground: #ffffff;
   --min-tap-target: 44px;
-  --nav-height: 52px;
+  --nav-height: 64px;
   --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -129,14 +131,32 @@ a {
   -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
 
-/* Legacy surface classes now render flat, monolithic sections. */
+/* Content lives on white rounded islands over the gray background (iOS inset grouped). */
+@layer components {
+  .ios-island {
+    background: #ffffff;
+    border-radius: var(--radius-island);
+    overflow: hidden;
+  }
+}
+
+/* Liquid-glass surfaces: floating tab bar, sidebar, toolbars. */
+.ios-glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow-glass);
+}
+
+/* Legacy surface classes now render as islands. */
 .glass-surface, .app-canvas { background: #ffffff; }
 .glass-halo { border: 0; box-shadow: none; }
 .sidebar-surface { background: var(--color-grouped); border-right: 1px solid var(--color-separator); }
 
 .surface-card {
   background: #ffffff;
-  border-bottom: 1px solid var(--color-separator);
+  border-radius: var(--radius-island);
 }
 
 .surface-elevated {
@@ -147,6 +167,7 @@ a {
 
 .surface-muted {
   background: var(--color-grouped);
+  border-radius: 14px;
 }
 
 .inner-divider {
@@ -157,13 +178,12 @@ a {
   color: var(--color-text-muted);
 }
 
-/* iOS section header: small caps label above a group. */
+/* iOS section header: sentence case, above an island. */
 .ios-section-header {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  letter-spacing: -0.01em;
+  color: #3c3c43;
 }
 
 .mobile-page-section {
@@ -247,7 +267,7 @@ a {
     inset: auto;
     min-height: 0;
     max-height: 90vh;
-    border-radius: 14px;
+    border-radius: 26px;
     box-shadow: var(--shadow-float);
   }
 }

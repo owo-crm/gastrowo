@@ -53,7 +53,7 @@ export function PeopleSection({ onOpen }: { onOpen: (userId: string) => void }) 
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-separator)] px-4 py-3 sm:px-6">
+      <div className="flex flex-wrap items-center gap-3 px-4 pb-4 sm:px-6">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#3c3c43]" />
           <Input className="pl-9" placeholder={t("team.search")} value={search} onChange={(event) => setSearch(event.target.value)} aria-label={t("team.search")} />

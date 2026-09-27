@@ -66,7 +66,7 @@ export function BillingPage() {
     <AppShell title={t("sub.billing")} subtitle={t("billing.subtitle")} flush>
       <div>
         {atLimit ? (
-          <div className="flex items-start gap-3 border-b border-[var(--color-separator)] bg-[var(--color-warning-fill)] px-4 py-3 text-[15px] text-[#7a3700] sm:px-6">
+          <div className="mx-4 mb-4 flex items-start gap-3 rounded-2xl bg-[var(--color-warning-fill)] px-4 py-3 text-[15px] text-[#7a3700] sm:mx-6">
             <AlertTriangle className="mt-0.5 size-5 shrink-0" />
             <p className="text-[#7a3700]">{t("billing.limit_reached", { count: subscription?.member_cap ?? 0 })}</p>
           </div>
@@ -110,14 +110,14 @@ export function BillingPage() {
           />
         </div>
 
-        <div className="grid border-y border-[var(--color-separator)] max-md:divide-y max-md:divide-[var(--color-separator)] md:grid-cols-3 md:divide-x md:divide-[var(--color-separator)]">
+        <div className="grid gap-3 px-4 sm:px-6 md:grid-cols-3">
           {plans.map((plan) => {
             const isCurrent = currentPlan === plan.key;
             const paid = plan.key !== "free" ? plan.key : null;
             const price = paid ? PRICE_PER_LOCATION[currency][paid][cycle] : 0;
             const saving = paid && currency === "USD" ? Math.round((1 - PRICE_PER_LOCATION.USD[paid].monthly / SEVENSHIFTS_USD[paid]) * 100) : null;
             return (
-              <section key={plan.key} className={cn("flex flex-col px-4 py-6 sm:px-6", isCurrent && "bg-[var(--color-accent)]")}>
+              <section key={plan.key} className={cn("ios-island flex flex-col px-5 py-6", isCurrent && "ring-2 ring-[var(--color-primary-strong)]")}>
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-[20px] font-bold text-black">{t(`plan.${plan.key}.title`)}</h3>
                   {isCurrent ? <Badge tone="blue">{isTrial ? t("billing.trial") : t("billing.current")}</Badge> : null}

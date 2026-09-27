@@ -48,9 +48,9 @@ function laborTone(percent: number | null) {
 
 function Stat({ label, value, note, valueClass }: { label: string; value: string; note?: string; valueClass?: string }) {
   return (
-    <div className="min-w-0 px-4 py-4 sm:px-6">
+    <div className="min-w-0 px-4 py-4">
       <p className="text-[13px] font-semibold text-[var(--color-text-muted)]">{label}</p>
-      <p className={cn("mt-1 truncate text-[28px] font-bold leading-tight tracking-tight tabular-nums text-black", valueClass)}>{value}</p>
+      <p className={cn("mt-1 truncate text-[30px] font-bold leading-tight tracking-[-0.03em] tabular-nums text-black", valueClass)}>{value}</p>
       {note ? <p className="mt-0.5 truncate text-[13px] text-[var(--color-text-muted)]">{note}</p> : null}
     </div>
   );
@@ -128,7 +128,7 @@ export function DashboardPage() {
     >
       <OnboardingChecklist />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-3 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4 sm:px-6">
         <Segmented
           ariaLabel={t("overview.period")}
           value={mode}
@@ -149,7 +149,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 border-b border-[var(--color-separator)] lg:grid-cols-4 [&>*]:border-[var(--color-separator)] [&>*:nth-child(odd)]:border-r lg:[&>*]:border-r lg:[&>*:last-child]:border-r-0 max-lg:[&>*:nth-child(-n+2)]:border-b">
+      <div className="mb-6 grid grid-cols-2 gap-3 px-4 sm:px-6 lg:grid-cols-4 [&>*]:ios-island">
         <Stat label={t("overview.revenue")} value={money(revenue)} />
         <Stat label={t("overview.labor_cost")} value={money(labor)} note={t("overview.labor_note")} />
         <Stat
@@ -182,7 +182,7 @@ export function DashboardPage() {
         </ListSection>
       )}
 
-      <section className="border-b border-[var(--color-separator)] px-4 py-5 sm:px-6">
+      <section className="ios-island mx-4 mb-6 px-4 py-5 sm:mx-6 sm:px-5">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="text-[17px] font-semibold text-black">{t("overview.chart_title")}</h2>
           <div className="flex items-center gap-4 text-[13px] text-[var(--color-text-muted)]" aria-hidden={!hasChartData}>
@@ -218,7 +218,7 @@ export function DashboardPage() {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="grid h-full place-items-center border-y border-dashed border-[var(--color-separator)] text-center">
+            <div className="grid h-full place-items-center rounded-2xl bg-[var(--color-grouped)] text-center">
               <div>
                 <p className="text-[17px] font-semibold text-black">{t("overview.chart_empty_title")}</p>
                 <p className="mt-1 text-[15px] text-[var(--color-text-muted)]">{t("overview.chart_empty_body")}</p>

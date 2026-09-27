@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   FileClock,
+  Check,
   CheckCircle2,
   CircleAlert,
   Pencil,
@@ -28,6 +29,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import { ListRow, ListSection } from "@/components/ui/list";
+import { Sheet } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { Segmented } from "@/components/ui/segmented";
 import { DayList, DayStrip, WeekGrid, type GridDay, type GridPerson, type GridShift } from "@/components/schedule/week-grid";
 import { currencyOf, formatDate, formatMoney } from "@/lib/format";
@@ -1272,6 +1275,8 @@ type PreviewEditorModalState = {
   userId: string;
   startTime: string;
   endTime: string;
+  /** The slot's position; kept when someone else is assigned (people can work several positions). */
+  position?: string | null;
 };
 
 type TeamAvailabilityEditorState = {
@@ -2393,6 +2398,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
       userId: entry.assigned_user_id,
       startTime: entry.startTime.slice(0, 5),
       endTime: entry.endTime.slice(0, 5),
+      position: entry.staff_position ?? null,
     });
   };
 
@@ -2799,6 +2805,60 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
       </div>
     );
 
+  // ---- Shift editor (draft) ----
+  const positionsByUser = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const user of usersQuery.data ?? []) map[user.id] = user.positions?.length ? user.positions : user.staff_position ? [user.staff_position] : [];
+    return map;
+  }, [usersQuery.data]);
+  const editorMember = sortedLocationMembers.find((member) => member.id === previewEditorModal?.userId) ?? null;
+  const editorPosition = previewEditorModal?.position ?? (editorMember ? positionsByUser[editorMember.id]?.[0] ?? editorMember.staff_position ?? "" : "");
+  const editorPositionOptions = Array.from(new Set([...(positionsCatalogQuery.data ?? []).map((item) => item.name), ...(editorPosition ? [editorPosition] : [])])).map((name) => ({ value: name, label: name }));
+  const editorPeople = previewEditorModal
+    ? sortedLocationMembers
+        .filter((member) => member.role !== "ADMIN")
+        .map((member) => {
+          const availability = availabilityStatusForMember(member, previewEditorModal.dayIso, `${previewEditorModal.startTime}:00`, `${previewEditorModal.endTime}:00`, previewEditorModal.overrideId);
+          const positions = positionsByUser[member.id] ?? (member.staff_position ? [member.staff_position] : []);
+          const canWork = member.role === "MANAGER" || !editorPosition || positions.some((item) => item.toLowerCase() === editorPosition.toLowerCase());
+          const hours = previewHoursByUser[member.id] ?? 0;
+          return { id: member.id, name: member.full_name, positions, canWork, tone: availability.tone, label: availability.label, rank: (canWork ? 0 : 10) + availability.rank, hours: hours % 1 ? hours.toFixed(1) : hours };
+        })
+        .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name))
+    : [];
+  const savePreviewEditor = () => {
+    if (!previewEditorModal) return;
+    const member = sortedLocationMembers.find((item) => item.id === previewEditorModal.userId);
+    if (!member) return;
+    const staffPosition = member.role === "STAFF" ? editorPosition || member.staff_position || null : null;
+    patchPreviewEditMutation.mutate(
+      previewEditorModal.mode === "create"
+        ? {
+            action: "create",
+            shift_key: `create:${member.id}:${previewEditorModal.dayIso}`,
+            location_id: locationFilter,
+            day_of_week: previewEditorModal.dayIndex,
+            start_time: `${previewEditorModal.startTime}:00`,
+            end_time: `${previewEditorModal.endTime}:00`,
+            required_role: member.role,
+            staff_position: staffPosition,
+            required_count: 1,
+            assigned_user_id: member.id,
+          }
+        : {
+            action: "upsert",
+            shift_key: `override:${previewEditorModal.overrideId}`,
+            start_time: `${previewEditorModal.startTime}:00`,
+            end_time: `${previewEditorModal.endTime}:00`,
+            assigned_user_id: member.id,
+            required_role: member.role,
+            staff_position: staffPosition,
+            required_count: 1,
+          },
+      { onSuccess: () => setPreviewEditorModal(null) },
+    );
+  };
+
   // ---- Full-screen week grid (manager calendar) ----
   const positionOrder = (positionsCatalogQuery.data ?? []).map((item) => item.name);
   const gridDays: GridDay[] = weekDays.map((day) => ({
@@ -2830,9 +2890,10 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
                     dayIso: weekDays[item.day_of_week]?.iso ?? weekStart,
                     dayIndex: item.day_of_week,
                     overrideId: item.id,
-                    userId: sortedLocationMembers.find((member) => member.role !== "ADMIN")?.id ?? "",
+                    userId: "",
                     startTime: item.start_time.slice(0, 5),
                     endTime: item.end_time.slice(0, 5),
+                    position: item.staff_position ?? null,
                   }),
           };
         })
@@ -2859,9 +2920,9 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
   const locations = locationsQuery.data ?? [];
 
   const managerCalendar = (
-    <div className="flex flex-col md:h-[calc(100dvh-var(--nav-height)-1px)]">
+    <div className="flex flex-col md:h-[calc(100dvh-var(--nav-height)-8px)]">
       {me?.role === "ADMIN" ? <OnboardingChecklist /> : null}
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-separator)] px-3 py-2 sm:px-4">
+      <div className="flex flex-wrap items-center gap-2 px-3 pb-2 sm:px-4">
         <div className="flex items-center">
           <Button size="icon" variant="ghost" aria-label={t("schedule.previous_week")} onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
             <ChevronLeft className="size-5" />
@@ -2930,7 +2991,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
         </div>
       </div>
       {isPhone && (scheduleStage !== "idle" || gridShifts.length) ? (
-        <div className="border-b border-[var(--color-separator)]">
+        <div className="ios-island mx-3 mb-2">
           <DayStrip
             days={gridDays}
             selected={selectedDayIndex}
@@ -2939,7 +3000,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
           />
         </div>
       ) : null}
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 md:ios-island md:mx-3 md:mb-3">
         {scheduleStage === "idle" && !gridShifts.length ? (
           <div className="grid h-full place-items-center px-6 text-center">
             <div className="max-w-md">
@@ -3408,167 +3469,103 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
 
       )}
 
-      {previewEditorModal ? (
-        <OverlayPortal>
-          <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[520px] lg:rounded-[12px] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 ">
-              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
-                <div>
-                  <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">
-                    {previewEditorModal.mode === "create" ? t("schedule.add_shift") : t("common.edit")}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                    {weekDays[previewEditorModal.dayIndex]?.title} • {weekDays[previewEditorModal.dayIndex]?.caption}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
-                  onClick={() => setPreviewEditorModal(null)}
-                  aria-label="Close"
-                >
-                  <XCircle className="size-5" />
-                </button>
-              </div>
-
-              <div className="mobile-sheet-scroll px-4 py-4 lg:px-0">
-                <div className="grid gap-4">
-                  <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
-                    {t("common.worker")}
-                    <Select
-                      options={previewEditorWorkerOptions.map((item) => ({ value: item.value, label: item.label }))}
-                      value={previewEditorModal.userId}
-                      onChange={(event) =>
-                        setPreviewEditorModal((current) =>
-                          current ? { ...current, userId: event.target.value } : current,
-                        )
-                      }
-                    />
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
-                      {t("schedule.start_time_label")}
-                      <Input
-                        type="time"
-                        value={previewEditorModal.startTime}
-                        onChange={(event) =>
-                          setPreviewEditorModal((current) =>
-                            current ? { ...current, startTime: event.target.value } : current,
-                          )
-                        }
-                      />
-                    </label>
-                    <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
-                      {t("schedule.end_time_label")}
-                      <Input
-                        type="time"
-                        value={previewEditorModal.endTime}
-                        onChange={(event) =>
-                          setPreviewEditorModal((current) =>
-                            current ? { ...current, endTime: event.target.value } : current,
-                          )
-                        }
-                      />
-                    </label>
-                  </div>
-                  {selectedPreviewEditorMember && selectedPreviewEditorAvailability ? (
-                    <div className="rounded-[12px] border border-[var(--color-separator)] bg-white px-4 py-3">
-                      <p className="text-sm font-semibold text-[var(--color-heading)]">
-                        {selectedPreviewEditorMember.full_name} • {selectedPreviewEditorMember.staff_position ?? selectedPreviewEditorMember.role}
-                      </p>
-                      <p
-                        className={`mt-1 text-sm ${
-                          selectedPreviewEditorAvailability.tone === "ok"
-                            ? "text-emerald-700"
-                            : selectedPreviewEditorAvailability.tone === "warning"
-                              ? "text-amber-700"
-                              : "text-[var(--color-text-muted)]"
-                        }`}
-                      >
-                        {selectedPreviewEditorAvailability.label}
-                      </p>
-                      {managerAvailabilityByUserDay[selectedPreviewEditorMember.id]?.[previewEditorModal.dayIso]?.windowLabel ? (
-                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                          {managerAvailabilityByUserDay[selectedPreviewEditorMember.id][previewEditorModal.dayIso].windowLabel}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="border-t border-[var(--color-separator)] px-4 py-4 lg:px-0">
-                <div className="grid gap-2">
-                  <Button variant="secondary" onClick={() => setPreviewEditorModal(null)}>
-                    {t("common.cancel")}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const selectedMember = sortedLocationMembers.find((member) => member.id === previewEditorModal.userId);
-                      if (!selectedMember) return;
-                      patchPreviewEditMutation.mutate(
-                        previewEditorModal.mode === "create"
-                          ? {
-                              action: "create",
-                              shift_key: `create:${selectedMember.id}:${previewEditorModal.dayIso}`,
-                              location_id: locationFilter,
-                              day_of_week: previewEditorModal.dayIndex,
-                              start_time: `${previewEditorModal.startTime}:00`,
-                              end_time: `${previewEditorModal.endTime}:00`,
-                              required_role: selectedMember.role,
-                              staff_position: selectedMember.role === "STAFF" ? selectedMember.staff_position ?? "Cook" : null,
-                              required_count: 1,
-                              assigned_user_id: selectedMember.id,
-                            }
-                          : {
-                              action: "upsert",
-                              shift_key: `override:${previewEditorModal.overrideId}`,
-                              start_time: `${previewEditorModal.startTime}:00`,
-                              end_time: `${previewEditorModal.endTime}:00`,
-                              assigned_user_id: selectedMember.id,
-                              required_role: selectedMember.role,
-                              staff_position: selectedMember.role === "STAFF" ? selectedMember.staff_position ?? "Cook" : null,
-                              required_count: 1,
-                            },
-                        {
-                          onSuccess: () => {
-                            setPreviewEditorModal(null);
-                          },
-                        },
-                      );
-                    }}
-                    disabled={patchPreviewEditMutation.isPending || !previewEditorModal.userId || !locationFilter}
-                  >
-                    {t("common.save")}
-                  </Button>
-                </div>
-              </div>
+      <Sheet
+        open={Boolean(previewEditorModal)}
+        onClose={() => setPreviewEditorModal(null)}
+        title={previewEditorModal?.mode === "create" ? t("schedule.add_shift") : t("schedule.edit_shift")}
+        subtitle={previewEditorModal ? formatDate(previewEditorModal.dayIso, lang, { weekday: "long", month: "long", day: "numeric" }) : undefined}
+        action={{
+          label: t("common.save"),
+          onClick: savePreviewEditor,
+          disabled: !previewEditorModal || patchPreviewEditMutation.isPending || !previewEditorModal.userId || !locationFilter || previewEditorModal.startTime === previewEditorModal.endTime,
+        }}
+      >
+        {previewEditorModal ? (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[var(--color-text-muted)]">{t("schedule.start_time_label")}</span>
+                <Input type="time" value={previewEditorModal.startTime} onChange={(event) => setPreviewEditorModal((current) => (current ? { ...current, startTime: event.target.value } : current))} />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[var(--color-text-muted)]">{t("schedule.end_time_label")}</span>
+                <Input type="time" value={previewEditorModal.endTime} onChange={(event) => setPreviewEditorModal((current) => (current ? { ...current, endTime: event.target.value } : current))} />
+              </label>
             </div>
+            {editorPositionOptions.length ? (
+              <label className="block">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[var(--color-text-muted)]">{t("team.position")}</span>
+                <Select value={editorPosition} onChange={(event) => setPreviewEditorModal((current) => (current ? { ...current, position: event.target.value } : current))} options={editorPositionOptions} />
+              </label>
+            ) : null}
+            <div>
+              <h3 className="ios-section-header pb-2">{t("schedule.who_works")}</h3>
+              <ul className="divide-y divide-[#e5e5ea] rounded-2xl border border-[#e5e5ea] px-3">
+                {editorPeople.map((person) => {
+                  const selected = person.id === previewEditorModal.userId;
+                  return (
+                    <li key={person.id}>
+                      <button
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setPreviewEditorModal((current) => (current ? { ...current, userId: person.id } : current))}
+                        className="flex min-h-[56px] w-full items-center gap-3 py-2 text-left active:bg-[var(--color-fill)]"
+                      >
+                        <span className={selected ? "grid size-6 place-items-center rounded-full bg-[var(--color-primary-strong)] text-white" : "size-6 rounded-full border-2 border-[#c7c7cc]"}>
+                          {selected ? <Check className="size-4" strokeWidth={3} /> : null}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[16px] text-black">
+                            {person.name}
+                            <span className="text-[#3c3c43]"> · {person.positions.join(", ") || t("team.position_none")}</span>
+                          </span>
+                          <span
+                            className={
+                              person.canWork && person.tone === "ok"
+                                ? "block text-[14px] font-semibold text-[var(--color-success)]"
+                                : !person.canWork || person.tone === "warning"
+                                  ? "block text-[14px] font-semibold text-[var(--color-warning)]"
+                                  : "block text-[14px] text-[#3c3c43]"
+                            }
+                          >
+                            {person.canWork ? person.label : t("schedule.not_this_position")}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-[13px] tabular-nums text-[#3c3c43]">{person.hours} h</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            {previewEditorModal.mode === "edit" && previewEditorModal.overrideId ? (
+              <Button
+                variant="danger-plain"
+                onClick={() =>
+                  patchPreviewEditMutation.mutate(
+                    { action: "delete", shift_key: `override:${previewEditorModal.overrideId}` },
+                    { onSuccess: () => setPreviewEditorModal(null) },
+                  )
+                }
+                disabled={patchPreviewEditMutation.isPending}
+              >
+                <Trash2 className="size-4" /> {t("schedule.delete_shift")}
+              </Button>
+            ) : null}
           </div>
-        </OverlayPortal>
-      ) : null}
+        ) : null}
+      </Sheet>
 
-      {teamAvailabilityEditor ? (
-        <OverlayPortal>
-          <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[520px] lg:rounded-[12px] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 ">
-              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
-                <div>
-                  <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{t("schedule.approve_availability")}</p>
-                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">{teamAvailabilityEditor.fullName}</p>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
-                  onClick={() => setTeamAvailabilityEditor(null)}
-                  aria-label="Close"
-                >
-                  <XCircle className="size-5" />
-                </button>
-              </div>
-
-              <div className="mobile-sheet-scroll px-4 py-4 lg:px-0">
-                <div className="grid gap-4 lg:mt-5">
+      <Sheet
+        open={Boolean(teamAvailabilityEditor)}
+        onClose={() => setTeamAvailabilityEditor(null)}
+        title={t("schedule.approve_availability")}
+        subtitle={teamAvailabilityEditor?.fullName}
+        action={{ label: t("common.save"), onClick: () => saveTeamAvailabilityEditorMutation.mutate(), disabled: saveTeamAvailabilityEditorMutation.isPending }}
+      >
+        {teamAvailabilityEditor ? (
+          <div>
+                <div className="grid gap-4">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("schedule.hours_per_week")}</p>
                     <div className="mt-1 flex items-baseline gap-2">
@@ -3588,14 +3585,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
                               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{day.title}</p>
                               <p className="text-xs text-[var(--color-text-muted)]">{day.caption}</p>
                             </div>
-                            <button
-                              type="button"
-                              aria-pressed={enabled}
-                              onClick={() => setTeamAvailabilityDayEnabled(index, !enabled)}
-                              className={`relative inline-flex h-11 w-16 items-center rounded-full p-1 transition ${enabled ? "bg-emerald-500/90" : "bg-slate-200"}`}
-                            >
-                              <span className={`size-7 rounded-full bg-white  transition ${enabled ? "translate-x-8" : "translate-x-0"}`} />
-                            </button>
+                            <Switch checked={enabled} label={day.title} onChange={(next) => setTeamAvailabilityDayEnabled(index, next)} />
                           </div>
                           <p className="mt-2 text-xs font-medium text-[var(--color-text-muted)]">{enabled ? t("schedule.available") : t("schedule.off")}</p>
                           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -3620,51 +3610,31 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
                   </div>
                 </div>
               </div>
+        ) : null}
+      </Sheet>
 
-              <div className="border-t border-[var(--color-separator)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
-                <div className="grid gap-2 lg:flex">
-                  <Button variant="secondary" onClick={() => setTeamAvailabilityEditor(null)}>
-                    {t("common.cancel")}
-                  </Button>
-                  <Button onClick={() => saveTeamAvailabilityEditorMutation.mutate()} disabled={saveTeamAvailabilityEditorMutation.isPending}>
-                    {t("common.save")}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </OverlayPortal>
-      ) : null}
-
-      {timesheetModal ? (
-        <OverlayPortal>
-          <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[440px] lg:rounded-[12px] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 ">
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
-              <div>
-                <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">
-                  {timesheetModal.mode === "shift" ? t("schedule.report_hours") : t("schedule.report_extra_hours")}
-                </p>
-                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                  {timesheetModal.mode === "shift"
-                    ? `${workDateLabel(timesheetModal.workDate)} • ${timesheetModal.shift.location_name}`
-                    : `${t("schedule.restricted_entry_for")} ${workDateLabel(timesheetModal.workDate)}`}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
-                onClick={() => setTimesheetModal(null)}
-                aria-label="Close"
-              >
-                <XCircle className="size-5" />
-              </button>
-            </div>
-
-            <div className="mobile-sheet-scroll px-4 py-4 lg:px-0">
-            <div className="grid gap-4 lg:mt-5">
+      <Sheet
+        open={Boolean(timesheetModal)}
+        onClose={() => setTimesheetModal(null)}
+        title={timesheetModal?.mode === "shift" ? t("schedule.report_hours") : t("schedule.report_extra_hours")}
+        subtitle={
+          timesheetModal
+            ? timesheetModal.mode === "shift"
+              ? `${workDateLabel(timesheetModal.workDate)} · ${timesheetModal.shift.location_name}`
+              : `${t("schedule.restricted_entry_for")} ${workDateLabel(timesheetModal.workDate)}`
+            : undefined
+        }
+        action={{
+          label: t("schedule.submit_report"),
+          onClick: () => timesheetModal && createTimesheetMutation.mutate({ modal: timesheetModal, form: timesheetForm }),
+          disabled: createTimesheetMutation.isPending || !timesheetForm.arrived_at || !timesheetForm.left_at,
+        }}
+      >
+        {timesheetModal ? (
+          <div>
+            <div className="grid gap-4">
               {timesheetModal.mode === "extra" ? (
-                <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+                <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                   {t("schedule.work_date")}
                   <Input
                     type="date"
@@ -3674,7 +3644,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
                 </label>
               ) : null}
               <div className="grid grid-cols-2 gap-3">
-                <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+                <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                   {t("schedule.arrived_at")}
                   <Input
                     type="time"
@@ -3682,7 +3652,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
                     onChange={(event) => setTimesheetForm((current) => ({ ...current, arrived_at: event.target.value }))}
                   />
                 </label>
-                <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+                <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                   {t("schedule.left_at")}
                   <Input
                     type="time"
@@ -3691,7 +3661,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
                   />
                 </label>
               </div>
-              <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+              <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                 {t("schedule.note")}
                 <Textarea
                   rows={3}
@@ -3707,51 +3677,35 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
               ) : null}
             </div>
             </div>
+        ) : null}
+      </Sheet>
 
-            <div className="border-t border-[var(--color-separator)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
-              <div className="grid gap-2 lg:flex">
-              <Button variant="secondary" onClick={() => setTimesheetModal(null)}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                onClick={() => createTimesheetMutation.mutate({ modal: timesheetModal, form: timesheetForm })}
-                disabled={createTimesheetMutation.isPending || !timesheetForm.arrived_at || !timesheetForm.left_at}
-                className="w-full lg:w-auto"
-              >
-                {t("schedule.submit_report")}
-              </Button>
-              </div>
-            </div>
-            </div>
-          </div>
-        </OverlayPortal>
-      ) : null}
-
-      {reviewModal ? (
-        <OverlayPortal>
-          <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[440px] lg:rounded-[12px] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 ">
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
-              <div>
-                <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{t("schedule.correct_timesheet")}</p>
-                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                  {timesheetUserNameById[reviewModal.entry.user_id] ?? reviewModal.entry.user_id.slice(0, 8)} • {workDateLabel(reviewModal.entry.work_date)}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
-                onClick={() => setReviewModal(null)}
-                aria-label="Close"
-              >
-                <XCircle className="size-5" />
-              </button>
-            </div>
-
-            <div className="mobile-sheet-scroll px-4 py-4 lg:px-0">
-            <div className="grid gap-4 lg:mt-5">
+      <Sheet
+        open={Boolean(reviewModal)}
+        onClose={() => setReviewModal(null)}
+        title={t("schedule.correct_timesheet")}
+        subtitle={reviewModal ? `${timesheetUserNameById[reviewModal.entry.user_id] ?? reviewModal.entry.user_id.slice(0, 8)} · ${workDateLabel(reviewModal.entry.work_date)}` : undefined}
+        action={{
+          label: t("schedule.save_correction"),
+          onClick: () =>
+            reviewModal &&
+            reviewTimesheetMutation.mutate({
+              entry: reviewModal.entry,
+              payload: {
+                action: "correct",
+                arrived_at: toApiTime(reviewModal.arrived_at),
+                left_at: toApiTime(reviewModal.left_at),
+                review_note: reviewModal.review_note.trim() || undefined,
+              },
+            }),
+          disabled: !reviewModal || reviewTimesheetMutation.isPending || !reviewModal.arrived_at || !reviewModal.left_at,
+        }}
+      >
+        {reviewModal ? (
+          <div>
+            <div className="grid gap-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+                <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                   {t("schedule.arrived_at")}
                   <Input
                     type="time"
@@ -3759,7 +3713,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
                     onChange={(event) => setReviewModal((current) => (current ? { ...current, arrived_at: event.target.value } : current))}
                   />
                 </label>
-                <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+                <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                   {t("schedule.left_at")}
                   <Input
                     type="time"
@@ -3768,7 +3722,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
                   />
                 </label>
               </div>
-              <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+              <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                 {t("schedule.review_note")}
                 <Textarea
                   rows={3}
@@ -3779,35 +3733,8 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
               </label>
             </div>
             </div>
-
-            <div className="border-t border-[var(--color-separator)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
-              <div className="grid gap-2 lg:flex">
-              <Button variant="secondary" onClick={() => setReviewModal(null)}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                onClick={() =>
-                  reviewTimesheetMutation.mutate({
-                    entry: reviewModal.entry,
-                    payload: {
-                      action: "correct",
-                      arrived_at: toApiTime(reviewModal.arrived_at),
-                      left_at: toApiTime(reviewModal.left_at),
-                      review_note: reviewModal.review_note.trim() || undefined,
-                    },
-                  })
-                }
-                disabled={reviewTimesheetMutation.isPending || !reviewModal.arrived_at || !reviewModal.left_at}
-                className="w-full lg:w-auto"
-              >
-                {t("schedule.save_correction")}
-              </Button>
-              </div>
-            </div>
-            </div>
-          </div>
-        </OverlayPortal>
-      ) : null}
+        ) : null}
+      </Sheet>
 
     </AppShell>
 

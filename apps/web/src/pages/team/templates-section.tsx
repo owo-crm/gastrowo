@@ -135,7 +135,7 @@ export function TemplatesSection() {
 
   return (
     <div>
-      <div className="space-y-3 border-b border-[var(--color-separator)] px-4 py-3 sm:px-6">
+      <div className="space-y-3 px-4 pb-4 sm:px-6">
         {locations.length > 1 ? (
           <Select value={locationId} onChange={(event) => setLocationId(event.target.value)} options={locations.map((item) => ({ value: item.id, label: item.name }))} />
         ) : null}

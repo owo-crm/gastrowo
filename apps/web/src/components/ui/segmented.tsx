@@ -17,7 +17,7 @@ export function Segmented<T extends string>({
   ariaLabel?: string;
 }) {
   return (
-    <div role="tablist" aria-label={ariaLabel} className={cn("inline-flex min-h-9 rounded-[9px] bg-[var(--color-fill)] p-[2px]", className)}>
+    <div role="tablist" aria-label={ariaLabel} className={cn("inline-flex min-h-9 rounded-full bg-[rgba(118,118,128,0.14)] p-[3px]", className)}>
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -28,7 +28,7 @@ export function Segmented<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              "inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[7px] px-3 text-[13px] font-semibold transition",
+              "inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[13px] font-semibold transition",
               selected ? "bg-white text-black shadow-[0_3px_8px_rgba(0,0,0,0.12),0_1px_1px_rgba(0,0,0,0.04)]" : "text-[#3c3c43] hover:text-black",
             )}
           >

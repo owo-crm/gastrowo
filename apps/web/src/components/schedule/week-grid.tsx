@@ -295,14 +295,14 @@ export function DayList({
     <div>
       {open.length ? (
         <>
-          <h3 className="ios-section-header px-4 pb-1.5 pt-4 text-[var(--color-danger)]">{t("schedule.grid_open")}</h3>
-          <ul className="divide-y divide-[var(--color-separator)] border-y border-[var(--color-separator)]">
+          <h3 className="ios-section-header px-7 pb-1.5 pt-3 text-[var(--color-danger)]">{t("schedule.grid_open")}</h3>
+          <ul className="ios-island mx-3 divide-y divide-[#e5e5ea]">
             {open.map((shift) => row(shift, (shift.missing ?? 1) > 1 ? `${t("schedule.grid_open_slot")} × ${shift.missing}` : t("schedule.grid_open_slot")))}
           </ul>
         </>
       ) : null}
-      <h3 className="ios-section-header px-4 pb-1.5 pt-4">{t("schedule.grid_working")}</h3>
-      <ul className="divide-y divide-[var(--color-separator)] border-y border-[var(--color-separator)]">
+      <h3 className="ios-section-header px-7 pb-1.5 pt-4">{t("schedule.grid_working")}</h3>
+      <ul className="ios-island mx-3 divide-y divide-[#e5e5ea]">
         {working.map((shift) => row(shift, names.get(shift.personId!) ?? t("schedule.assigned_label")))}
         {!working.length ? <li className="px-4 py-6 text-center text-[15px] text-[var(--color-text-muted)]">{t("schedule.no_shifts_this_day")}</li> : null}
       </ul>

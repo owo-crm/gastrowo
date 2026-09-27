@@ -73,7 +73,7 @@ export function OnboardingChecklist() {
   const nextStep = steps.find((step) => !step.done)?.key;
 
   return (
-    <section className="border-b border-[var(--color-separator)] bg-[var(--color-grouped)] px-4 py-4 sm:px-6" aria-labelledby="onboarding-title">
+    <section className="ios-island mx-3 mb-4 px-4 py-4 sm:mx-6 sm:px-5" aria-labelledby="onboarding-title">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id="onboarding-title" className="text-[17px] font-bold text-black">
@@ -97,7 +97,7 @@ export function OnboardingChecklist() {
                 to={step.to}
                 className={cn(
                   "flex h-full items-start gap-2.5 rounded-[10px] py-2.5 md:flex-col md:gap-1.5",
-                  isNext && "md:bg-white md:px-3 md:ring-2 md:ring-[var(--color-primary-strong)]",
+                  isNext && "md:bg-[var(--color-accent)] md:px-3",
                 )}
               >
                 <span

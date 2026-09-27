@@ -36,9 +36,9 @@ const fromOverride = (value: Override): boolean | null => (value === "allow" ? t
 function SheetSection({ title, footer, children }: { title: string; footer?: string; children: React.ReactNode }) {
   return (
     <section className="mb-6">
-      <h3 className="ios-section-header pb-2">{title}</h3>
-      <div className="divide-y divide-[var(--color-separator)] border-y border-[var(--color-separator)]">{children}</div>
-      {footer ? <p className="mt-2 text-[13px] text-[var(--color-text-muted)]">{footer}</p> : null}
+      <h3 className="ios-section-header px-4 pb-2">{title}</h3>
+      <div className="ios-island divide-y divide-[#e5e5ea] px-4">{children}</div>
+      {footer ? <p className="mt-2 px-4 text-[13px] leading-[18px] text-[#3c3c43]">{footer}</p> : null}
     </section>
   );
 }
@@ -156,11 +156,12 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
       subtitle={setup?.role ? t(`shell.role.${setup.role}`) : undefined}
       action={{ label: t("common.save"), onClick: () => save.mutate(), disabled: !setup || save.isPending || (canWorkPositions && positions.length === 0) }}
       size="lg"
+      grouped
     >
       {setupQuery.isError ? <p className="text-[15px] text-[var(--color-danger)]">{setupQuery.error instanceof Error ? setupQuery.error.message : ""}</p> : null}
       {setup ? (
         <>
-          <div className="mb-6 flex items-center gap-3">
+          <div className="mb-6 flex items-center gap-3 px-1">
             <WorkerAvatar name={setup.full_name} size={52} />
             <div className="min-w-0">
               <p className="truncate text-[20px] font-bold text-black">{setup.full_name}</p>
@@ -194,7 +195,7 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
                     <span className="text-[15px] text-[var(--color-text-muted)]">{symbol}</span>
                     <Input
                       inputMode="decimal"
-                      className="h-10 w-24"
+                      className="h-10 w-24 bg-[rgba(118,118,128,0.12)]"
                       placeholder={t("team.location_rate")}
                       aria-label={t("team.rate_for", { position: item.position })}
                       value={item.hourly_rate ?? ""}
