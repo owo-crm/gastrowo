@@ -770,7 +770,8 @@ class TaskPatch(BaseModel):
 
 
 class TaskPhotoCreate(BaseModel):
-    photo_url: str = Field(min_length=4, max_length=512)
+    # Photos are sent as compressed data URLs from the phone camera.
+    photo_url: str = Field(min_length=4, max_length=1_500_000)
 
 
 class TaskPhotoOut(APIModel):
@@ -797,7 +798,7 @@ class RevenueReportCreate(BaseModel):
     report_date: date
     revenue: Decimal = Field(ge=0)
     currency: str = Field(default="PLN", min_length=3, max_length=8)
-    photo_url: str | None = Field(default=None, max_length=512)
+    photo_url: str | None = Field(default=None, max_length=1_500_000)
 
 
 class RevenueReportOut(APIModel):

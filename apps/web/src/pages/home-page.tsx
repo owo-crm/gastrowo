@@ -14,7 +14,7 @@ import { api } from "@/lib/api";
 import { hasPlanFeature } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatTime, getMonday, toLocalIso } from "@/lib/date";
-import { fileToDataUrl } from "@/lib/file";
+import { imageFileToDataUrl } from "@/lib/file";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -355,7 +355,7 @@ export function HomePage() {
                     onChange={async (event) => {
                       const file = event.target.files?.[0];
                       if (!file) return;
-                      const dataUrl = await fileToDataUrl(file);
+                      const dataUrl = await imageFileToDataUrl(file);
                       setReport((current) => ({ ...current, photo_url: dataUrl }));
                       setReportPhotoName(file.name);
                     }}

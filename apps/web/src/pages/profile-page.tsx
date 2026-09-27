@@ -12,7 +12,7 @@ import { api, apiAbsoluteUrl } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { loadBusinessLogo, saveBusinessLogo } from "@/lib/business-branding";
 import { useLanguage } from "@/lib/i18n";
-import { fileToDataUrl } from "@/lib/file";
+import { imageFileToDataUrl } from "@/lib/file";
 import { useToast } from "@/lib/toast";
 
 type SettingsTab = "personal" | "business";
@@ -162,7 +162,7 @@ export function ProfilePage() {
                       onChange={async (event) => {
                         const file = event.target.files?.[0];
                         if (!file) return;
-                        const dataUrl = await fileToDataUrl(file);
+                        const dataUrl = await imageFileToDataUrl(file);
                         setAvatarUrl(dataUrl);
                       }}
                     />
@@ -326,7 +326,7 @@ export function ProfilePage() {
                         onChange={async (event) => {
                           const file = event.target.files?.[0];
                           if (!file) return;
-                          const dataUrl = await fileToDataUrl(file);
+                          const dataUrl = await imageFileToDataUrl(file);
                           setBusinessLogo(dataUrl);
                         }}
                       />

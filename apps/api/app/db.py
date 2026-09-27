@@ -405,6 +405,12 @@ def _ensure_runtime_schema_compat() -> None:
             if "failed_attempts" not in otp_columns:
                 connection.execute(text("ALTER TABLE otp_challenges ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0"))
 
+        # Photo columns used to be VARCHAR(512), far too small for real (data URL) photos.
+        if connection.dialect.name == "postgresql":
+            for table in ("task_photos", "revenue_reports"):
+                if table in tables:
+                    connection.execute(text(f"ALTER TABLE {table} ALTER COLUMN photo_url TYPE TEXT"))
+
         organizations = connection.execute(text("SELECT id FROM organizations")).fetchall() if "organizations" in tables else []
         for (organization_id,) in organizations:
             subscription_exists = connection.execute(

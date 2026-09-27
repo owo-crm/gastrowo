@@ -1494,9 +1494,9 @@ export function SchedulePage() {
 
   const pendingTimesheetsQuery = useQuery({
 
-    queryKey: ["timesheets", "pending", weekStart, weekEnd],
-
-    queryFn: () => api.listTimesheets(token!, { scope: "pending", start_date: weekStart, end_date: weekEnd }),
+    // Pending reports need attention whatever week is on screen, so they are not filtered by week.
+    queryKey: ["timesheets", "pending"],
+    queryFn: () => api.listTimesheets(token!, { scope: "pending" }),
 
     enabled: Boolean(token) && isManagerView && timesheetsEnabled,
 

@@ -27,12 +27,25 @@ def list_users(
     context: OrgContext = Depends(require_org_context()),
     db: Session = Depends(get_db),
 ):
-    _require_team_access(context, db)
     rows = db.execute(
         select(User, OrganizationMembership)
         .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
         .where(OrganizationMembership.organization_id == context.membership.organization_id)
     ).all()
+    if not can_manage_team(context.membership, get_current_organization(context, db)):
+        # Coworkers are needed for tasks and swaps, but emails and pay rates stay private.
+        return ok(
+            [
+                {
+                    "id": str(user.id),
+                    "full_name": user.full_name,
+                    "avatar_url": user.avatar_url,
+                    "role": membership.role,
+                    "staff_position": membership.staff_position,
+                }
+                for user, membership in rows
+            ]
+        )
 
     user_ids = [user.id for user, _ in rows]
     rate_rows = db.scalars(select(LocationMembership).where(LocationMembership.user_id.in_(user_ids))).all() if user_ids else []

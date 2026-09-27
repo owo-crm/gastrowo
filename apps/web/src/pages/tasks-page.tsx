@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatRelativeTimestamp } from "@/lib/date";
-import { fileToDataUrl } from "@/lib/file";
+import { imageFileToDataUrl } from "@/lib/file";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import type { Task } from "@/lib/types";
@@ -221,8 +221,10 @@ function TaskRow({
               accept="image/*"
               className="hidden"
               onChange={async (event) => {
-                await onPickPhoto(task.id, event.target.files?.[0]);
-                event.currentTarget.value = "";
+                // Grab the input before awaiting: React clears currentTarget after the handler yields.
+                const input = event.currentTarget;
+                await onPickPhoto(task.id, input.files?.[0]);
+                input.value = "";
               }}
             />
           </label>
@@ -366,7 +368,7 @@ export function TasksPage() {
 
   const handlePhotoPick = async (taskId: string, file?: File | null) => {
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
+    const dataUrl = await imageFileToDataUrl(file);
     addPhotoMutation.mutate({ taskId, photoUrl: dataUrl });
   };
 
