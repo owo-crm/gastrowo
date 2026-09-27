@@ -841,3 +841,9 @@ def test_pending_invites_list_cancel_and_join_with_name(client):
     members = client.get(f"/locations/{location_id}/members", headers=auth_header(ADMIN_token)).json()["data"]
     new_member = next(item for item in members if item.get("full_name") == "Nowa Kelnerka")
     assert new_member["priority"] == 3
+
+
+def test_session_bootstrap_without_cookie_is_not_an_error(client):
+    response = client.get("/auth/session")
+    assert response.status_code == 200
+    assert response.json()["data"] is None

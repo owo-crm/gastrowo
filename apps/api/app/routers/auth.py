@@ -493,14 +493,16 @@ def bootstrap_session(
     session_token: str | None = Cookie(default=None, alias=settings.auth_session_cookie_name),
     db: Session = Depends(get_db),
 ):
+    # Not being signed in is the normal state for a visitor, so answer 200 with no data instead of 401.
     session = _get_session_from_cookie(db, session_token)
     if session is None:
-        _clear_auth_session_cookie(response)
-        raise HTTPException(status_code=401, detail="No remembered session")
+        if session_token:
+            _clear_auth_session_cookie(response)
+        return ok(None)
     user = db.get(User, session.user_id)
     if user is None:
         _clear_auth_session_cookie(response)
-        raise HTTPException(status_code=401, detail="User not found")
+        return ok(None)
     memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)).all()
     session.last_seen_at = utc_now()
     session.expires_at = utc_now() + timedelta(days=settings.auth_session_ttl_days)

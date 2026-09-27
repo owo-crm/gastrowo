@@ -141,7 +141,7 @@ export const api = {
     return request<WaitlistLead[]>("/marketing/waitlist", {}, token);
   },
   bootstrapSession() {
-    return request<SessionBootstrapResponse>("/auth/session");
+    return request<SessionBootstrapResponse | null>("/auth/session");
   },
   logout() {
     return request<{ logged_out: boolean }>("/auth/logout", { method: "POST" });

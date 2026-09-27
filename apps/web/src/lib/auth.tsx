@@ -104,6 +104,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isStale() || sessionStorage.getItem(EXPLICIT_LOGOUT_STORAGE_KEY) === "1") {
           return;
         }
+        if (!session) {
+          clearLocalSession();
+          return;
+        }
         applyLocalSession(session.access_token);
         try {
           await hydrateMe(session.access_token);
