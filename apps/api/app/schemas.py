@@ -20,6 +20,7 @@ from app.models import (
     TaskStatusEnum,
     TimesheetStatusEnum,
 )
+from app.services.worktime import validate_timesheet_times
 
 
 class APIModel(BaseModel):
@@ -828,8 +829,7 @@ class TimesheetCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_timesheet(self):
-        if self.left_at <= self.arrived_at:
-            raise ValueError("left_at must be later than arrived_at")
+        validate_timesheet_times(self.arrived_at, self.left_at)
         if self.shift_id is None and self.work_date is None:
             raise ValueError("work_date is required when shift_id is not provided")
         return self
@@ -846,8 +846,7 @@ class TimesheetReviewAction(BaseModel):
         if self.action == "correct":
             if self.arrived_at is None or self.left_at is None:
                 raise ValueError("arrived_at and left_at are required for correction")
-            if self.left_at <= self.arrived_at:
-                raise ValueError("left_at must be later than arrived_at")
+            validate_timesheet_times(self.arrived_at, self.left_at)
         return self
 
 
