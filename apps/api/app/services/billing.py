@@ -1,4 +1,4 @@
-"""Plan rules: Free for small teams, Standard and Pro billed per team member, locations never limited."""
+"""Plan rules: Free for one small location; Starter and Pro are billed per location (Stripe quantity = locations)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,10 @@ from app.schemas import SubscriptionSummaryOut
 
 logger = logging.getLogger("gastrowo.billing")
 
-FREE_MEMBER_LIMIT = 5
+FREE_MEMBER_LIMIT = 15
+FREE_LOCATION_LIMIT = 1
+# Starter covers up to 30 people per paid location; Pro has no people limit.
+STARTER_MEMBERS_PER_LOCATION = 30
 # New team members start as schedulable in every location (0 would exclude them from auto-planning).
 DEFAULT_LOCATION_PRIORITY = 3
 
@@ -39,7 +42,7 @@ FEATURE_MIN_PLAN = {
     "permissions": SubscriptionPlanEnum.PRO,
 }
 
-PLAN_NAMES = {SubscriptionPlanEnum.STANDARD: "Standard", SubscriptionPlanEnum.PRO: "Pro"}
+PLAN_NAMES = {SubscriptionPlanEnum.STANDARD: "Starter", SubscriptionPlanEnum.PRO: "Pro"}
 
 
 def get_or_create_subscription(db: Session, organization_id: UUID) -> OrganizationSubscription:
@@ -95,8 +98,20 @@ def require_feature(db: Session, organization_id: UUID, feature: str) -> None:
         raise HTTPException(status_code=402, detail=f"This feature is available from the {plan_name} plan")
 
 
-def member_cap_for(plan: SubscriptionPlanEnum) -> int | None:
-    return FREE_MEMBER_LIMIT if plan == SubscriptionPlanEnum.FREE else None
+def count_locations(db: Session, organization_id: UUID) -> int:
+    return db.scalar(select(func.count()).select_from(Location).where(Location.organization_id == organization_id)) or 0
+
+
+def member_cap_for(plan: SubscriptionPlanEnum, locations: int) -> int | None:
+    if plan == SubscriptionPlanEnum.FREE:
+        return FREE_MEMBER_LIMIT
+    if plan == SubscriptionPlanEnum.STANDARD:
+        return STARTER_MEMBERS_PER_LOCATION * max(locations, 1)
+    return None
+
+
+def location_cap_for(plan: SubscriptionPlanEnum) -> int | None:
+    return FREE_LOCATION_LIMIT if plan == SubscriptionPlanEnum.FREE else None
 
 
 def count_members(db: Session, organization_id: UUID) -> int:
@@ -105,14 +120,22 @@ def count_members(db: Session, organization_id: UUID) -> int:
     ) or 0
 
 
+def require_location_slot(db: Session, organization_id: UUID) -> None:
+    """Free covers one location; more locations need a paid plan (priced per location)."""
+    cap = location_cap_for(organization_plan(db, organization_id))
+    if cap is not None and count_locations(db, organization_id) >= cap:
+        raise HTTPException(status_code=402, detail="The Free plan includes one location. Upgrade to Starter to add more.")
+
+
 def build_subscription_summary(db: Session, organization_id: UUID | None) -> SubscriptionSummaryOut | None:
     if organization_id is None:
         return None
     subscription = get_or_create_subscription(db, organization_id)
     plan, status = effective_plan(subscription)
     members = count_members(db, organization_id)
-    locations = db.scalar(select(func.count()).select_from(Location).where(Location.organization_id == organization_id)) or 0
-    member_cap = member_cap_for(plan)
+    locations = count_locations(db, organization_id)
+    member_cap = member_cap_for(plan, locations)
+    billable_locations = max(locations, 1)
     return SubscriptionSummaryOut(
         plan=plan,
         status=status,
@@ -122,16 +145,17 @@ def build_subscription_summary(db: Session, organization_id: UUID | None) -> Sub
         active_members_count=members,
         active_locations_count=locations,
         member_cap=member_cap,
-        location_cap=None,
+        location_cap=location_cap_for(plan),
         soft_limit_reached=member_cap is not None and members >= member_cap,
-        billable_seats=max(members, 1),
+        billable_seats=billable_locations,
+        billable_locations=billable_locations,
         has_payment_method=bool(subscription.stripe_subscription_id),
         features=allowed_features(plan),
     )
 
 
-def sync_stripe_seats(db: Session, organization_id: UUID) -> None:
-    """Keep the Stripe subscription quantity equal to the team size. Best effort: never blocks team changes."""
+def sync_stripe_locations(db: Session, organization_id: UUID) -> None:
+    """Keep the Stripe quantity equal to the number of locations. Best effort: never blocks changes."""
     subscription = db.scalar(select(OrganizationSubscription).where(OrganizationSubscription.organization_id == organization_id))
     if subscription is None or not subscription.stripe_subscription_id or not settings.stripe_secret_key:
         return
@@ -142,12 +166,12 @@ def sync_stripe_seats(db: Session, organization_id: UUID) -> None:
         items = remote["items"]["data"]
         if not items:
             return
-        seats = max(count_members(db, organization_id), 1)
-        if items[0]["quantity"] != seats:
+        quantity = max(count_locations(db, organization_id), 1)
+        if items[0]["quantity"] != quantity:
             stripe.Subscription.modify(
                 subscription.stripe_subscription_id,
-                items=[{"id": items[0]["id"], "quantity": seats}],
+                items=[{"id": items[0]["id"], "quantity": quantity}],
                 proration_behavior="create_prorations",
             )
     except Exception:
-        logger.exception("Failed to sync Stripe seats for organization %s", organization_id)
+        logger.exception("Failed to sync Stripe locations for organization %s", organization_id)

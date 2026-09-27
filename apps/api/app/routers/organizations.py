@@ -41,7 +41,7 @@ from app.schemas import (
 )
 from app.services.auth_email import send_invite_email
 from app.services.labor_rules import default_timezone_for, locale_settings
-from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, require_feature, sync_stripe_seats
+from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, require_feature
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -257,7 +257,9 @@ def link_member_by_email(
         raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
     subscription_summary = build_subscription_summary(db, context.membership.organization_id)
     if subscription_summary.member_cap is not None and subscription_summary.active_members_count >= subscription_summary.member_cap:
-        raise HTTPException(status_code=402, detail="Team member limit reached for the current plan")
+        limit = subscription_summary.member_cap
+        hint = "Upgrade to Starter for 30 people per location." if subscription_summary.plan.value == "free" else "Add a location or upgrade to Pro for no limit."
+        raise HTTPException(status_code=402, detail=f"Your plan covers {limit} people. {hint}")
     normalized_email = payload.email.lower()
     user = db.scalar(select(User).where(User.email == normalized_email))
     if user is None:
@@ -324,7 +326,6 @@ def link_member_by_email(
             db.add(LocationMembership(location_id=location_id, user_id=user.id, priority=DEFAULT_LOCATION_PRIORITY, hourly_rate_pln=0))
 
     db.commit()
-    sync_stripe_seats(db, context.membership.organization_id)
     return ok(
         {
             "status": "linked",
@@ -408,7 +409,6 @@ def remove_member(
     if membership is not None:
         db.delete(membership)
     db.commit()
-    sync_stripe_seats(db, context.membership.organization_id)
     return ok(
         MemberRemovalResultOut(
             **impact.model_dump(),

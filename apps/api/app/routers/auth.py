@@ -49,7 +49,7 @@ from app.schemas import (
 )
 from app.services.auth_email import send_otp_email
 from app.services.labor_rules import default_timezone_for, locale_settings
-from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, sync_stripe_seats
+from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -485,7 +485,6 @@ def verify_invite_join(payload: InviteJoinVerifyRequest, response: Response, db:
     _create_remembered_session(db, response, user, [membership])
     db.commit()
     db.refresh(user)
-    sync_stripe_seats(db, organization_id)
     return ok(_issue_auth_payload(user, [membership]))
 
 

@@ -11,6 +11,7 @@ from app.core.envelope import ok
 from app.core.permissions import can_manage_team, membership_permission_overrides
 from app.db import get_db
 from app.models import Location, LocationMembership, OrganizationMembership, RoleEnum, User
+from app.services.billing import require_location_slot, sync_stripe_locations
 from app.schemas import LocationCreate, LocationMemberOut, LocationMemberPatch, LocationOut, LocationPatch
 
 router = APIRouter(prefix="/locations", tags=["locations"])
@@ -101,6 +102,7 @@ def create_location(
     db: Session = Depends(get_db),
 ):
     _require_team_access(context, db)
+    require_location_slot(db, context.membership.organization_id)
     location = Location(
         organization_id=context.membership.organization_id,
         name=payload.name,
@@ -127,6 +129,7 @@ def create_location(
 
     db.commit()
     db.refresh(location)
+    sync_stripe_locations(db, context.membership.organization_id)
     return ok(
         LocationOut(id=location.id, name=location.name, timezone=location.timezone, manager_user_ids=[], manager_names=[]).model_dump(mode="json")
     )
@@ -214,6 +217,7 @@ def delete_location(
     location = _get_location_or_404(db, context.membership.organization_id, location_id)
     db.delete(location)
     db.commit()
+    sync_stripe_locations(db, context.membership.organization_id)
     return ok({"deleted": True, "id": str(location_id)})
 
 
