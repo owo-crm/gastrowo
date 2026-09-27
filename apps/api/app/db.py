@@ -400,6 +400,10 @@ def _ensure_runtime_schema_compat() -> None:
             connection.execute(text("CREATE INDEX ix_otp_challenges_purpose ON otp_challenges (purpose)"))
             connection.execute(text("CREATE INDEX ix_otp_challenges_invite_token ON otp_challenges (invite_token)"))
             connection.execute(text("CREATE INDEX ix_otp_challenges_expires_at ON otp_challenges (expires_at)"))
+        else:
+            otp_columns = {column["name"] for column in inspector.get_columns("otp_challenges")}
+            if "failed_attempts" not in otp_columns:
+                connection.execute(text("ALTER TABLE otp_challenges ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0"))
 
         organizations = connection.execute(text("SELECT id FROM organizations")).fetchall() if "organizations" in tables else []
         for (organization_id,) in organizations:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,17 +14,14 @@ from app.core.permissions import can_view_full_dashboard, can_view_payroll
 from app.db import get_db
 from app.models import Assignment, Location, LocationMembership, OrganizationMembership, RevenueReport, RoleEnum, Shift, User
 from app.models import Timesheet, TimesheetStatusEnum
+from app.services.billing import require_feature
 from app.services.scheduler import shift_duration_hours
+
+from app.services.worktime import worked_hours as timesheet_hours
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
-def timesheet_duration_hours(arrived_at, left_at) -> Decimal:
-    started = datetime.combine(date.today(), arrived_at)
-    ended = datetime.combine(date.today(), left_at)
-    if ended <= started:
-        return Decimal("0.00")
-    return Decimal(str((ended - started).total_seconds() / 3600))
 
 
 @router.get("/owner")
@@ -35,6 +32,7 @@ def owner_dashboard(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "revenue")
     organization = get_current_organization(context, db)
     if not can_view_full_dashboard(context.membership, organization):
         raise HTTPException(status_code=403, detail="Manager dashboard access is disabled in this workspace")
@@ -153,7 +151,7 @@ def owner_dashboard(
     for item in timesheets:
         if item.status not in (TimesheetStatusEnum.APPROVED, TimesheetStatusEnum.CORRECTED):
             continue
-        worked_hours = timesheet_duration_hours(item.arrived_at, item.left_at)
+        worked_hours = timesheet_hours(item.arrived_at, item.left_at)
         if worked_hours > 0:
             approved_worked_hours += worked_hours
             confirmed_timesheets.append(item)
@@ -204,7 +202,7 @@ def owner_dashboard(
     payroll_acc: dict[str, dict[str, Decimal | str]] = {}
     for item in confirmed_timesheets:
         user_key = str(item.user_id)
-        worked_hours = timesheet_duration_hours(item.arrived_at, item.left_at)
+        worked_hours = timesheet_hours(item.arrived_at, item.left_at)
         if worked_hours <= 0:
             continue
         default_rate = fallback_rate_for_user(user_key)

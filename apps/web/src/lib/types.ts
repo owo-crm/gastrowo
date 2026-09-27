@@ -77,6 +77,7 @@ export type OtpVerifyResponse = {
 
 export type MeResponse = {
   id: string;
+  is_platform_admin?: boolean;
   email: string;
   full_name: string;
   avatar_url?: string | null;
@@ -89,7 +90,7 @@ export type MeResponse = {
   subscription: SubscriptionSummary | null;
 };
 
-export type SubscriptionPlan = "free" | "pro" | "business" | "enterprise";
+export type SubscriptionPlan = "free" | "standard" | "pro" | "business" | "enterprise";
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled" | "expired";
 
 export type SubscriptionSummary = {
@@ -103,6 +104,9 @@ export type SubscriptionSummary = {
   member_cap: number | null;
   location_cap: number | null;
   soft_limit_reached: boolean;
+  billable_seats?: number;
+  has_payment_method?: boolean;
+  features?: string[];
 };
 
 export type BillingCheckoutCycle = "monthly" | "annual";

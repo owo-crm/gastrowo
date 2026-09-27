@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { hasPlanFeature } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatTime, getMonday, toLocalIso } from "@/lib/date";
 import { fileToDataUrl } from "@/lib/file";
@@ -140,7 +141,7 @@ export function HomePage() {
   const ownerDashboardQuery = useQuery({
     queryKey: ["owner-dashboard-inline", todayIso],
     queryFn: () => api.ownerDashboard(token!, todayIso, todayIso),
-    enabled: Boolean(token) && me?.role !== "STAFF",
+    enabled: Boolean(token) && me?.role !== "STAFF" && hasPlanFeature(me, "revenue"),
   });
 
   const reportMutation = useMutation({

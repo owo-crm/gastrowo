@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+import csv
+import io
+from datetime import date, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -15,15 +17,12 @@ from app.core.permissions import can_view_payroll
 from app.db import get_db
 from app.models import Location, LocationMembership, OrganizationMembership, RoleEnum, Shift, Timesheet, TimesheetStatusEnum, User
 
+from app.services.worktime import worked_hours as timesheet_hours
+from app.services.billing import require_feature
+
 router = APIRouter(prefix="/payroll", tags=["payroll"])
 
 
-def _timesheet_duration_hours(arrived_at, left_at) -> Decimal:
-    started = datetime.combine(date.today(), arrived_at)
-    ended = datetime.combine(date.today(), left_at)
-    if ended <= started:
-        return Decimal("0.00")
-    return Decimal(str((ended - started).total_seconds() / 3600))
 
 
 def _build_payroll_rows(db: Session, organization_id: UUID, start_date: date, end_date: date) -> list[dict]:
@@ -75,7 +74,7 @@ def _build_payroll_rows(db: Session, organization_id: UUID, start_date: date, en
     payroll_acc: dict[str, dict[str, Decimal]] = {}
     for item in confirmed_timesheets:
         user_key = str(item.user_id)
-        worked_hours = _timesheet_duration_hours(item.arrived_at, item.left_at)
+        worked_hours = timesheet_hours(item.arrived_at, item.left_at)
         if worked_hours <= 0:
             continue
         default_rate = fallback_rate_for_user(user_key)
@@ -143,6 +142,7 @@ def payroll_summary(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.STAFF)),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "payroll")
     organization = get_current_organization(context, db)
 
     if end_date is None:
@@ -175,3 +175,57 @@ def payroll_summary(
             "rows": rows,
         }
     )
+
+
+def _polish_decimal(value: str) -> str:
+    return value.replace(".", ",")
+
+
+def _safe_cell(value: str) -> str:
+    # Names are user-controlled; neutralise spreadsheet formulas (CSV injection).
+    return f"'{value}" if value[:1] in ("=", "+", "-", "@", "\t", "\r") else value
+
+
+@router.get("/export.csv")
+def export_payroll_csv(
+    start_date: date,
+    end_date: date,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    require_feature(db, context.membership.organization_id, "payroll")
+    """Payroll for the accountant: semicolon-separated with decimal commas, as Polish Excel expects."""
+    organization = get_current_organization(context, db)
+    if context.membership.role == RoleEnum.MANAGER and not can_view_payroll(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Manager payroll access is disabled in this workspace")
+    if end_date < start_date:
+        raise HTTPException(status_code=422, detail="end_date must not be before start_date")
+
+    rows = _build_payroll_rows(db, context.membership.organization_id, start_date, end_date)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter=";", lineterminator="\r\n")
+    writer.writerow(["Pracownik", "Stanowisko", "Rola", "Godziny zatwierdzone", "Stawka PLN/h", "Wynagrodzenie PLN", "Godziny poza grafikiem"])
+    for row in rows:
+        writer.writerow(
+            [
+                _safe_cell(row["full_name"]),
+                _safe_cell(row["staff_position"] or ""),
+                row["role"],
+                _polish_decimal(row["approved_hours"]),
+                _polish_decimal(row["hourly_rate_default_pln"]),
+                _polish_decimal(row["payroll_pln"]),
+                _polish_decimal(row.get("restricted_hours", "0.00")),
+            ]
+        )
+    total_hours = sum((Decimal(row["approved_hours"]) for row in rows), Decimal("0.00"))
+    total_payroll = sum((Decimal(row["payroll_pln"]) for row in rows), Decimal("0.00"))
+    writer.writerow(["RAZEM", "", "", _polish_decimal(f"{total_hours:.2f}"), "", _polish_decimal(f"{total_payroll:.2f}"), ""])
+
+    filename = f"payroll_{start_date.isoformat()}_{end_date.isoformat()}.csv"
+    # BOM so Excel detects UTF-8 and shows Polish characters correctly.
+    return Response(
+        content="\ufeff" + buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from app.core.config import settings
 from app.core.security import create_access_token, hash_password
+from app.tests.otp_outbox import sent_code
 from app.models import Organization, OrganizationMembership, RoleEnum, User
 
 
@@ -11,14 +13,16 @@ def auth_header(token: str) -> dict[str, str]:
 
 
 def current_monday() -> date:
+    # Plan next week: flows such as pickup requests reject shifts in the past,
+    # so using this week made the suite fail late in the week.
     today = date.today()
-    return today - timedelta(days=today.weekday())
+    return today - timedelta(days=today.weekday()) + timedelta(days=7)
 
 
 def signup_ADMIN(client, *, organization_name: str, email: str) -> tuple[str, str]:
     send = client.post("/auth/otp/send", json={"email": email, "purpose": "owner_signup"})
     assert send.status_code == 200
-    code = send.json()["data"]["debug_code"]
+    code = sent_code(email)
 
     verify = client.post("/auth/otp/verify", json={"email": email, "code": code, "purpose": "owner_signup"})
     assert verify.status_code == 200
@@ -44,7 +48,7 @@ def signup_ADMIN(client, *, organization_name: str, email: str) -> tuple[str, st
 def signup_staff(client, *, full_name: str, email: str) -> str:
     send = client.post("/auth/otp/send", json={"email": email, "purpose": "worker_signup"})
     assert send.status_code == 200
-    code = send.json()["data"]["debug_code"]
+    code = sent_code(email)
     signup = client.post(
         "/auth/otp/verify",
         json={
@@ -71,7 +75,7 @@ def invite_accept_login(client, *, ADMIN_token: str, email: str, full_name: str,
 
     send = client.post("/auth/otp/send", json={"email": email, "purpose": "invite_join", "invite_token": invite_token})
     assert send.status_code == 200
-    code = send.json()["data"]["debug_code"]
+    code = sent_code(email)
 
     accept = client.post(
         "/auth/invites/join/verify",
@@ -139,7 +143,7 @@ def test_marketing_waitlist_signup_and_duplicate(client):
     assert second_payload["created_at"] == first_payload["created_at"]
 
 
-def test_marketing_waitlist_admin_only_listing(client, db_session):
+def test_marketing_waitlist_admin_only_listing(client, db_session, monkeypatch):
     client.post("/marketing/waitlist", json={"email": "first@example.com"})
     client.post("/marketing/waitlist", json={"email": "second@example.com"})
 
@@ -162,6 +166,11 @@ def test_marketing_waitlist_admin_only_listing(client, db_session):
     forbidden = client.get("/marketing/waitlist", headers=auth_header(staff_token))
     assert forbidden.status_code == 403
 
+    # A restaurant admin is not a platform admin: leads belong to GastrOWO, not to tenants.
+    tenant_admin = client.get("/marketing/waitlist", headers=auth_header(ADMIN_token))
+    assert tenant_admin.status_code == 403
+
+    monkeypatch.setattr(settings, "platform_admin_emails", "admin-leads@example.com")
     allowed = client.get("/marketing/waitlist", headers=auth_header(ADMIN_token))
     assert allowed.status_code == 200
     emails = [item["email"] for item in allowed.json()["data"]]
@@ -518,10 +527,12 @@ def test_staff_calendar_and_shift_request_flow(client):
     assert submit_staff_availability(client, staff_token=staff_a_token, week_start=monday, desired_hours=40).status_code == 200
 
     create_template(client, ADMIN_token=ADMIN_token, location_id=location_id, required_count=2)
+    # /schedule/generate is preview-only (see test_generate_endpoint_does_not_publish_schedule),
+    # staff only see published shifts, so publish through apply.
     generated = client.post(
-        "/schedule/generate",
+        "/schedule/generate/apply",
         headers=auth_header(ADMIN_token),
-        json={"week_start": monday.isoformat()},
+        json={"week_start": monday.isoformat(), "location_id": location_id},
     )
     assert generated.status_code == 200
     assert generated.json()["data"]["created_assignments"] == 1
@@ -614,7 +625,7 @@ def test_staff_self_signup_email_pending_and_link_flow(client):
 
     send_login = client.post("/auth/otp/send", json={"email": worker_email, "purpose": "login"})
     assert send_login.status_code == 200
-    login_code = send_login.json()["data"]["debug_code"]
+    login_code = sent_code(worker_email)
     staff_login = client.post("/auth/otp/verify", json={"email": worker_email, "code": login_code, "purpose": "login"})
     assert staff_login.status_code == 200
     staff_payload = staff_login.json()["data"]
@@ -699,6 +710,38 @@ def test_timesheet_assigned_shift_submit_and_manager_review(client):
     )
     assert approve.status_code == 200
     assert approve.json()["data"]["status"] == "approved"
+
+    period = {"start_date": monday.isoformat(), "end_date": (monday + timedelta(days=6)).isoformat()}
+    export = client.get("/payroll/export.csv", headers=auth_header(ADMIN_token), params=period)
+    assert export.status_code == 200
+    assert export.headers["content-type"].startswith("text/csv")
+    lines = export.content.decode("utf-8-sig").strip().splitlines()
+    assert lines[0].startswith("Pracownik;")
+    # Invited users are named from their email until they edit their profile.
+    staff_line = next(line for line in lines if line.startswith("Staff;"))
+    # 08:02-16:05 = 8.05h at 29 PLN/h, written with decimal commas.
+    assert ";8,05;29,00;233,45;" in staff_line
+    assert lines[-1].startswith("RAZEM;")
+
+    staff_export = client.get("/payroll/export.csv", headers=auth_header(staff_token), params=period)
+    assert staff_export.status_code == 403
+
+
+    feed = client.get("/calendar/feed", headers=auth_header(staff_token))
+    assert feed.status_code == 200
+    feed_path = feed.json()["data"]["path"]
+    ics = client.get(feed_path)
+    assert ics.status_code == 200
+    assert ics.headers["content-type"].startswith("text/calendar")
+    body = ics.text
+    assert body.startswith("BEGIN:VCALENDAR") and "END:VCALENDAR" in body
+    assert body.count("BEGIN:VEVENT") == 1
+    assert f"DTSTART;TZID=Europe/Warsaw:{monday.strftime('%Y%m%d')}T080000" in body
+
+    # The feed token is not an API credential.
+    feed_token = feed_path.removeprefix("/calendar/").removesuffix(".ics")
+    assert client.get("/auth/me", headers=auth_header(feed_token)).status_code == 401
+    assert client.get("/calendar/not-a-token.ics").status_code == 404
 
 
 def test_timesheet_restricted_entry_requires_review_and_staff_scope_limits(client):

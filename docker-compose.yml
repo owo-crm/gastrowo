@@ -26,6 +26,7 @@ services:
       FRONTEND_URL: http://localhost:5173
       APP_ENV: development
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      DEV_LOGIN_ENABLED: "true"
     depends_on:
       - db
     ports:
@@ -42,6 +43,7 @@ services:
     container_name: workdish_web
     environment:
       VITE_API_URL: http://localhost:8000
+      VITE_DEV_LOGIN: "true"
     depends_on:
       - api
     ports:

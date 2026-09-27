@@ -38,9 +38,9 @@ from app.schemas import (
     OrganizationPatch,
     OrganizationSettingsOut,
     OrganizationSettingsPatch,
-    SubscriptionSummaryOut,
 )
 from app.services.auth_email import send_invite_email
+from app.services.billing import build_subscription_summary, require_feature, sync_stripe_seats
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -64,55 +64,6 @@ def _require_business_settings_access(context: OrgContext, organization: Organiz
     if can_manage_business_settings(context.membership, organization):
         return
     raise HTTPException(status_code=403, detail="Business settings access is disabled for this role")
-
-
-def _get_or_create_subscription(db: Session, organization_id: UUID) -> OrganizationSubscription:
-    subscription = db.scalar(select(OrganizationSubscription).where(OrganizationSubscription.organization_id == organization_id))
-    if subscription is None:
-        subscription = OrganizationSubscription(
-            organization_id=organization_id,
-            plan=SubscriptionPlanEnum.FREE,
-            status=SubscriptionStatusEnum.ACTIVE,
-            billing_cycle="monthly",
-        )
-        db.add(subscription)
-        db.flush()
-    return subscription
-
-
-def _subscription_caps(subscription: OrganizationSubscription) -> tuple[int | None, int | None]:
-    if subscription.plan == SubscriptionPlanEnum.FREE:
-        return 5, 1
-    if subscription.plan == SubscriptionPlanEnum.PRO:
-        return 25, None
-    if subscription.plan == SubscriptionPlanEnum.BUSINESS:
-        return None, 5
-    return None, None
-
-
-def _build_subscription_summary(db: Session, organization_id: UUID) -> SubscriptionSummaryOut:
-    subscription = _get_or_create_subscription(db, organization_id)
-    active_members_count = db.scalar(
-        select(func.count()).select_from(OrganizationMembership).where(OrganizationMembership.organization_id == organization_id)
-    ) or 0
-    active_locations_count = db.scalar(select(func.count()).select_from(Location).where(Location.organization_id == organization_id)) or 0
-    member_cap, location_cap = _subscription_caps(subscription)
-    soft_limit_reached = bool(
-        (member_cap is not None and active_members_count >= member_cap)
-        or (location_cap is not None and active_locations_count >= location_cap)
-    )
-    return SubscriptionSummaryOut(
-        plan=subscription.plan,
-        status=subscription.status,
-        billing_cycle=subscription.billing_cycle,
-        trial_ends_at=subscription.trial_ends_at,
-        current_period_ends_at=subscription.current_period_ends_at,
-        active_members_count=active_members_count,
-        active_locations_count=active_locations_count,
-        member_cap=member_cap,
-        location_cap=location_cap,
-        soft_limit_reached=soft_limit_reached,
-    )
 
 
 def _member_removal_impact(db: Session, organization_id: UUID, user_id: UUID) -> MemberRemovalImpactOut:
@@ -204,6 +155,9 @@ def create_organization(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # One account = one business; otherwise any user could farm unlimited PRO trials.
+    if db.scalar(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)) is not None:
+        raise HTTPException(status_code=409, detail="This account already belongs to another business")
     org = Organization(name=payload.name)
     db.add(org)
     db.flush()
@@ -264,6 +218,7 @@ def patch_current_organization_settings(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "permissions")
     organization = get_current_organization(context, db)
     _require_business_settings_access(context, organization)
     organization.staff_can_submit_revenue_reports = payload.staff_can_submit_revenue_reports
@@ -290,7 +245,7 @@ def link_member_by_email(
     organization = get_current_organization(context, db)
     if not can_manage_team(context.membership, organization):
         raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
-    subscription_summary = _build_subscription_summary(db, context.membership.organization_id)
+    subscription_summary = build_subscription_summary(db, context.membership.organization_id)
     if subscription_summary.member_cap is not None and subscription_summary.active_members_count >= subscription_summary.member_cap:
         raise HTTPException(status_code=402, detail="Team member limit reached for the current plan")
     normalized_email = payload.email.lower()
@@ -351,6 +306,7 @@ def link_member_by_email(
             db.add(LocationMembership(location_id=location_id, user_id=user.id, priority=0, hourly_rate_pln=0))
 
     db.commit()
+    sync_stripe_seats(db, context.membership.organization_id)
     return ok(
         {
             "status": "linked",
@@ -366,7 +322,7 @@ def current_subscription(
     context: OrgContext = Depends(require_org_context()),
     db: Session = Depends(get_db),
 ):
-    return ok(_build_subscription_summary(db, context.membership.organization_id).model_dump(mode="json"))
+    return ok(build_subscription_summary(db, context.membership.organization_id).model_dump(mode="json"))
 
 
 @router.get("/members/{user_id}/removal-impact")
@@ -434,6 +390,7 @@ def remove_member(
     if membership is not None:
         db.delete(membership)
     db.commit()
+    sync_stripe_seats(db, context.membership.organization_id)
     return ok(
         MemberRemovalResultOut(
             **impact.model_dump(),

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import model_validator
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +22,8 @@ class Settings(BaseSettings):
     auth_session_secure_cookie: bool = False
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
+    stripe_price_standard_monthly: str = ""
+    stripe_price_standard_annual: str = ""
     stripe_price_pro_monthly: str = ""
     stripe_price_pro_annual: str = ""
     stripe_price_business_monthly: str = ""
@@ -27,8 +31,32 @@ class Settings(BaseSettings):
     stripe_checkout_success_url: str | None = None
     stripe_checkout_cancel_url: str | None = None
     stripe_portal_return_url: str | None = None
+    # Comma-separated emails of GastrOWO staff allowed to read platform-wide data (e.g. waitlist leads).
+    platform_admin_emails: str = ""
+    # Test-only one-click login (POST /auth/dev-login). Refused in production.
+    dev_login_enabled: bool = False
+    dev_login_email: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
+
+    @model_validator(mode="after")
+    def _normalize_and_check(self) -> "Settings":
+        # Hosting providers hand out postgres:// or postgresql+psycopg:// URLs; only psycopg2 is installed.
+        for prefix in ("postgres://", "postgresql://", "postgresql+psycopg://"):
+            if self.database_url.startswith(prefix):
+                self.database_url = "postgresql+psycopg2://" + self.database_url[len(prefix) :]
+                break
+        if self.app_env == "production":
+            if self.secret_key in {"change-me-in-dev", "replace-with-a-long-random-secret"} or len(self.secret_key) < 32:
+                raise ValueError("SECRET_KEY must be set to a random value of at least 32 characters in production")
+            self.auth_session_secure_cookie = True
+            if self.dev_login_enabled:
+                raise ValueError("DEV_LOGIN_ENABLED must not be set in production")
+        return self
+
+    @property
+    def parsed_platform_admin_emails(self) -> set[str]:
+        return {item.strip().lower() for item in self.platform_admin_emails.split(",") if item.strip()}
 
     @property
     def parsed_cors_origins(self) -> list[str]:

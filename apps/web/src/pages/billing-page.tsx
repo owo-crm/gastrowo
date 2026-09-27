@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CalendarClock, CheckCircle2, CreditCard, MapPin, Users2 } from "lucide-react";
+import { AlertTriangle, Check, CreditCard, MapPin, Users2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -8,48 +9,38 @@ import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
+import { FREE_MEMBER_LIMIT, SEAT_PRICE_PLN, formatPln, normalizePlan, planTitle, plans, type PaidPlan } from "@/lib/plans";
 import { useToast } from "@/lib/toast";
-import type { BillingCheckoutCycle, SubscriptionPlan } from "@/lib/types";
+import type { BillingCheckoutCycle, SubscriptionSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const plans: Array<{
-  key: SubscriptionPlan;
-  title: string;
-  price: string;
-  cycle: string;
-  highlights: string[];
-}> = [
-  {
-    key: "free",
-    title: "Free",
-    price: "0 zl",
-    cycle: "/ mies.",
-    highlights: ["1 lokal", "do 5 aktywnych czlonkow", "grafik i dostepnosc"],
-  },
-  {
-    key: "pro",
-    title: "Pro",
-    price: "89 zl",
-    cycle: "/ lokal / mies.",
-    highlights: ["do 25 aktywnych czlonkow", "raporty i prosby o zmiany", "powiadomienia i eksporty"],
-  },
-  {
-    key: "business",
-    title: "Business",
-    price: "179 zl",
-    cycle: "/ workspace / mies.",
-    highlights: ["do 5 lokali", "uprawnienia i raporty zbiorcze", "zadania, notatki i inventory"],
-  },
-];
+function formatDate(value: string | null): string | null {
+  if (!value) return null;
+  return new Date(value).toLocaleDateString("pl-PL", { day: "numeric", month: "long", year: "numeric" });
+}
 
-function planLabel(plan: SubscriptionPlan) {
-  return plans.find((item) => item.key === plan)?.title ?? plan;
+function peopleLabel(count: number): string {
+  if (count === 1) return "osoba";
+  const lastDigit = count % 10;
+  const lastTwo = count % 100;
+  return lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 12 || lastTwo > 14) ? "osoby" : "osób";
+}
+
+function statusBadge(subscription: SubscriptionSummary): { label: string; className: string } {
+  if (subscription.status === "trialing") {
+    const ends = formatDate(subscription.trial_ends_at);
+    return { label: ends ? `Trial Pro do ${ends}` : "Trial Pro", className: "border-blue-200 bg-blue-50 text-blue-700" };
+  }
+  if (subscription.status === "past_due") return { label: "Zaległa płatność", className: "border-red-200 bg-red-50 text-red-700" };
+  if (subscription.plan === "free") return { label: "Plan Free", className: "border-slate-200 bg-slate-50 text-slate-700" };
+  return { label: `${planTitle(subscription.plan)} aktywny`, className: "border-emerald-200 bg-emerald-50 text-emerald-700" };
 }
 
 export function BillingPage() {
   const { token, me } = useAuth();
   const { t } = useLanguage();
   const toast = useToast();
+  const [cycle, setCycle] = useState<BillingCheckoutCycle>("monthly");
 
   const subscriptionQuery = useQuery({
     queryKey: ["subscription"],
@@ -60,150 +51,143 @@ export function BillingPage() {
   const subscription = subscriptionQuery.data;
 
   const checkoutMutation = useMutation({
-    mutationFn: (body: { plan: SubscriptionPlan; billing_cycle: BillingCheckoutCycle }) => api.createCheckoutSession(token!, body),
-    onSuccess: (session) => {
-      window.location.assign(session.url);
-    },
-    onError: (error) => {
-      toast.error("Stripe checkout unavailable", error instanceof Error ? error.message : undefined);
-    },
+    mutationFn: (plan: PaidPlan) => api.createCheckoutSession(token!, { plan, billing_cycle: cycle }),
+    onSuccess: (session) => window.location.assign(session.url),
+    onError: (error) => toast.error("Nie udało się otworzyć płatności", error instanceof Error ? error.message : undefined),
   });
 
   const portalMutation = useMutation({
     mutationFn: () => api.createBillingPortalSession(token!),
-    onSuccess: (session) => {
-      window.location.assign(session.url);
-    },
-    onError: (error) => {
-      toast.error("Billing portal unavailable", error instanceof Error ? error.message : undefined);
-    },
+    onSuccess: (session) => window.location.assign(session.url),
+    onError: (error) => toast.error("Nie udało się otworzyć panelu płatności", error instanceof Error ? error.message : undefined),
   });
 
-  const handleCheckout = (plan: SubscriptionPlan) => {
-    if (!token) return;
-    checkoutMutation.mutate({ plan, billing_cycle: "monthly" });
-  };
+  const seats = subscription?.billable_seats ?? Math.max(subscription?.active_members_count ?? 1, 1);
+  const currentPlan = subscription ? normalizePlan(subscription.plan) : null;
+  const isTrial = subscription?.status === "trialing";
+  const hasPaidSubscription = Boolean(subscription?.has_payment_method);
+  const atFreeLimit = currentPlan === "free" && (subscription?.active_members_count ?? 0) >= FREE_MEMBER_LIMIT;
+  const badge = subscription ? statusBadge(subscription) : null;
+  const periodEnd = formatDate(subscription?.current_period_ends_at ?? null);
 
   return (
-    <AppShell
-      title={t("billing.title")}
-      subtitle={t("billing.subtitle")}
-      action={
-        subscription ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
-              {subscription.status === "trialing" ? "30 dni trialu Pro" : `Plan ${planLabel(subscription.plan)}`}
-            </Badge>
-            {subscription.plan !== "free" ? (
-              <Button variant="secondary" onClick={() => portalMutation.mutate()} disabled={portalMutation.isPending}>
-                {portalMutation.isPending ? "Opening..." : "Open billing portal"}
-              </Button>
-            ) : null}
+    <AppShell title={t("billing.title")} subtitle="Płacisz tylko za osoby w zespole. Lokale bez limitu.">
+      <div className="mx-auto max-w-4xl space-y-5">
+        {atFreeLimit ? (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <p>
+              Plan Free obejmuje do {FREE_MEMBER_LIMIT} osób. Aby zaprosić kolejne, wybierz Standard lub Pro.
+            </p>
           </div>
-        ) : undefined
-      }
-    >
-      <div className="space-y-5">
-        <Card className="overflow-hidden border-0 p-0">
-          <div className="grid gap-5 bg-[linear-gradient(135deg,#eef5ff_0%,#ffffff_54%,#f1fff5_100%)] px-4 py-5 sm:px-6 sm:py-6 lg:grid-cols-[1.1fr_0.9fr]">
+        ) : null}
+
+        <Card className="rounded-2xl border border-[var(--color-border)] p-5 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Billing</p>
-              <h2 className="mt-3 text-2xl font-bold tracking-[-0.05em] text-[var(--color-heading)] sm:text-3xl">
-                Przewidywalna subskrypcja dla restauracji i malych sieci
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">
-                Startujesz bez karty. Trial daje pelny dostep do Pro przez 30 dni, a potem mozesz zostac na Free albo przejsc na platny plan.
-              </p>
+              <p className="text-sm text-[var(--color-text-muted)]">Twój plan</p>
+              <p className="mt-1 text-3xl font-bold tracking-tight text-[var(--color-heading)]">{subscription ? planTitle(subscription.plan) : "…"}</p>
+              {periodEnd && hasPaidSubscription ? <p className="mt-1 text-sm text-[var(--color-text-muted)]">Następna płatność: {periodEnd}</p> : null}
             </div>
-            <div className="grid gap-3 rounded-[1.25rem] bg-white/88 p-4 sm:rounded-[1.4rem]">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm text-[var(--color-text-muted)]">Aktualny plan</p>
-                  <p className="mt-1 text-2xl font-bold tracking-[-0.04em] text-[var(--color-heading)]">
-                    {subscription ? planLabel(subscription.plan) : "Loading..."}
-                  </p>
-                </div>
-                {subscription ? (
-                  <Badge className="border-blue-200 bg-blue-50 text-blue-700">
-                    {subscription.status === "trialing" ? "Trial" : "Aktywny"}
-                  </Badge>
-                ) : null}
+            {badge ? <Badge className={badge.className}>{badge.label}</Badge> : null}
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="flex items-center gap-3 rounded-xl bg-[var(--color-surface-muted)] px-4 py-3">
+              <Users2 className="size-4 text-[var(--color-primary)]" />
+              <div>
+                <p className="text-xs text-[var(--color-text-muted)]">Zespół</p>
+                <p className="text-sm font-semibold text-[var(--color-heading)]">
+                  {subscription ? `${subscription.active_members_count}${subscription.member_cap ? ` / ${subscription.member_cap}` : ""} osób` : "–"}
+                </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-3">
-                  <Users2 className="size-4 text-[var(--color-primary)]" />
-                  <p className="mt-3 text-xs uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Aktywny zespol</p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--color-heading)]">
-                    {subscription ? `${subscription.active_members_count}${subscription.member_cap ? ` / ${subscription.member_cap}` : ""}` : "-"}
-                  </p>
-                </div>
-                <div className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-3">
-                  <MapPin className="size-4 text-[var(--color-primary)]" />
-                  <p className="mt-3 text-xs uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Lokale</p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--color-heading)]">
-                    {subscription ? `${subscription.active_locations_count}${subscription.location_cap ? ` / ${subscription.location_cap}` : ""}` : "-"}
-                  </p>
-                </div>
-                <div className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-3">
-                  <CalendarClock className="size-4 text-[var(--color-primary)]" />
-                  <p className="mt-3 text-xs uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Koniec trialu / okresu</p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--color-heading)]">
-                    {subscription?.trial_ends_at ?? subscription?.current_period_ends_at ?? "-"}
-                  </p>
-                </div>
-                <div className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-3">
-                  <CreditCard className="size-4 text-[var(--color-primary)]" />
-                  <p className="mt-3 text-xs uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Rocznie</p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--color-heading)]">2 miesiace gratis</p>
-                </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl bg-[var(--color-surface-muted)] px-4 py-3">
+              <MapPin className="size-4 text-[var(--color-primary)]" />
+              <div>
+                <p className="text-xs text-[var(--color-text-muted)]">Lokale</p>
+                <p className="text-sm font-semibold text-[var(--color-heading)]">{subscription ? `${subscription.active_locations_count} · bez limitu` : "–"}</p>
               </div>
             </div>
           </div>
         </Card>
 
-        <section className="grid gap-5 xl:grid-cols-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-[var(--color-heading)]">Wybierz plan</h2>
+          <div className="inline-flex rounded-xl border border-[var(--color-border)] bg-white p-1" role="group" aria-label="Okres rozliczeniowy">
+            {(["monthly", "annual"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setCycle(item)}
+                aria-pressed={cycle === item}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-sm font-semibold transition",
+                  cycle === item ? "bg-[var(--color-heading)] text-white" : "text-[var(--color-text-muted)] hover:text-[var(--color-heading)]",
+                )}
+              >
+                {item === "monthly" ? "Miesięcznie" : "Rocznie −17%"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <section className="grid gap-4 md:grid-cols-3">
           {plans.map((plan) => {
-            const isCurrent = subscription?.plan === plan.key;
+            const isCurrent = currentPlan === plan.key;
+            const paid = plan.key !== "free" ? plan.key : null;
+            const seatPrice = paid ? SEAT_PRICE_PLN[paid][cycle] : 0;
             return (
               <Card
                 key={plan.key}
-                className={cn(
-                  "flex flex-col justify-between rounded-[1.6rem] border border-[var(--color-border)] bg-[#f7f7f5] p-5 sm:p-6",
-                  isCurrent && "border-[var(--color-primary)] bg-white",
-                )}
+                className={cn("flex flex-col rounded-2xl border p-5", isCurrent ? "border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]" : "border-[var(--color-border)]")}
               >
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-2xl font-bold tracking-[-0.04em] text-[var(--color-heading)]">{plan.title}</h3>
-                    {isCurrent ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">Aktualny</Badge> : null}
-                  </div>
-                  <div className="mt-6 flex items-end gap-1">
-                    <p className="text-[3.2rem] font-bold leading-none tracking-[-0.08em] text-[var(--color-heading)]">{plan.price}</p>
-                    <p className="pb-2 text-base font-semibold text-[var(--color-text-muted)]">{plan.cycle}</p>
-                  </div>
-                  <div className="mt-6 space-y-3">
-                    {plan.highlights.map((feature) => (
-                      <div key={feature} className="flex items-center gap-3 text-sm text-[var(--color-heading)]">
-                        <span className="grid size-5 shrink-0 place-items-center rounded-full bg-slate-950 text-white">
-                          <CheckCircle2 className="size-3.5" />
-                        </span>
-                        <span>{feature}</span>
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-base font-semibold text-[var(--color-heading)]">{plan.title}</h3>
+                  {isCurrent ? <Badge className="border-blue-200 bg-blue-50 text-blue-700">{isTrial ? "Trial" : "Aktualny"}</Badge> : null}
                 </div>
-                <Button
-                  variant={isCurrent ? "secondary" : "default"}
-                  className="mt-8"
-                  disabled={isCurrent || checkoutMutation.isPending}
-                  onClick={() => handleCheckout(plan.key)}
-                >
-                  {isCurrent ? "Aktywny plan" : checkoutMutation.isPending ? "Opening Stripe..." : "Open Stripe checkout"}
-                </Button>
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">{plan.tagline}</p>
+                <p className="mt-4">
+                  <span className="text-3xl font-bold tracking-tight text-[var(--color-heading)]">{paid ? formatPln(seatPrice) : plan.price}</span>{" "}
+                  <span className="text-sm text-[var(--color-text-muted)]">{paid ? (cycle === "monthly" ? "/ osoba / mies." : "/ osoba / rok") : plan.cycle}</span>
+                </p>
+                {paid ? (
+                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                    Twój zespół: <span className="font-semibold text-[var(--color-heading)]">{formatPln(seats * seatPrice)}</span> {cycle === "monthly" ? "/ mies." : "/ rok"}
+                  </p>
+                ) : null}
+                <ul className="mt-5 flex-1 space-y-2">
+                  {plan.highlights.map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-sm text-[var(--color-heading)]">
+                      <Check className="mt-0.5 size-4 shrink-0 text-[var(--color-primary)]" /> {item}
+                    </li>
+                  ))}
+                </ul>
+                {paid && !hasPaidSubscription ? (
+                  <Button
+                    className="mt-6 w-full"
+                    variant={plan.key === "standard" ? "default" : "secondary"}
+                    onClick={() => checkoutMutation.mutate(paid)}
+                    disabled={checkoutMutation.isPending || !token}
+                  >
+                    <CreditCard className="size-4" />
+                    {checkoutMutation.isPending && checkoutMutation.variables === paid ? "Otwieranie…" : `Wybierz ${plan.title}`}
+                  </Button>
+                ) : null}
               </Card>
             );
           })}
         </section>
+
+        <p className="text-sm text-[var(--color-text-muted)]">
+          Płacisz za osoby w zespole ({seats} {peopleLabel(seats)} teraz). Kwota zmienia się sama, gdy dodajesz lub usuwasz osoby. Lokale bez limitu w każdym planie.
+        </p>
+
+        {hasPaidSubscription ? (
+          <Button onClick={() => portalMutation.mutate()} disabled={portalMutation.isPending}>
+            <CreditCard className="size-4" />
+            {portalMutation.isPending ? "Otwieranie…" : "Zmień plan lub zarządzaj płatnościami"}
+          </Button>
+        ) : null}
       </div>
     </AppShell>
   );

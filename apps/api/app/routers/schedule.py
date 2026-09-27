@@ -832,6 +832,34 @@ def freeze_applied_week_into_preview(
                 created_by=context.user.id,
             ))
 
+    # The frozen week fully describes this location, so suppress its templates for the week;
+    # otherwise template demand is planned on top of the frozen slots and shows phantom open shifts.
+    templates = db.scalars(
+        select(ShiftTemplate).where(
+            ShiftTemplate.organization_id == organization_id,
+            ShiftTemplate.location_id == payload.location_id,
+            ShiftTemplate.is_active.is_(True),
+        )
+    ).all()
+    for template in templates:
+        created_drafts.append(
+            ScheduleWeeklyOverride(
+                organization_id=UUID(int=0),
+                week_start=payload.week_start,
+                source_template_id=template.id,
+                location_id=template.location_id,
+                day_of_week=template.day_of_week,
+                start_time=template.start_time,
+                end_time=template.end_time,
+                required_role=template.required_role,
+                staff_position=template.staff_position,
+                required_count=0,
+                is_deleted=True,
+                assigned_user_id=None,
+                created_by=context.user.id,
+            )
+        )
+
     created = _replace_location_overrides(
         db,
         organization_id=organization_id,
@@ -840,7 +868,7 @@ def freeze_applied_week_into_preview(
         created_by=context.user.id,
         overrides=created_drafts,
     )
-    return ok([_serialize_override(item) for item in created])
+    return ok([_serialize_override(item) for item in created if not item.is_deleted])
 
 
 @router.patch("/preview/edits")

@@ -46,6 +46,11 @@ import type {
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
+/** Absolute URL of an API path, also when VITE_API_URL is relative (e.g. "/api" behind the proxy). */
+export function apiAbsoluteUrl(path: string): string {
+  return new URL(`${API_URL}${path}`, window.location.origin).toString();
+}
+
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   let response: Response;
   try {
@@ -92,6 +97,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     });
+  },
+  devLogin() {
+    return request<AuthLoginResponse>("/auth/dev-login", { method: "POST" });
   },
   loginWithPassword(input: { email: string; password: string }) {
     return request<AuthLoginResponse>("/auth/login/password", {
@@ -542,6 +550,21 @@ export const api = {
     search.set("end_date", params.end_date);
     if (params.user_id) search.set("user_id", params.user_id);
     return request<PayrollSummary>(`/payroll/summary?${search.toString()}`, {}, token);
+  },
+  async downloadPayrollCsv(token: string, params: { start_date: string; end_date: string }): Promise<Blob> {
+    const search = new URLSearchParams(params);
+    const response = await fetch(`${API_URL}/payroll/export.csv?${search.toString()}`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as Envelope<unknown> | null;
+      throw new Error(payload?.error?.message ?? `Request failed: ${response.status}`);
+    }
+    return response.blob();
+  },
+  getCalendarFeed(token: string) {
+    return request<{ path: string; expires_in_days: number }>("/calendar/feed", {}, token);
   },
   listNotifications(token: string, limit = 20) {
     return request<NotificationListResponse>(`/notifications?limit=${limit}`, {}, token);

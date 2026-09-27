@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from html import escape
 import json
 import logging
 
@@ -11,7 +12,7 @@ from app.core.config import settings
 logger = logging.getLogger("gastrowo.auth_email")
 
 
-def otp_email_html(*, title: str, subtitle: str, code: str) -> str:
+def otp_email_html(*, title: str, subtitle: str, code: str, expires_in_minutes: int = 5) -> str:
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,7 +54,7 @@ def otp_email_html(*, title: str, subtitle: str, code: str) -> str:
                 <span class="verification-code">{code}</span>
             </div>
             
-            <p class="expire-text">This code is valid for 15 minutes.</p>
+            <p class="expire-text">This code is valid for {expires_in_minutes} minutes.</p>
             
             <div class="noreply-warning">
                 <strong>Please note:</strong> This is an automated message from an unmonitored address. Do not reply to this email.
@@ -92,8 +93,16 @@ def invite_email_html(*, business_name: str, join_link: str) -> str:
     """.strip()
 
 
-def send_otp_email(*, email: str, code: str, title: str, subtitle: str) -> None:
-    html = otp_email_html(title=title, subtitle=subtitle, code=code)
+def _require_email_provider_in_production(kind: str) -> None:
+    # Without a provider the code/link is only written to logs, which must never happen in production.
+    if settings.app_env == "production" and not settings.resend_api_key:
+        logger.error("RESEND_API_KEY is not configured; cannot send %s email in production", kind)
+        raise HTTPException(status_code=503, detail="Email delivery is not configured")
+
+
+def send_otp_email(*, email: str, code: str, title: str, subtitle: str, expires_in_minutes: int = 5) -> None:
+    html = otp_email_html(title=title, subtitle=subtitle, code=code, expires_in_minutes=expires_in_minutes)
+    _require_email_provider_in_production("verification")
     
     logger.info("send_otp_email called for %s, api_key_set=%s", email, bool(settings.resend_api_key))
     
@@ -112,21 +121,21 @@ def send_otp_email(*, email: str, code: str, title: str, subtitle: str) -> None:
                     "subject": title,
                     "html": html,
                 },
+                timeout=10,
             )
             response.raise_for_status()
-            logger.info("OTP EMAIL SENT -> %s | code=%s | response=%s", email, code, response.json())
+            logger.info("OTP email sent to %s", email)
         except Exception as exc:
-            logger.error("Failed to send OTP email to %s: %s", email, exc, exc_info=True)
-            provider_body = None
-            if isinstance(exc, requests.HTTPError) and exc.response is not None:
-                provider_body = exc.response.text
-            raise HTTPException(status_code=502, detail=f"Failed to send verification email{f': {provider_body}' if provider_body else ''}") from exc
+            provider_body = exc.response.text if isinstance(exc, requests.HTTPError) and exc.response is not None else None
+            logger.error("Failed to send OTP email to %s: %s | provider=%s", email, exc, provider_body, exc_info=True)
+            raise HTTPException(status_code=502, detail="Failed to send verification email") from exc
     else:
         logger.info("DEV OTP EMAIL -> %s | code=%s | html=%s", email, code, html)
 
 
 def send_invite_email(*, email: str, business_name: str, join_link: str) -> None:
-    html = invite_email_html(business_name=business_name, join_link=join_link)
+    html = invite_email_html(business_name=escape(business_name), join_link=escape(join_link))
+    _require_email_provider_in_production("invite")
     
     logger.info("send_invite_email called for %s, api_key_set=%s", email, bool(settings.resend_api_key))
     
@@ -145,14 +154,13 @@ def send_invite_email(*, email: str, business_name: str, join_link: str) -> None
                     "subject": f"You were invited to join {business_name}",
                     "html": html,
                 },
+                timeout=10,
             )
             response.raise_for_status()
-            logger.info("INVITE EMAIL SENT -> %s | business=%s | response=%s", email, business_name, response.json())
+            logger.info("Invite email sent to %s | business=%s", email, business_name)
         except Exception as exc:
-            logger.error("Failed to send invite email to %s: %s", email, exc, exc_info=True)
-            provider_body = None
-            if isinstance(exc, requests.HTTPError) and exc.response is not None:
-                provider_body = exc.response.text
-            raise HTTPException(status_code=502, detail=f"Failed to send invite email{f': {provider_body}' if provider_body else ''}") from exc
+            provider_body = exc.response.text if isinstance(exc, requests.HTTPError) and exc.response is not None else None
+            logger.error("Failed to send invite email to %s: %s | provider=%s", email, exc, provider_body, exc_info=True)
+            raise HTTPException(status_code=502, detail="Failed to send invite email") from exc
     else:
         logger.info("DEV INVITE EMAIL -> %s | join_link=%s | html=%s", email, join_link, html)

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import hmac
+import secrets
 from uuid import UUID
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -18,6 +20,7 @@ from app.models import (
     InviteToken,
     Location,
     LocationMembership,
+    NotificationTypeEnum,
     Organization,
     OrganizationMembership,
     OrganizationSubscription,
@@ -42,15 +45,17 @@ from app.schemas import (
     OrganizationSettingsOut,
     OwnerOnboardingCompleteRequest,
     SessionBootstrapResponse,
-    SubscriptionSummaryOut,
 )
 from app.services.auth_email import send_otp_email
+from app.services.billing import build_subscription_summary, sync_stripe_seats
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 NIL_ORG_ID = str(UUID(int=0))
 OTP_EXPIRES_SECONDS = 300
 OTP_REUSE_MIN_SECONDS = 60
+OTP_RESEND_COOLDOWN_SECONDS = 30
+OTP_MAX_FAILED_ATTEMPTS = 5
 
 
 def utc_now() -> datetime:
@@ -82,55 +87,6 @@ def _issue_auth_payload(user: User, memberships: list[OrganizationMembership]) -
         "role": active_membership.role if active_membership else None,
         "status": "linked" if memberships else "pending_link",
     }
-
-
-def _build_subscription_summary(db: Session, organization_id: UUID | None) -> SubscriptionSummaryOut | None:
-    if organization_id is None:
-        return None
-    subscription = db.scalar(select(OrganizationSubscription).where(OrganizationSubscription.organization_id == organization_id))
-    if subscription is None:
-        subscription = OrganizationSubscription(
-            organization_id=organization_id,
-            plan=SubscriptionPlanEnum.FREE,
-            status=SubscriptionStatusEnum.ACTIVE,
-            billing_cycle="monthly",
-        )
-        db.add(subscription)
-        db.flush()
-
-    active_members_count = db.scalar(
-        select(func.count()).select_from(OrganizationMembership).where(OrganizationMembership.organization_id == organization_id)
-    ) or 0
-    active_locations_count = db.scalar(
-        select(func.count()).select_from(Location).where(Location.organization_id == organization_id)
-    ) or 0
-
-    member_cap = None
-    location_cap = None
-    if subscription.plan == SubscriptionPlanEnum.FREE:
-        member_cap = 5
-        location_cap = 1
-    elif subscription.plan == SubscriptionPlanEnum.PRO:
-        member_cap = 25
-    elif subscription.plan == SubscriptionPlanEnum.BUSINESS:
-        location_cap = 5
-
-    soft_limit_reached = bool(
-        (member_cap is not None and active_members_count >= member_cap)
-        or (location_cap is not None and active_locations_count >= location_cap)
-    )
-    return SubscriptionSummaryOut(
-        plan=subscription.plan,
-        status=subscription.status,
-        billing_cycle=subscription.billing_cycle,
-        trial_ends_at=subscription.trial_ends_at,
-        current_period_ends_at=subscription.current_period_ends_at,
-        active_members_count=active_members_count,
-        active_locations_count=active_locations_count,
-        member_cap=member_cap,
-        location_cap=location_cap,
-        soft_limit_reached=soft_limit_reached,
-    )
 
 
 def _set_auth_session_cookie(response: Response, session_token: str) -> None:
@@ -199,10 +155,16 @@ def _create_otp_challenge(db: Session, *, email: str, purpose: OtpPurposeEnum, i
         )
     )
     now = utc_now()
-    if existing is not None and utc_value(existing.expires_at) > now + timedelta(seconds=OTP_REUSE_MIN_SECONDS):
+    if existing is not None and utc_value(existing.created_at) > now - timedelta(seconds=OTP_RESEND_COOLDOWN_SECONDS):
+        raise HTTPException(status_code=429, detail="Please wait before requesting another code")
+    if (
+        existing is not None
+        and existing.failed_attempts < OTP_MAX_FAILED_ATTEMPTS
+        and utc_value(existing.expires_at) > now + timedelta(seconds=OTP_REUSE_MIN_SECONDS)
+    ):
         return existing.code
 
-    code = str(int(datetime.now(UTC).timestamp() * 1000) % 1000000).zfill(6)
+    code = f"{secrets.randbelow(1_000_000):06d}"
     db.execute(delete(OtpChallenge).where(OtpChallenge.email == email, OtpChallenge.purpose == purpose))
     db.add(
         OtpChallenge(
@@ -225,21 +187,25 @@ def _consume_otp(
     code: str,
     invite_token: str | None = None,
 ) -> OtpChallenge:
+    # Look up the challenge by email + purpose only and compare the code in constant time,
+    # so every wrong guess is counted against the challenge (brute-force protection).
     challenge = db.scalar(
-        select(OtpChallenge).where(
-            OtpChallenge.email == email,
-            OtpChallenge.purpose == purpose,
-            OtpChallenge.code == code,
-        )
+        select(OtpChallenge)
+        .where(OtpChallenge.email == email, OtpChallenge.purpose == purpose)
+        .order_by(OtpChallenge.created_at.desc())
     )
     if challenge is None:
-        raise HTTPException(status_code=401, detail="Invalid code")
-    if challenge.invite_token != invite_token:
         raise HTTPException(status_code=401, detail="Invalid code")
     if challenge.consumed_at is not None:
         raise HTTPException(status_code=409, detail="Code already used")
     if utc_value(challenge.expires_at) < utc_now():
         raise HTTPException(status_code=410, detail="Code expired")
+    if challenge.failed_attempts >= OTP_MAX_FAILED_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Too many attempts. Request a new code")
+    if not hmac.compare_digest(challenge.code, code) or challenge.invite_token != invite_token:
+        challenge.failed_attempts += 1
+        db.commit()
+        raise HTTPException(status_code=401, detail="Invalid code")
     challenge.consumed_at = utc_now()
     db.commit()
     return challenge
@@ -298,7 +264,7 @@ def send_otp(payload: OtpSendRequest, db: Session = Depends(get_db)):
         subtitle = "Use this code to join the invited business."
 
     code = _create_otp_challenge(db, email=email, purpose=payload.purpose, invite_token=payload.invite_token)
-    send_otp_email(email=email, code=code, title=title, subtitle=subtitle)
+    send_otp_email(email=email, code=code, title=title, subtitle=subtitle, expires_in_minutes=OTP_EXPIRES_SECONDS // 60)
     return ok(
         OtpSendResponse(
             sent=True,
@@ -422,6 +388,30 @@ def login_with_password(payload: LoginRequest, response: Response, db: Session =
     return ok(_issue_auth_payload(user, memberships))
 
 
+@router.post("/dev-login")
+def dev_login(response: Response, db: Session = Depends(get_db)):
+    """One-click admin login for local/staging testing; invisible unless DEV_LOGIN_ENABLED is set."""
+    if not settings.dev_login_enabled or settings.app_env == "production":
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    if settings.dev_login_email:
+        user = db.scalar(select(User).where(User.email == settings.dev_login_email.lower()))
+    else:
+        user = db.scalar(
+            select(User)
+            .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+            .where(OrganizationMembership.role == RoleEnum.ADMIN)
+            .order_by(User.created_at)
+        )
+    if user is None:
+        raise HTTPException(status_code=404, detail="No admin account to log in as")
+
+    memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)).all()
+    _create_remembered_session(db, response, user, memberships)
+    db.commit()
+    return ok(_issue_auth_payload(user, memberships))
+
+
 @router.post("/invites/join/verify")
 def verify_invite_join(payload: InviteJoinVerifyRequest, response: Response, db: Session = Depends(get_db)):
     email = payload.email.lower()
@@ -485,6 +475,7 @@ def verify_invite_join(payload: InviteJoinVerifyRequest, response: Response, db:
     _create_remembered_session(db, response, user, [membership])
     db.commit()
     db.refresh(user)
+    sync_stripe_seats(db, organization_id)
     return ok(_issue_auth_payload(user, [membership]))
 
 
@@ -557,7 +548,7 @@ def me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
         is_linked=bool(memberships),
         memberships=[MembershipOut.model_validate(item) for item in memberships],
         organization_settings=_settings_out(organization),
-        subscription=_build_subscription_summary(db, active_membership.organization_id if active_membership else None),
+        subscription=build_subscription_summary(db, active_membership.organization_id if active_membership else None),
+        is_platform_admin=user.email.lower() in settings.parsed_platform_admin_emails,
     )
     return ok(payload_out.model_dump(mode="json"))
-    NotificationTypeEnum,

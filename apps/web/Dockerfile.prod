@@ -4,6 +4,9 @@ WORKDIR /app
 
 ARG VITE_API_URL=https://api-production.up.railway.app
 ENV VITE_API_URL=${VITE_API_URL}
+# "true" shows the one-click test admin login (the API also needs DEV_LOGIN_ENABLED=true).
+ARG VITE_DEV_LOGIN=false
+ENV VITE_DEV_LOGIN=${VITE_DEV_LOGIN}
 
 COPY package*.json ./
 RUN npm install

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Building2, ImagePlus, Languages, LogOut, Settings2, ShieldCheck, UserCircle2 } from "lucide-react";
+import { Building2, CalendarPlus, Copy, ImagePlus, Languages, LogOut, Settings2, ShieldCheck, UserCircle2 } from "lucide-react";
 
 import { canManageBusinessSettings } from "@/lib/access";
 import { AppShell } from "@/components/layout/app-shell";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { api } from "@/lib/api";
+import { api, apiAbsoluteUrl } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { loadBusinessLogo, saveBusinessLogo } from "@/lib/business-branding";
 import { useLanguage } from "@/lib/i18n";
@@ -38,6 +38,24 @@ export function ProfilePage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("personal");
   const [fullName, setFullName] = useState(me?.full_name ?? "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(me?.avatar_url ?? null);
+  const [calendarUrl, setCalendarUrl] = useState<string | null>(null);
+
+  const calendarFeedMutation = useMutation({
+    mutationFn: () => api.getCalendarFeed(token!),
+    onSuccess: (data) => setCalendarUrl(apiAbsoluteUrl(data.path)),
+    onError: (error) => toast.error(t("profile.calendar_failed"), error instanceof Error ? error.message : undefined),
+  });
+
+  const copyCalendarUrl = async () => {
+    if (!calendarUrl) return;
+    try {
+      await navigator.clipboard.writeText(calendarUrl);
+      toast.success(t("profile.calendar_copied"));
+    } catch {
+      toast.error(t("profile.calendar_failed"));
+    }
+  };
+  const webcalUrl = calendarUrl?.replace(/^https?:/, "webcal:") ?? null;
   const [workspaceName, setWorkspaceName] = useState(me?.active_organization_name ?? "");
   const [businessLogo, setBusinessLogo] = useState<string | null>(null);
   const [workspaceSettings, setWorkspaceSettings] = useState(me?.organization_settings ?? defaultWorkspaceSettings);
@@ -233,6 +251,51 @@ export function ProfilePage() {
                 ))}
               </CardContent>
             </Card>
+
+            {me?.is_linked ? (
+              <Card>
+                <CardHeader>
+                  <div>
+                    <CardTitle>{t("profile.calendar_title")}</CardTitle>
+                    <CardDescription>{t("profile.calendar_description")}</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {calendarUrl && webcalUrl ? (
+                    <>
+                      <div className="flex gap-2">
+                        <Input readOnly value={calendarUrl} onFocus={(event) => event.currentTarget.select()} />
+                        <Button type="button" variant="secondary" onClick={copyCalendarUrl} aria-label={t("profile.calendar_copy")}>
+                          <Copy className="size-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          className="inline-flex items-center gap-2 rounded-[0.9rem] border border-[var(--color-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--color-heading)]"
+                          href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Google Calendar
+                        </a>
+                        <a
+                          className="inline-flex items-center gap-2 rounded-[0.9rem] border border-[var(--color-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--color-heading)]"
+                          href={webcalUrl}
+                        >
+                          Apple / Outlook
+                        </a>
+                      </div>
+                      <p className="text-xs text-[var(--color-text-muted)]">{t("profile.calendar_private")}</p>
+                    </>
+                  ) : (
+                    <Button type="button" onClick={() => calendarFeedMutation.mutate()} disabled={calendarFeedMutation.isPending}>
+                      <CalendarPlus className="size-4" />
+                      {t("profile.calendar_connect")}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
         ) : (
           <div className="stagger-grid grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">

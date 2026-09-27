@@ -14,6 +14,7 @@ from app.db import get_db
 from app.models import Location, RevenueReport, RoleEnum
 from app.schemas import RevenueReportCreate
 from app.services.notifications import notify_admins_and_managers
+from app.services.billing import require_feature
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -24,6 +25,7 @@ def create_revenue_report(
     context: OrgContext = Depends(require_org_context()),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "revenue")
     organization = get_current_organization(context, db)
     if not can_submit_revenue_reports(context.membership, organization):
         raise HTTPException(status_code=403, detail="Staff revenue reports are disabled in this workspace")
@@ -76,6 +78,7 @@ def list_revenue_reports(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "revenue")
     query = select(RevenueReport).where(
         RevenueReport.organization_id == context.membership.organization_id,
         RevenueReport.report_date >= start_date,
@@ -106,6 +109,7 @@ def delete_revenue_report(
     context: OrgContext = Depends(require_org_context()),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "revenue")
     organization = get_current_organization(context, db)
     if not can_delete_revenue_reports(context.membership, organization):
         raise HTTPException(status_code=403, detail="Revenue report deletion is disabled in this workspace")
