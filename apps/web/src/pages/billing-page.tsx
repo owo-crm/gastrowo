@@ -8,39 +8,10 @@ import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
+import { plans } from "@/lib/plans";
 import { useToast } from "@/lib/toast";
 import type { BillingCheckoutCycle, SubscriptionPlan } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const plans: Array<{
-  key: SubscriptionPlan;
-  title: string;
-  price: string;
-  cycle: string;
-  highlights: string[];
-}> = [
-  {
-    key: "free",
-    title: "Free",
-    price: "0 zl",
-    cycle: "/ mies.",
-    highlights: ["1 lokal", "do 5 aktywnych czlonkow", "grafik i dostepnosc"],
-  },
-  {
-    key: "pro",
-    title: "Pro",
-    price: "89 zl",
-    cycle: "/ lokal / mies.",
-    highlights: ["do 25 aktywnych czlonkow", "raporty i prosby o zmiany", "powiadomienia i eksporty"],
-  },
-  {
-    key: "business",
-    title: "Business",
-    price: "179 zl",
-    cycle: "/ workspace / mies.",
-    highlights: ["do 5 lokali", "uprawnienia i raporty zbiorcze", "zadania, notatki i inventory"],
-  },
-];
 
 function planLabel(plan: SubscriptionPlan) {
   return plans.find((item) => item.key === plan)?.title ?? plan;
