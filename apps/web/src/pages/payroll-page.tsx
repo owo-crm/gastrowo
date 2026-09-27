@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, CreditCard, ReceiptText, Users2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CreditCard, Download, ReceiptText, Users2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,9 @@ import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { canViewPayroll } from "@/lib/access";
+import { saveBlob } from "@/lib/file";
 import { useLanguage } from "@/lib/i18n";
+import { useToast } from "@/lib/toast";
 import type { PayrollSummaryRow, TimesheetEntry } from "@/lib/types";
 
 type PeriodMode = "weekly" | "monthly";
@@ -86,6 +88,8 @@ function selectedRowFrom(rows: PayrollSummaryRow[], userId: string | null | unde
 export function PayrollPage() {
   const { token, me } = useAuth();
   const { t } = useLanguage();
+  const toast = useToast();
+  const [exporting, setExporting] = useState(false);
   const [periodMode, setPeriodMode] = useState<PeriodMode>("weekly");
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const isStaff = me?.role === "STAFF";
@@ -136,6 +140,19 @@ export function PayrollPage() {
     [timesheetsQuery.data],
   );
 
+  const exportCsv = async () => {
+    if (!token) return;
+    setExporting(true);
+    try {
+      const blob = await api.downloadPayrollCsv(token, { start_date: range.start, end_date: range.end });
+      saveBlob(blob, `payroll_${range.start}_${range.end}.csv`);
+    } catch (error) {
+      toast.error(t("dashboard.export_failed"), error instanceof Error ? error.message : undefined);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const changePeriod = (direction: number) => setAnchorDate((current) => shiftAnchor(current, direction, periodMode));
 
   if (!payrollAllowed) {
@@ -180,6 +197,17 @@ export function PayrollPage() {
                 <ChevronRight className="size-4" />
               </button>
             </div>
+            {!isStaff ? (
+              <button
+                type="button"
+                onClick={exportCsv}
+                disabled={exporting}
+                className="inline-flex items-center justify-center gap-2 rounded-[0.9rem] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-[0_8px_18px_rgba(15,23,42,0.04)] transition hover:border-slate-300 disabled:opacity-60"
+              >
+                <Download className="size-4" />
+                {t("dashboard.export_csv")}
+              </button>
+            ) : null}
           </div>
         </Card>
 

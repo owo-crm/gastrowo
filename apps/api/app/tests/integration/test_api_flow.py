@@ -711,6 +711,21 @@ def test_timesheet_assigned_shift_submit_and_manager_review(client):
     assert approve.status_code == 200
     assert approve.json()["data"]["status"] == "approved"
 
+    period = {"start_date": monday.isoformat(), "end_date": (monday + timedelta(days=6)).isoformat()}
+    export = client.get("/payroll/export.csv", headers=auth_header(ADMIN_token), params=period)
+    assert export.status_code == 200
+    assert export.headers["content-type"].startswith("text/csv")
+    lines = export.content.decode("utf-8-sig").strip().splitlines()
+    assert lines[0].startswith("Pracownik;")
+    # Invited users are named from their email until they edit their profile.
+    staff_line = next(line for line in lines if line.startswith("Staff;"))
+    # 08:02-16:05 = 8.05h at 29 PLN/h, written with decimal commas.
+    assert ";8,05;29,00;233,45;" in staff_line
+    assert lines[-1].startswith("RAZEM;")
+
+    staff_export = client.get("/payroll/export.csv", headers=auth_header(staff_token), params=period)
+    assert staff_export.status_code == 403
+
 
 def test_timesheet_restricted_entry_requires_review_and_staff_scope_limits(client):
     ADMIN_token, location_id = signup_ADMIN(client, organization_name="Timesheet Restrict Org", email="ADMIN@timesheet2.com")

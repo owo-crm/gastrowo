@@ -543,6 +543,18 @@ export const api = {
     if (params.user_id) search.set("user_id", params.user_id);
     return request<PayrollSummary>(`/payroll/summary?${search.toString()}`, {}, token);
   },
+  async downloadPayrollCsv(token: string, params: { start_date: string; end_date: string }): Promise<Blob> {
+    const search = new URLSearchParams(params);
+    const response = await fetch(`${API_URL}/payroll/export.csv?${search.toString()}`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as Envelope<unknown> | null;
+      throw new Error(payload?.error?.message ?? `Request failed: ${response.status}`);
+    }
+    return response.blob();
+  },
   listNotifications(token: string, limit = 20) {
     return request<NotificationListResponse>(`/notifications?limit=${limit}`, {}, token);
   },
