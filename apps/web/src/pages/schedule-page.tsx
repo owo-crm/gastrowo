@@ -27,6 +27,7 @@ import { WorkerAvatar } from "@/components/worker-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+import { ListRow, ListSection } from "@/components/ui/list";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OverlayPortal } from "@/components/ui/overlay-portal";
 
@@ -40,7 +41,6 @@ import { api } from "@/lib/api";
 
 import { hasPlanFeature } from "@/lib/access";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
-import { ScheduleTabs } from "@/components/schedule-tabs";
 import { MyWeekShifts } from "@/components/my-week-shifts";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
@@ -145,7 +145,7 @@ function statusClass(status: ShiftRequest["status"]) {
 
   if (status === "cancelled") return "border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]";
 
-  return "border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary)]";
+  return "border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary-strong)]";
 
 }
 
@@ -163,7 +163,7 @@ function positionTone(position?: string | null, fallbackRole?: string | null) {
   if (key === "manager" || key === "kierownik") {
     return { accent: "#34d399", text: "text-emerald-700", chip: "bg-emerald-50 text-emerald-700" };
   }
-  return { accent: "#2f6fed", text: "text-[var(--color-primary)]", chip: "bg-[var(--color-accent)] text-[var(--color-primary)]" };
+  return { accent: "#2f6fed", text: "text-[var(--color-primary-strong)]", chip: "bg-[var(--color-accent)] text-[var(--color-primary-strong)]" };
 }
 
 function normalizePositionLegendLabel(value?: string | null): string {
@@ -341,7 +341,7 @@ function DayWarningPopover({
             }}
           >
             <div
-              className={popupClassName ?? "rounded-[1rem] border border-amber-200 bg-white p-3 shadow-[0_18px_40px_rgba(15,23,42,0.14)]"}
+              className={popupClassName ?? "rounded-[12px] border border-amber-200 bg-white p-3 "}
               style={{
                 position: "fixed",
                 top: popupStyle.top,
@@ -356,7 +356,7 @@ function DayWarningPopover({
                 {warningEntries.map((entry) => (
                   <div
                     key={`warning-${entry.key}`}
-                    className={`rounded-[0.9rem] px-3 py-2 ${entry.tone === "coverage" ? "bg-orange-50" : "bg-amber-50"}`}
+                    className={`rounded-[12px] px-3 py-2 ${entry.tone === "coverage" ? "bg-orange-50" : "bg-amber-50"}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-semibold text-[var(--color-heading)]">{entry.timeLabel}</p>
@@ -467,7 +467,7 @@ function MobileDaySelector({ weekDays, selectedDayIndex, onSelect, warningEntrie
                     onSelect(index);
                   }}
                   aria-pressed={isActive}
-                  className={`w-full min-w-0 rounded-lg px-0.5 py-2 text-center transition ${isActive ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-[inset_0_0_0_1px_rgba(47,111,237,0.12)]" : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"}`}
+                  className={`w-full min-w-0 rounded-lg px-0.5 py-2 text-center transition ${isActive ? "bg-[var(--color-accent)] text-[var(--color-primary-strong)] " : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"}`}
                 >
                   <p className="text-[11px] font-semibold uppercase">{day.title.slice(0, 3)}</p>
                   <p className="mt-0.5 text-sm font-semibold">{day.caption.split(".")[0]}</p>
@@ -502,23 +502,23 @@ type WeekRangeNavigatorProps = {
 function WeekRangeNavigator({ label, onPrevious, onNext, className }: WeekRangeNavigatorProps) {
   return (
     <div className={className}>
-      <div className="inline-flex w-full items-center gap-2 rounded-[0.9rem] border border-slate-200 bg-white px-2 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
+      <div className="inline-flex w-full items-center gap-2 rounded-[12px] border border-[var(--color-separator)] bg-white px-2 py-1.5 ">
         <button
           type="button"
           onClick={onPrevious}
           aria-label="Previous week"
-          className="grid size-8 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
+          className="grid size-8 place-items-center rounded-full text-[var(--color-text-muted)] transition hover:bg-[var(--color-grouped)] hover:text-black"
         >
           <ChevronLeft className="size-4" />
         </button>
-        <div className="min-w-[110px] flex-1 px-2 text-center text-sm font-semibold text-slate-900 sm:min-w-[150px]">
+        <div className="min-w-[110px] flex-1 px-2 text-center text-sm font-semibold text-black sm:min-w-[150px]">
           {label}
         </div>
         <button
           type="button"
           onClick={onNext}
           aria-label="Next week"
-          className="grid size-8 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
+          className="grid size-8 place-items-center rounded-full text-[var(--color-text-muted)] transition hover:bg-[var(--color-grouped)] hover:text-black"
         >
           <ChevronRight className="size-4" />
         </button>
@@ -561,7 +561,7 @@ function ShiftBlock({
       }
       className={`relative ${fitContent ? "inline-flex w-fit max-w-full" : "flex w-full"} min-h-[54px] flex-col justify-between border-l-[3px] px-2 py-1.5 ${
         highlighted
-          ? "rounded-[0.9rem] border border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-200"
+          ? "rounded-[12px] border border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-200"
           : ""
       } ${isEditing ? "bg-[var(--color-accent)] ring-1 ring-[rgba(47,111,237,0.20)]" : ""}`}
       draggable={false}
@@ -612,7 +612,7 @@ type ScheduleShiftPillProps = {
 function ScheduleShiftPill({ timeLabel, positionLabel, metaLabel, toneLabel, kind = "assigned" }: ScheduleShiftPillProps) {
   if (kind === "missing") {
     return (
-      <div className="rounded-[1rem] border border-dashed border-red-300 bg-red-50 px-3 py-2 text-red-600">
+      <div className="rounded-[12px] border border-dashed border-red-300 bg-red-50 px-3 py-2 text-red-600">
         <p className="text-base font-semibold">{timeLabel}</p>
         {metaLabel ? <p className="mt-1 text-xs font-medium">{metaLabel}</p> : null}
       </div>
@@ -621,7 +621,7 @@ function ScheduleShiftPill({ timeLabel, positionLabel, metaLabel, toneLabel, kin
 
   const tone = positionTone(toneLabel ?? positionLabel);
   return (
-    <div className={`rounded-[1rem] px-3 py-2 shadow-[0_8px_20px_rgba(15,23,42,0.04)] ${tone.chip}`} style={{ boxShadow: `inset 4px 0 0 ${tone.accent}` }}>
+    <div className={`rounded-[12px] px-3 py-2  ${tone.chip}`} style={{ boxShadow: `inset 4px 0 0 ${tone.accent}` }}>
       <p className="text-base font-semibold">{timeLabel}</p>
       {positionLabel ? <p className="mt-1 text-xs font-semibold">{positionLabel}</p> : null}
       {metaLabel ? <p className="mt-1 text-xs opacity-80">{metaLabel}</p> : null}
@@ -826,14 +826,14 @@ function AppliedShiftCard({
 
   return (
     <div
-      className={`rounded-[1rem] border px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] ${
+      className={`rounded-[12px] border px-4 py-4  ${
         entry.isConflict
           ? "border-red-200 bg-red-50/90"
           : entry.isOpen
             ? "border-red-200 bg-red-50/85"
             : entry.isMine
               ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-200"
-              : "border-[var(--color-divider)] bg-white"
+              : "border-[var(--color-separator)] bg-white"
       }`}
       style={{
         boxShadow: `inset 4px 0 0 ${entry.isConflict ? "#ef4444" : entry.isOpen ? "#ef4444" : tone.accent}`,
@@ -874,7 +874,7 @@ function PreviewEditableShiftCard({
 
   return (
     <div
-      className="rounded-[1rem] border border-[var(--color-divider)] px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+      className="rounded-[12px] border border-[var(--color-separator)] px-4 py-4 "
       style={{
         boxShadow: `inset 4px 0 0 ${tone.accent}`,
         backgroundColor: hexToRgba(tone.accent, 0.11),
@@ -944,7 +944,7 @@ function PreviewCardsBoard({
         return (
           <div
             key={`preview-cards-${day.iso}`}
-            className={`rounded-[1.2rem] border border-[var(--color-divider)] p-3 ${
+            className={`rounded-[12px] border border-[var(--color-separator)] p-3 ${
               day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"
             }`}
           >
@@ -988,7 +988,7 @@ function PreviewCardsBoard({
                 ))}
               </div>
             ) : (
-              <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+              <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
                 {t("schedule.no_shifts_this_day")}
               </div>
             )}
@@ -1024,7 +1024,7 @@ function AppliedCardsBoard({
         return (
           <div
             key={`cards-${day.iso}`}
-            className={`rounded-[1.2rem] border border-[var(--color-divider)] p-3 ${
+            className={`rounded-[12px] border border-[var(--color-separator)] p-3 ${
               day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"
             }`}
           >
@@ -1054,7 +1054,7 @@ function AppliedCardsBoard({
                 ))}
               </div>
             ) : (
-              <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+              <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
                 {t("schedule.no_shifts_this_day")}
               </div>
             )}
@@ -1099,14 +1099,14 @@ function AppliedTimetableBoard({
           className="sticky top-0 z-30 grid bg-white"
           style={{ gridTemplateColumns }}
         >
-          <div className="sticky left-0 z-40 border-r border-b border-[var(--color-divider)] bg-white" />
+          <div className="sticky left-0 z-40 border-r border-b border-[var(--color-separator)] bg-white" />
           {weekDays.map((day) => {
             const warningEntries = warningEntriesByDate[day.iso] ?? [];
             const isWarningOpen = openWarningDay === day.iso;
             return (
             <div
               key={`header-${day.iso}`}
-              className={`relative border-b border-r border-[var(--color-divider)] ${dayHeaderClass} ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"}`}
+              className={`relative border-b border-r border-[var(--color-separator)] ${dayHeaderClass} ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"}`}
             >
               <div className="pr-8">
                 <p className={`font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)] ${compact ? "text-[11px]" : "text-[12px]"}`}>{day.title}</p>
@@ -1131,14 +1131,14 @@ function AppliedTimetableBoard({
           className="grid"
           style={{ gridTemplateColumns }}
         >
-          <div className="sticky left-0 z-20 border-r border-[var(--color-divider)] bg-white">
+          <div className="sticky left-0 z-20 border-r border-[var(--color-separator)] bg-white">
             <div className="relative" style={{ height: boardHeight }}>
               {timeSlots.map((slot, index) => {
                 const top = index * rowHeight;
                 const hourLabel = `${`${Math.floor(slot / 60)}`.padStart(2, "0")}:${`${slot % 60}`.padStart(2, "0")}:00`;
                 return (
                   <div key={`time-${slot}`} className="absolute inset-x-0" style={{ top }}>
-                    <div className="border-t border-[var(--color-divider)]" />
+                    <div className="border-t border-[var(--color-separator)]" />
                     {index < timeSlots.length - 1 ? (
                       <span className={`absolute left-2 top-1 ${compact ? "text-[10px]" : "text-xs"} font-semibold text-[var(--color-text-muted)]`}>
                         {formatTime(hourLabel)}
@@ -1153,13 +1153,13 @@ function AppliedTimetableBoard({
           {weekDays.map((day, dayIndex) => (
             <div
               key={`column-${day.iso}`}
-              className={`relative min-w-0 border-r border-[var(--color-divider)] ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.04)]" : "bg-white"}`}
+              className={`relative min-w-0 border-r border-[var(--color-separator)] ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.04)]" : "bg-white"}`}
               style={{ height: boardHeight }}
             >
               {timeSlots.map((slot, index) => (
                 <div
                   key={`line-${day.iso}-${slot}`}
-                  className="absolute inset-x-0 border-t border-[var(--color-divider)]"
+                  className="absolute inset-x-0 border-t border-[var(--color-separator)]"
                   style={{ top: index * rowHeight }}
                 />
               ))}
@@ -1327,13 +1327,15 @@ function latestTimesheet(entries: TimesheetEntry[]): TimesheetEntry | undefined 
 
 
 
-export function SchedulePage() {
+export type ScheduleSection = "calendar" | "availability" | "requests" | "hours";
+
+export function SchedulePage({ section = "calendar" }: { section?: ScheduleSection }) {
   const { t, lang } = useLanguage();
   const location = useLocation();
   const { token, me } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const isTimesheetsRoute = location.pathname === "/timesheets";
+  const isTimesheetsRoute = section === "hours";
 
 
 
@@ -2587,7 +2589,7 @@ export function SchedulePage() {
         <CardDescription>{isManagerView && !isStaff ? t("schedule.manager_availability_description") : t("schedule.availability_description")}</CardDescription>
       </CardHeader>
       <CardContent className="min-h-0 max-w-full space-y-4 overflow-y-auto overflow-x-hidden pr-1">
-        <div className="grid items-end gap-2 border-b border-[var(--color-divider)] pb-3 md:grid-cols-[1fr_auto]">
+        <div className="grid items-end gap-2 border-b border-[var(--color-separator)] pb-3 md:grid-cols-[1fr_auto]">
           <div>
             <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("schedule.hours_per_week")}</p>
             <div className="mt-1 flex items-baseline gap-2">
@@ -2606,7 +2608,7 @@ export function SchedulePage() {
             const firstSlot = slots[0];
             const enabled = Boolean(firstSlot);
             return (
-              <div key={`availability-card-${day.iso}`} className="rounded-[1rem] border border-[var(--color-border)] bg-white px-4 py-4">
+              <div key={`availability-card-${day.iso}`} className="rounded-[12px] border border-[var(--color-border)] bg-white px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{day.title}</p>
@@ -2619,7 +2621,7 @@ export function SchedulePage() {
                     onClick={() => setAvailabilityDayEnabled(index, !enabled)}
                     className={`relative inline-flex h-11 w-16 items-center rounded-full p-1 transition ${enabled ? "bg-emerald-500/90" : "bg-slate-200"} disabled:opacity-40`}
                   >
-                    <span className={`size-7 rounded-full bg-white shadow-sm transition ${enabled ? "translate-x-8" : "translate-x-0"}`} />
+                    <span className={`size-7 rounded-full bg-white  transition ${enabled ? "translate-x-8" : "translate-x-0"}`} />
                   </button>
                 </div>
                 <p className="mt-2 text-xs font-medium text-[var(--color-text-muted)]">{enabled ? t("schedule.available") : t("schedule.off")}</p>
@@ -2653,7 +2655,7 @@ export function SchedulePage() {
     if (status === "approved") return "border-emerald-200 bg-emerald-50 text-emerald-700";
     if (status === "filled") return "border-sky-200 bg-sky-50 text-sky-700";
     if (status === "partial") return "border-amber-200 bg-amber-50 text-amber-700";
-    return "border-slate-200 bg-slate-50 text-slate-600";
+    return "border-[var(--color-separator)] bg-[var(--color-grouped)] text-[var(--color-text-muted)]";
   };
 
   const availabilityStatusLabel = (status: TeamAvailabilitySummaryRow["status"]) => {
@@ -2675,7 +2677,7 @@ export function SchedulePage() {
             {(teamAvailabilityQuery.data ?? [])
               .filter((item) => item.user_id !== me?.id)
               .map((item) => (
-                <div key={item.user_id} className="flex flex-wrap items-center justify-between gap-3 rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-3">
+                <div key={item.user_id} className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-[var(--color-separator)] bg-white px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-[var(--color-heading)]">{item.full_name}</p>
                     <p className="mt-1 text-xs text-[var(--color-text-muted)]">
@@ -2717,7 +2719,7 @@ export function SchedulePage() {
               ))}
           </div>
         ) : (
-          <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+          <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
             {t("schedule.no_team_availability")}
           </div>
         )}
@@ -2727,18 +2729,73 @@ export function SchedulePage() {
 
 
 
-  return (
+  const staffShiftById = Object.fromEntries((staffCalendarQuery.data ?? []).flatMap((day) => day.shifts).map((shift) => [shift.shift_id, shift]));
+  const requestStatusTone = (status: string) =>
+    status === "approved" ? "green" : status === "rejected" ? "red" : status === "cancelled" ? "neutral" : "orange";
+  const staffWeekNav = (
+    <div className="flex items-center justify-between gap-2 border-b border-[var(--color-separator)] py-2">
+      <Button size="icon" variant="ghost" aria-label={t("schedule.previous_week")} onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
+        <ChevronLeft className="size-5" />
+      </Button>
+      <span className="text-[15px] font-semibold text-black">
+        {weekDays[0]?.caption} – {weekDays[6]?.caption}
+      </span>
+      <Button size="icon" variant="ghost" aria-label={t("schedule.next_week")} onClick={() => setWeekStart((current) => shiftWeek(current, 7))}>
+        <ChevronRight className="size-5" />
+      </Button>
+    </div>
+  );
+  const staffOtherSection =
+    section === "availability" ? (
+      availabilityCard
+    ) : section === "requests" ? (
+      <ListSection header={t("schedule.my_requests")} footer={t("schedule.my_requests_footer")}>
+        {(myRequestsQuery.data ?? []).map((request) => {
+          const shift = staffShiftById[request.shift_id];
+          return (
+            <ListRow
+              key={request.id}
+              title={`${t(`schedule.request_type.${request.request_type}`)}${shift ? ` · ${shift.date} ${formatTime(shift.start_time)}–${formatTime(shift.end_time)}` : ""}`}
+              subtitle={request.note ?? new Date(request.created_at).toLocaleDateString(lang)}
+              trailing={<Badge tone={requestStatusTone(request.status)}>{t(`schedule.request_status.${request.status}`)}</Badge>}
+            />
+          );
+        })}
+        {!myRequestsQuery.data?.length ? <ListRow title={t("schedule.my_requests_empty")} /> : null}
+      </ListSection>
+    ) : (
+      <div>
+        {staffWeekNav}
+        <ListSection
+          header={t("schedule.my_hours")}
+          footer={timesheetsEnabled ? (
+            <Button variant="tinted" onClick={() => openExtraTimesheetModal(weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0]?.iso)}>
+              <FileClock className="size-4" /> {t("schedule.report_extra_hours")}
+            </Button>
+          ) : null}
+        >
+          {(myTimesheetsQuery.data ?? []).map((entry) => (
+            <ListRow
+              key={entry.id}
+              title={`${workDateLabel(entry.work_date)} · ${formatTime(entry.arrived_at)}–${formatTime(entry.left_at)}`}
+              subtitle={entry.is_restricted_entry ? t("schedule.extra_entry") : t("schedule.planned_entry")}
+              trailing={<Badge tone={entry.status === "approved" || entry.status === "corrected" ? "green" : entry.status === "rejected" ? "red" : "orange"}>{statusText(entry.status)}</Badge>}
+            />
+          ))}
+          {!myTimesheetsQuery.data?.length ? <ListRow title={t("schedule.my_hours_empty")} /> : null}
+        </ListSection>
+      </div>
+    );
 
-    <AppShell
-      title={isTimesheetsRoute ? t("nav.timesheets") : t("schedule.title")}
-      headerVariant={isManagerView ? "minimal" : "default"}
-      restaurantName="Old Town"
-      subtitle={isTimesheetsRoute ? t("schedule.timesheet_approvals_description") : isStaff ? t("schedule.subtitle.staff") : undefined}
-      action={isStaff ? <div className="hidden sm:block"><Badge>{t("schedule.week_of", { date: weekStart })}</Badge></div> : undefined}
-    >
-      {isStaff ? (
-        <div className="stagger-grid grid gap-4 2xl:h-[calc(100vh-11.5rem)] 2xl:grid-cols-[2.35fr_1fr]">
-          <Card className="min-h-0 max-w-full overflow-x-hidden">
+  const pageTitle = section === "calendar" ? (isStaff ? t("sub.my_week") : t("schedule.title")) : t(`sub.${section}`);
+
+  return (
+    <AppShell title={pageTitle} fullBleed={section === "calendar" && !isStaff} flush={isStaff && section !== "calendar"}>
+      {isStaff && section !== "calendar" ? (
+        staffOtherSection
+      ) : isStaff ? (
+        <div>
+          <Card className="min-h-0 max-w-full overflow-x-hidden border-b-0">
             <CardHeader className="pb-2">
               <div className="grid gap-3">
                 <div className="flex items-start justify-between gap-3">
@@ -2750,19 +2807,19 @@ export function SchedulePage() {
                   ) : null}
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <Button size="sm" variant="secondary" className="h-8 min-w-8 rounded-none border-0 bg-transparent px-1.5 shadow-none hover:bg-transparent" onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
+                  <Button size="sm" variant="secondary" className="h-8 min-w-8 rounded-none border-0 bg-transparent px-1.5 hover:bg-transparent" onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
                     <ChevronLeft className="size-4" />
                   </Button>
                   <span className="min-w-0 flex-1 px-1 text-center text-xs font-semibold text-[var(--color-heading)] sm:text-sm">
                     {weekDays[0]?.caption} - {weekDays[6]?.caption}
                   </span>
-                  <Button size="sm" variant="secondary" className="h-8 min-w-8 rounded-none border-0 bg-transparent px-1.5 shadow-none hover:bg-transparent" onClick={() => setWeekStart((current) => shiftWeek(current, 7))}>
+                  <Button size="sm" variant="secondary" className="h-8 min-w-8 rounded-none border-0 bg-transparent px-1.5 hover:bg-transparent" onClick={() => setWeekStart((current) => shiftWeek(current, 7))}>
                     <ChevronRight className="size-4" />
                   </Button>
                 </div>
                 {timesheetsEnabled ? (
                   <div className="hidden sm:flex sm:justify-end">
-                    <Button size="sm" variant="secondary" className="h-8 rounded-none border-0 bg-transparent px-1.5 shadow-none hover:bg-transparent" onClick={() => openExtraTimesheetModal(weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0]?.iso)}>
+                    <Button size="sm" variant="secondary" className="h-8 rounded-none border-0 bg-transparent px-1.5 hover:bg-transparent" onClick={() => openExtraTimesheetModal(weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0]?.iso)}>
                       <FileClock className="size-4" /> {t("schedule.report_extra_hours")}
                     </Button>
                   </div>
@@ -2782,7 +2839,7 @@ export function SchedulePage() {
                   const coworkerAgenda = teamAgenda.filter((item) => !item.isMine);
                   return (
                     <>
-                      <div className={`rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-4 ${selectedDay?.iso === todayIso ? "bg-[rgba(47,111,237,0.04)]" : ""}`}>
+                      <div className={`rounded-[12px] border border-[var(--color-separator)] bg-white px-4 py-4 ${selectedDay?.iso === todayIso ? "bg-[rgba(47,111,237,0.04)]" : ""}`}>
                         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{selectedDay?.title}</p>
                         <p className="mt-1 text-sm text-[var(--color-text-muted)]">{selectedDay?.caption}</p>
                       </div>
@@ -2790,7 +2847,7 @@ export function SchedulePage() {
                         const latest = latestTimesheet(myTimesheetsByShiftId[shift.shift_id] ?? []);
                         const canSubmitReport = timesheetsEnabled && shift.is_mine && (!latest || latest.status === "rejected");
                         return (
-                          <div key={`mobile-${shift.shift_id}`} className="surface-card rounded-[1rem] px-4 py-4">
+                          <div key={`mobile-${shift.shift_id}`} className="surface-card rounded-[12px] px-4 py-4">
                             <ShiftBlock
                               timeRangeLabel={`${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`}
                               positionLabel={shift.staff_position ?? shift.required_role}
@@ -2820,11 +2877,11 @@ export function SchedulePage() {
                         );
                       })}
                       {(myRestrictedTimesheetsByDate[selectedDay?.iso ?? ""] ?? []).length ? (
-                        <div className="rounded-[1rem] bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                        <div className="rounded-[12px] bg-amber-50 px-4 py-3 text-sm text-amber-700">
                           {t("schedule.extra_hours")}: {statusText(latestTimesheet(myRestrictedTimesheetsByDate[selectedDay?.iso ?? ""])?.status ?? "pending")}
                         </div>
                       ) : null}
-                      <div className="rounded-[1rem] border border-[var(--color-divider)] bg-[var(--color-surface-muted)] px-4 py-4">
+                      <div className="rounded-[12px] border border-[var(--color-separator)] bg-[var(--color-surface-muted)] px-4 py-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{t("schedule.team_on_this_day")}</p>
@@ -2837,7 +2894,7 @@ export function SchedulePage() {
                         {coworkerAgenda.length ? (
                           <div className="mt-3 space-y-2">
                             {coworkerAgenda.map((item) => (
-                              <div key={`team-mobile-${item.shiftId}-${item.userId}`} className="flex items-center justify-between gap-3 rounded-[0.9rem] border border-[var(--color-divider)] bg-white px-3 py-2">
+                              <div key={`team-mobile-${item.shiftId}-${item.userId}`} className="flex items-center justify-between gap-3 rounded-[12px] border border-[var(--color-separator)] bg-white px-3 py-2">
                                 <div className="min-w-0">
                                   <p className="truncate text-sm font-semibold text-[var(--color-heading)]">{item.userName}</p>
                                   <p className="text-[11px] text-[var(--color-text-muted)]">{item.positionLabel}</p>
@@ -2852,7 +2909,7 @@ export function SchedulePage() {
                         ) : null}
                       </div>
                       {!shifts.length ? (
-                        <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                        <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
                           {t("schedule.no_shifts_this_day")}
                         </div>
                       ) : null}
@@ -2860,14 +2917,14 @@ export function SchedulePage() {
                   );
                 })()}
               </div>
-              <div className="hidden h-full overflow-auto rounded-[1rem] border border-[var(--color-divider)] bg-white 2xl:block">
+              <div className="hidden h-full overflow-auto rounded-[12px] border border-[var(--color-separator)] bg-white 2xl:block">
                 <div className="grid min-w-[820px] grid-cols-7">
                   {weekDays.map((day, index) => {
                     const dayData = staffDaysByWeek[index];
                     const shifts = dayData?.shifts ?? [];
                     const teamAgenda = (teamAgendaByDay[index] ?? []).filter((item) => !item.isMine);
                     return (
-                      <div key={day.iso} className={`min-h-[96px] border-r border-[var(--color-divider)] p-2 ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : ""}`}>
+                      <div key={day.iso} className={`min-h-[96px] border-r border-[var(--color-separator)] p-2 ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : ""}`}>
                         <p className="text-xs font-semibold text-[var(--color-heading)]">{day.title}</p>
                         <p className="text-[10px] text-[var(--color-text-muted)]">{day.caption}</p>
                         <div className="mt-1.5 space-y-1">
@@ -2898,7 +2955,7 @@ export function SchedulePage() {
                                     {canSubmitReport ? (
                                       <button
                                         type="button"
-                                        className="text-[10px] font-semibold text-[var(--color-primary)] hover:underline"
+                                        className="text-[10px] font-semibold text-[var(--color-primary-strong)] hover:underline"
                                         onClick={() => openShiftTimesheetModal(shift)}
                                       >
                                         {t("schedule.report_hours")}
@@ -2910,12 +2967,12 @@ export function SchedulePage() {
                             );
                           })}
                           {(myRestrictedTimesheetsByDate[day.iso] ?? []).length ? (
-                            <div className="rounded-[0.75rem] bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700">
+                            <div className="rounded-[10px] bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700">
                               {t("schedule.extra_hours")}: {statusText(latestTimesheet(myRestrictedTimesheetsByDate[day.iso])?.status ?? "pending")}
                             </div>
                           ) : null}
                           {teamAgenda.length ? (
-                            <div className="rounded-[0.75rem] border border-[var(--color-divider)] bg-[var(--color-surface-muted)] px-2 py-1.5">
+                            <div className="rounded-[10px] border border-[var(--color-separator)] bg-[var(--color-surface-muted)] px-2 py-1.5">
                               <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">{t("schedule.team")}</p>
                               <div className="mt-1 space-y-1">
                                 {teamAgenda.map((item) => (
@@ -2936,8 +2993,6 @@ export function SchedulePage() {
               </div>
             </CardContent>
           </Card>
-
-          {availabilityCard}
         </div>
 
       ) : (
@@ -2946,10 +3001,9 @@ export function SchedulePage() {
 
           <section className="min-w-0 space-y-5">
 
-            {me?.role === "ADMIN" && !isTimesheetsRoute ? <OnboardingChecklist /> : null}
-            <ScheduleTabs pendingCount={pendingTimesheetsQuery.data?.length ?? 0} />
+            {me?.role === "ADMIN" && section === "calendar" ? <OnboardingChecklist /> : null}
 
-            {!isTimesheetsRoute ? (
+            {section === "calendar" ? (
             <Card>
 
               <CardHeader>
@@ -3084,7 +3138,7 @@ export function SchedulePage() {
 
                 <div className="mt-2 grid gap-3 lg:mt-0 lg:flex lg:flex-wrap lg:items-center">
                   <Select
-                    className="w-full min-w-0 lg:min-w-[220px] border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary)]"
+                    className="w-full min-w-0 lg:min-w-[220px] border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary-strong)]"
                     options={((locationsQuery.data ?? []).map((location) => ({ label: location.name, value: location.id })))}
                     value={locationFilter}
                     onChange={(event) => setLocationFilter(event.target.value)}
@@ -3158,13 +3212,13 @@ export function SchedulePage() {
                 )}
 
                 {scheduleStage === "idle" ? (
-                  <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                  <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
                     {t("schedule.generate_empty")}
                   </div>
                 ) : null}
 
                 {scheduleStage === "preview" && previewVisibleIssueCount > 0 ? (
-                  <div className="flex flex-wrap items-start gap-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <div className="flex flex-wrap items-start gap-3 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                     <CircleAlert className="mt-0.5 size-4 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold">{t("schedule.missing_staff")}</p>
@@ -3221,12 +3275,12 @@ export function SchedulePage() {
                           <AppliedShiftCard key={`applied-mobile-${entry.key}`} entry={entry} t={t} />
                         ))
                       ) : (
-                        <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                        <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
                           {t("schedule.no_shifts_this_day")}
                         </div>
                       )
                     ) : (
-                      <div className="rounded-[1.1rem] border border-[var(--color-divider)] bg-white">
+                      <div className="rounded-[12px] border border-[var(--color-separator)] bg-white">
                         <AppliedTimetableBoard
                           compact
                           weekDays={weekDays}
@@ -3251,7 +3305,7 @@ export function SchedulePage() {
                       />
                     </div>
                   ) : (
-                    <div className="hidden rounded-[1.25rem] border border-[var(--color-divider)] bg-white lg:block">
+                    <div className="hidden rounded-[12px] border border-[var(--color-separator)] bg-white lg:block">
                       <AppliedTimetableBoard
                         weekDays={weekDays}
                         entriesByDate={appliedTimetableByDate}
@@ -3269,13 +3323,10 @@ export function SchedulePage() {
             </Card>
             ) : null}
 
-            {!isTimesheetsRoute ? (
+            {section === "requests" ? (
             <Card>
-
               <CardHeader>
-
                 <div>
-
                   <CardTitle>{t("schedule.incoming_requests")}</CardTitle>
 
                   <CardDescription>{t("schedule.incoming_requests_description")}</CardDescription>
@@ -3292,7 +3343,7 @@ export function SchedulePage() {
 
                   return (
 
-                    <div key={item.id} className="surface-muted rounded-[1.2rem] px-4 py-4">
+                    <div key={item.id} className="surface-muted rounded-[12px] px-4 py-4">
 
                       <p className="font-medium text-[var(--color-heading)]">{item.requester_name}  {item.request_type.toUpperCase()}</p>
 
@@ -3326,7 +3377,7 @@ export function SchedulePage() {
 
                 {!incomingRequestsQuery.data?.length ? (
 
-                  <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                  <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
 
                     {t("schedule.no_incoming_requests")}
 
@@ -3339,10 +3390,8 @@ export function SchedulePage() {
             </Card>
             ) : null}
 
-            {!isTimesheetsRoute && availabilityCard ? (
-              <div className="stagger-item">{availabilityCard}</div>
-            ) : null}
-            {!isTimesheetsRoute && teamAvailabilityCard ? <div className="stagger-item">{teamAvailabilityCard}</div> : null}
+            {section === "availability" && teamAvailabilityCard ? <div>{teamAvailabilityCard}</div> : null}
+            {section === "availability" && availabilityCard ? <div>{availabilityCard}</div> : null}
 
             {isTimesheetsRoute ? (
             <Card>
@@ -3362,7 +3411,7 @@ export function SchedulePage() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      className="h-9 rounded-[0.85rem] border-0 bg-transparent px-0 text-[var(--color-primary)] shadow-none hover:bg-transparent"
+                      className="h-9 rounded-[10px] border-0 bg-transparent px-0 text-[var(--color-primary-strong)] hover:bg-transparent"
                       onClick={() => approveVisibleTimesheetsMutation.mutate(visiblePendingTimesheets)}
                       disabled={approveVisibleTimesheetsMutation.isPending || reviewTimesheetMutation.isPending}
                     >
@@ -3376,7 +3425,7 @@ export function SchedulePage() {
 
               <CardContent className="space-y-3 overflow-hidden">
                 {visiblePendingTimesheets.length ? (
-                  <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-3">
+                  <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-[12px] border border-[var(--color-separator)] bg-white px-4 py-3">
                     <p className="text-sm font-medium text-[var(--color-heading)]">{t("schedule.pending_reports_in_week", { count: visiblePendingTimesheets.length })}</p>
                     <span className="text-xs text-[var(--color-text-muted)]">{t("schedule.scrollable_list")}</span>
                   </div>
@@ -3388,7 +3437,7 @@ export function SchedulePage() {
                   const employeeName = timesheetUserNameById[entry.user_id] ?? entry.user_id.slice(0, 8);
                   const deltaLabel = deltaText(shift, entry);
                   return (
-                    <div key={entry.id} className="surface-muted rounded-[1.2rem] px-4 py-4">
+                    <div key={entry.id} className="surface-muted rounded-[12px] px-4 py-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="font-medium text-[var(--color-heading)]">{employeeName}</p>
@@ -3448,7 +3497,7 @@ export function SchedulePage() {
 
                 {!visiblePendingTimesheets.length ? (
 
-                  <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                  <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
 
                     {t("schedule.no_pending_timesheets")}
 
@@ -3470,8 +3519,8 @@ export function SchedulePage() {
       {previewEditorModal ? (
         <OverlayPortal>
           <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[520px] lg:rounded-[1.5rem] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 lg:shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
-              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
+            <div className="mobile-sheet-panel lg:w-full lg:max-w-[520px] lg:rounded-[12px] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 ">
+              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
                 <div>
                   <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">
                     {previewEditorModal.mode === "create" ? t("schedule.add_shift") : t("common.edit")}
@@ -3531,7 +3580,7 @@ export function SchedulePage() {
                     </label>
                   </div>
                   {selectedPreviewEditorMember && selectedPreviewEditorAvailability ? (
-                    <div className="rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-3">
+                    <div className="rounded-[12px] border border-[var(--color-separator)] bg-white px-4 py-3">
                       <p className="text-sm font-semibold text-[var(--color-heading)]">
                         {selectedPreviewEditorMember.full_name} • {selectedPreviewEditorMember.staff_position ?? selectedPreviewEditorMember.role}
                       </p>
@@ -3556,7 +3605,7 @@ export function SchedulePage() {
                 </div>
               </div>
 
-              <div className="border-t border-[var(--color-divider)] px-4 py-4 lg:px-0">
+              <div className="border-t border-[var(--color-separator)] px-4 py-4 lg:px-0">
                 <div className="grid gap-2">
                   <Button variant="secondary" onClick={() => setPreviewEditorModal(null)}>
                     {t("common.cancel")}
@@ -3610,8 +3659,8 @@ export function SchedulePage() {
       {teamAvailabilityEditor ? (
         <OverlayPortal>
           <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[520px] lg:rounded-[1.5rem] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 lg:shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
-              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
+            <div className="mobile-sheet-panel lg:w-full lg:max-w-[520px] lg:rounded-[12px] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 ">
+              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
                 <div>
                   <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{t("schedule.approve_availability")}</p>
                   <p className="mt-1 text-sm text-[var(--color-text-muted)]">{teamAvailabilityEditor.fullName}</p>
@@ -3641,7 +3690,7 @@ export function SchedulePage() {
                       const firstSlot = slots[0];
                       const enabled = Boolean(firstSlot);
                       return (
-                        <div key={`team-availability-editor-${day.iso}`} className="rounded-[1rem] border border-[var(--color-border)] bg-white px-4 py-4">
+                        <div key={`team-availability-editor-${day.iso}`} className="rounded-[12px] border border-[var(--color-border)] bg-white px-4 py-4">
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{day.title}</p>
@@ -3653,7 +3702,7 @@ export function SchedulePage() {
                               onClick={() => setTeamAvailabilityDayEnabled(index, !enabled)}
                               className={`relative inline-flex h-11 w-16 items-center rounded-full p-1 transition ${enabled ? "bg-emerald-500/90" : "bg-slate-200"}`}
                             >
-                              <span className={`size-7 rounded-full bg-white shadow-sm transition ${enabled ? "translate-x-8" : "translate-x-0"}`} />
+                              <span className={`size-7 rounded-full bg-white  transition ${enabled ? "translate-x-8" : "translate-x-0"}`} />
                             </button>
                           </div>
                           <p className="mt-2 text-xs font-medium text-[var(--color-text-muted)]">{enabled ? t("schedule.available") : t("schedule.off")}</p>
@@ -3680,7 +3729,7 @@ export function SchedulePage() {
                 </div>
               </div>
 
-              <div className="border-t border-[var(--color-divider)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
+              <div className="border-t border-[var(--color-separator)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
                 <div className="grid gap-2 lg:flex">
                   <Button variant="secondary" onClick={() => setTeamAvailabilityEditor(null)}>
                     {t("common.cancel")}
@@ -3698,8 +3747,8 @@ export function SchedulePage() {
       {timesheetModal ? (
         <OverlayPortal>
           <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[440px] lg:rounded-[1.5rem] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 lg:shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
+            <div className="mobile-sheet-panel lg:w-full lg:max-w-[440px] lg:rounded-[12px] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 ">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
               <div>
                 <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">
                   {timesheetModal.mode === "shift" ? t("schedule.report_hours") : t("schedule.report_extra_hours")}
@@ -3760,14 +3809,14 @@ export function SchedulePage() {
                 />
               </label>
               {timesheetModal.mode === "shift" && timesheetModal.assignmentStatus === "in_shift" ? (
-                <p className="rounded-[1rem] bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                <p className="rounded-[12px] bg-amber-50 px-3 py-2 text-sm text-amber-700">
                   {t("schedule.shift_timer_notice")}
                 </p>
               ) : null}
             </div>
             </div>
 
-            <div className="border-t border-[var(--color-divider)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
+            <div className="border-t border-[var(--color-separator)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
               <div className="grid gap-2 lg:flex">
               <Button variant="secondary" onClick={() => setTimesheetModal(null)}>
                 {t("common.cancel")}
@@ -3789,8 +3838,8 @@ export function SchedulePage() {
       {reviewModal ? (
         <OverlayPortal>
           <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[440px] lg:rounded-[1.5rem] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 lg:shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
+            <div className="mobile-sheet-panel lg:w-full lg:max-w-[440px] lg:rounded-[12px] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 ">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
               <div>
                 <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{t("schedule.correct_timesheet")}</p>
                 <p className="mt-1 text-sm text-[var(--color-text-muted)]">
@@ -3839,7 +3888,7 @@ export function SchedulePage() {
             </div>
             </div>
 
-            <div className="border-t border-[var(--color-divider)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
+            <div className="border-t border-[var(--color-separator)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
               <div className="grid gap-2 lg:flex">
               <Button variant="secondary" onClick={() => setReviewModal(null)}>
                 {t("common.cancel")}

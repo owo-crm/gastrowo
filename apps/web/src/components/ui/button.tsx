@@ -4,22 +4,30 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * iOS button styles. default = filled tint, secondary = gray fill with black label,
+ * tinted = light blue fill, ghost/plain = blue text only, danger = filled red.
+ * Every label clears 4.5:1 on its own fill.
+ */
 const buttonVariants = cva(
-  "inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-center text-sm font-semibold leading-tight whitespace-normal transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-50 sm:min-h-11 sm:px-4",
+  "inline-flex max-w-full select-none items-center justify-center gap-1.5 rounded-[10px] text-center text-[15px] font-semibold leading-tight whitespace-normal transition-[background-color,opacity] duration-150 active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-40 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default:
-          "border border-[color:var(--color-primary)] bg-[color:var(--color-primary)] text-white hover:bg-[#245fd1]",
-        secondary: "border border-[var(--color-border)] bg-white text-[var(--color-heading)] hover:bg-[var(--color-surface-muted)]",
-        ghost: "bg-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]",
-        danger:
-          "border border-[color:var(--color-danger)]/35 bg-[color:var(--color-danger)] text-white hover:bg-[#df5555]",
+        default: "bg-[var(--color-primary-strong)] text-white hover:bg-[var(--color-primary-pressed)]",
+        secondary: "bg-[var(--color-fill)] text-black hover:bg-[#d8d8de]",
+        tinted: "bg-[var(--color-accent)] text-[var(--color-primary-strong)] hover:bg-[#dae6fd]",
+        ghost: "bg-transparent text-[var(--color-primary-strong)] hover:bg-[var(--color-grouped)]",
+        plain: "bg-transparent px-0 text-[var(--color-primary-strong)] hover:underline",
+        danger: "bg-[var(--color-danger)] text-white hover:bg-[#b80012]",
+        "danger-plain": "bg-transparent text-[var(--color-danger)] hover:bg-[var(--color-danger-fill)]",
+        inverse: "bg-white text-black hover:bg-[var(--color-grouped)]",
       },
       size: {
-        default: "h-auto min-h-11",
-        sm: "h-auto min-h-10 px-3",
-        lg: "h-auto min-h-12 px-5",
+        default: "min-h-11 px-4 py-2",
+        sm: "min-h-[34px] px-3 py-1.5 text-[14px]",
+        lg: "min-h-[50px] px-5 py-3 text-[17px]",
+        icon: "size-11 p-0",
       },
     },
     defaultVariants: {

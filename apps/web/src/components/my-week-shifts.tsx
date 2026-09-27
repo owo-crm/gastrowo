@@ -135,7 +135,7 @@ export function MyWeekShifts({
 
       {swapFor ? (
         <div className="fixed inset-0 z-[130] grid place-items-end bg-slate-900/30 sm:place-items-center" role="dialog" aria-modal="true" aria-labelledby="swap-title">
-          <div className="w-full rounded-t-3xl bg-white p-5 shadow-[var(--shadow-float)] sm:max-w-md sm:rounded-3xl">
+          <div className="w-full rounded-t-3xl bg-white p-5 sm:max-w-md sm:rounded-[12px]">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 id="swap-title" className="text-base font-semibold text-[var(--color-heading)]">

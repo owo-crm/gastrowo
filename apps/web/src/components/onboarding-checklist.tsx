@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check, ChevronRight, X } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { CloseButton } from "@/components/ui/sheet";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { getMonday } from "@/lib/date";
@@ -52,10 +53,10 @@ export function OnboardingChecklist() {
   const published = (shiftsThisWeek.data?.length ?? 0) + (shiftsNextWeek.data?.length ?? 0) > 0;
 
   const steps = [
-    { key: "location", to: "/team", done: locations.some((location) => location.name !== "Main Location") },
-    { key: "team", to: "/team", done: team.length > 0 },
-    { key: "setup", to: "/team", done: team.length > 0 && team.every((user) => Boolean(user.staff_position)) },
-    { key: "templates", to: "/team", done: (templatesQuery.data?.length ?? 0) > 0 },
+    { key: "location", to: "/team/locations", done: locations.some((location) => location.name !== "Main Location") },
+    { key: "team", to: "/team/invites", done: team.length > 0 },
+    { key: "setup", to: "/team/positions", done: team.length > 0 && team.every((user) => Boolean(user.staff_position)) },
+    { key: "templates", to: "/team/templates", done: (templatesQuery.data?.length ?? 0) > 0 },
     { key: "publish", to: "/schedule", done: published },
   ];
   const doneCount = steps.filter((step) => step.done).length;
@@ -72,25 +73,22 @@ export function OnboardingChecklist() {
   const nextStep = steps.find((step) => !step.done)?.key;
 
   return (
-    <section className="surface-card mb-5 rounded-2xl p-4 sm:p-5" aria-labelledby="onboarding-title">
+    <section className="border-b border-[var(--color-separator)] bg-[var(--color-grouped)] px-4 py-4 sm:px-6" aria-labelledby="onboarding-title">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 id="onboarding-title" className="text-base font-semibold text-[var(--color-heading)] sm:text-lg">
+        <div className="min-w-0">
+          <h2 id="onboarding-title" className="text-[17px] font-bold text-black">
             {t("onboarding.title")}
           </h2>
-          <p className="mt-0.5 text-sm text-[var(--color-text-muted)]">{t("onboarding.subtitle")}</p>
+          <p className="text-[14px] text-[var(--color-text-muted)]">
+            {t("onboarding.progress", { done: doneCount, total: steps.length })} · {t("onboarding.subtitle")}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[var(--color-text-muted)]">{t("onboarding.progress", { done: doneCount, total: steps.length })}</span>
-          <button type="button" onClick={hide} className="rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]" aria-label={t("onboarding.hide")}>
-            <X className="size-4" />
-          </button>
-        </div>
+        <CloseButton onClick={hide} label={t("onboarding.hide")} className="-mr-2 -mt-2" />
       </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--color-surface-muted)]">
-        <div className="h-full rounded-full bg-[var(--color-primary)] transition-all" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
+      <div className="mt-3 h-1 overflow-hidden rounded-full bg-[var(--color-fill)]">
+        <div className="h-full rounded-full bg-[var(--color-success)] transition-all" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
       </div>
-      <ol className="mt-4 grid gap-2 md:grid-cols-5">
+      <ol className="mt-3 grid gap-x-6 md:grid-cols-5">
         {steps.map((step, index) => {
           const isNext = step.key === nextStep;
           return (
@@ -98,29 +96,29 @@ export function OnboardingChecklist() {
               <Link
                 to={step.to}
                 className={cn(
-                  "flex h-full flex-col rounded-xl border p-3 transition",
-                  step.done && "border-emerald-200 bg-emerald-50/60",
-                  isNext && "border-[var(--color-primary)] bg-[var(--color-accent)]",
-                  !step.done && !isNext && "border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]",
+                  "flex h-full items-start gap-2.5 rounded-[10px] py-2.5 md:flex-col md:gap-1.5",
+                  isNext && "md:bg-white md:px-3 md:ring-2 md:ring-[var(--color-primary-strong)]",
                 )}
               >
-                <span className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold",
-                      step.done ? "bg-emerald-500 text-white" : isNext ? "bg-[var(--color-primary)] text-white" : "bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]",
-                    )}
-                  >
-                    {step.done ? <Check className="size-3.5" /> : index + 1}
-                  </span>
-                  <span className="text-sm font-semibold text-[var(--color-heading)]">{t(`onboarding.step.${step.key}`)}</span>
+                <span
+                  className={cn(
+                    "grid size-6 shrink-0 place-items-center rounded-full text-[13px] font-bold",
+                    step.done ? "bg-[var(--color-success)] text-white" : isNext ? "bg-[var(--color-primary-strong)] text-white" : "bg-[var(--color-fill)] text-black",
+                  )}
+                >
+                  {step.done ? <Check className="size-4" strokeWidth={3} /> : index + 1}
                 </span>
-                <span className="mt-1.5 text-xs leading-5 text-[var(--color-text-muted)]">{t(`onboarding.step.${step.key}_body`)}</span>
-                {isNext ? (
-                  <span className="mt-auto inline-flex items-center gap-1 pt-2 text-xs font-semibold text-[var(--color-primary)]">
-                    {t("onboarding.open")} <ChevronRight className="size-3.5" />
+                <span className="min-w-0">
+                  <span className={cn("block text-[15px] font-semibold", step.done ? "text-[var(--color-text-muted)] line-through" : "text-black")}>
+                    {t(`onboarding.step.${step.key}`)}
                   </span>
-                ) : null}
+                  <span className="block text-[13px] leading-5 text-[var(--color-text-muted)]">{t(`onboarding.step.${step.key}_body`)}</span>
+                  {isNext ? (
+                    <span className="mt-1 inline-flex items-center gap-0.5 text-[14px] font-semibold text-[var(--color-primary-strong)]">
+                      {t("onboarding.open")} <ChevronRight className="size-4" />
+                    </span>
+                  ) : null}
+                </span>
               </Link>
             </li>
           );

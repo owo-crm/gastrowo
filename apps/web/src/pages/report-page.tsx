@@ -1,154 +1,152 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, FileUp } from "lucide-react";
+import { Camera, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ListRow, ListSection } from "@/components/ui/list";
 import { Select } from "@/components/ui/select";
+import { canDeleteReports } from "@/lib/access";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toLocalIso } from "@/lib/date";
 import { imageFileToDataUrl } from "@/lib/file";
+import { currencyOf, currencySymbol, formatDate, formatMoney } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 
-function todayIso() {
-  return toLocalIso(new Date());
-}
+const today = () => toLocalIso(new Date());
+const daysAgo = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return toLocalIso(date);
+};
 
+/** End-of-day revenue per location. It feeds labor cost % on the overview. */
 export function ReportPage() {
-   const { token, me } = useAuth();
-   const { t } = useLanguage();
-   const toast = useToast();
-   const queryClient = useQueryClient();
-  const [report, setReport] = useState({
-    location_id: "",
-    report_date: todayIso(),
-    revenue: "",
-    photo_url: "",
-  });
-  const [photoName, setPhotoName] = useState("");
+  const { token, me } = useAuth();
+  const { t, lang } = useLanguage();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const currency = currencyOf(me);
+  const canSeeHistory = me?.role === "ADMIN" || me?.role === "MANAGER";
 
-  const locationsQuery = useQuery({
-    queryKey: ["locations"],
-    queryFn: () => api.listLocations(token!),
-    enabled: Boolean(token),
-  });
+  const locationsQuery = useQuery({ queryKey: ["locations"], queryFn: () => api.listLocations(token!), enabled: Boolean(token) });
+  const locations = locationsQuery.data ?? [];
+  const [locationId, setLocationId] = useState("");
+  const [date, setDate] = useState(today);
+  const [amount, setAmount] = useState("");
+  const [photo, setPhoto] = useState<string | null>(null);
+  const selectedLocation = locationId || locations[0]?.id || "";
 
-  const reportMutation = useMutation({
+  const historyStart = daysAgo(13);
+  const historyQuery = useQuery({
+    queryKey: ["revenue-reports", historyStart],
+    queryFn: () => api.listRevenueReports(token!, historyStart, today()),
+    enabled: Boolean(token) && canSeeHistory,
+  });
+  const locationName = (id: string) => locations.find((item) => item.id === id)?.name ?? "";
+
+  const refresh = () => {
+    for (const key of ["revenue-reports", "dashboard", "notifications"]) void queryClient.invalidateQueries({ queryKey: [key] });
+  };
+  const save = useMutation({
     mutationFn: () =>
       api.addRevenueReport(token!, {
-        location_id: report.location_id,
-        report_date: report.report_date,
-        revenue: report.revenue,
-        currency: "PLN",
-        photo_url: report.photo_url || null,
+        location_id: selectedLocation,
+        report_date: date,
+        revenue: amount.replace(",", "."),
+        currency,
+        photo_url: photo,
       }),
     onSuccess: () => {
-      setReport((current) => ({ ...current, revenue: "", photo_url: "" }));
-      setPhotoName("");
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      void queryClient.invalidateQueries({ queryKey: ["owner-dashboard-inline"] });
-      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      setAmount("");
+      setPhoto(null);
+      refresh();
       toast.success(t("report.saved"));
     },
-    onError: (error) => {
-      toast.error(t("report.save_failed"), error instanceof Error ? error.message : undefined);
-    },
+    onError: (error) => toast.error(t("report.save_failed"), error instanceof Error ? error.message : undefined),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api.deleteRevenueReport(token!, id),
+    onSuccess: refresh,
+    onError: (error) => toast.error(t("dashboard.report_delete_failed"), error instanceof Error ? error.message : undefined),
   });
 
-  const locationOptions = useMemo(
-    () => (locationsQuery.data ?? []).map((location) => ({ label: location.name, value: location.id })),
-    [locationsQuery.data],
-  );
+  const valid = Boolean(selectedLocation) && Number(amount.replace(",", ".")) > 0 && Boolean(date);
 
   return (
-    <AppShell
-      title={t("report.title")}
-      subtitle={me?.role === "STAFF" ? t("report.subtitle.staff") : t("report.subtitle.default")}
-      action={<Badge>{me?.role ?? t("common.member")}</Badge>}
-    >
-      <div className="stagger-children mx-auto max-w-[760px] pb-24 sm:pb-0">
-        <Card className="animate-slide-in overflow-hidden p-0" style={{ animationDelay: "100ms" }}>
-          <div className="bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_55%,#ecfdf5_100%)] px-4 py-5 sm:px-6 sm:py-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-semibold text-blue-700">
-              <FileUp className="size-3.5" />
-              {t("report.badge")}
+    <AppShell title={t("sub.revenue")} subtitle={t("revenue.subtitle")} flush>
+      <ListSection header={t("revenue.add")} footer={t("revenue.footer")}>
+        <li className="grid gap-4 px-4 py-4 sm:grid-cols-2 sm:px-6">
+          {locations.length > 1 ? (
+            <label className="block sm:col-span-2">
+              <span className="mb-1.5 block text-[13px] font-semibold text-[var(--color-text-muted)]">{t("revenue.location")}</span>
+              <Select value={selectedLocation} onChange={(event) => setLocationId(event.target.value)} options={locations.map((item) => ({ value: item.id, label: item.name }))} />
+            </label>
+          ) : null}
+          <label className="block">
+            <span className="mb-1.5 block text-[13px] font-semibold text-[var(--color-text-muted)]">{t("revenue.date")}</span>
+            <Input type="date" value={date} max={today()} onChange={(event) => setDate(event.target.value)} />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-[13px] font-semibold text-[var(--color-text-muted)]">{t("revenue.amount")}</span>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[16px] font-semibold text-black">{currencySymbol(currency, lang)}</span>
+              <Input inputMode="decimal" className="pl-9 text-[17px] font-semibold" placeholder="0.00" value={amount} onChange={(event) => setAmount(event.target.value)} />
             </div>
-            <h2 className="mt-4 text-2xl font-bold tracking-[-0.05em] text-[var(--color-heading)] sm:text-3xl">{t("report.heading")}</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">
-              {t("report.body")}
-            </p>
-          </div>
-          <CardContent className="grid gap-4 p-4 pb-8 sm:p-6 sm:pb-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("report.location")}</p>
-                <Select
-                  options={locationOptions}
-                  value={report.location_id}
-                  onChange={(event) => setReport((current) => ({ ...current, location_id: event.target.value }))}
-                />
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("report.date")}</p>
-                <Input type="date" value={report.report_date} onChange={(event) => setReport((current) => ({ ...current, report_date: event.target.value }))} />
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("report.revenue")}</p>
-              <Input
-                type="number"
-                min={0}
-                placeholder={t("report.revenue_placeholder")}
-                value={report.revenue}
-                onChange={(event) => setReport((current) => ({ ...current, revenue: event.target.value }))}
+          </label>
+          <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+            <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[10px] bg-[var(--color-fill)] px-4 text-[15px] font-semibold text-black active:opacity-70">
+              <Camera className="size-5" />
+              {photo ? t("revenue.photo_change") : t("revenue.photo_add")}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                onChange={async (event) => {
+                  const input = event.currentTarget;
+                  const file = input.files?.[0];
+                  if (file) setPhoto(await imageFileToDataUrl(file));
+                  input.value = "";
+                }}
               />
-            </div>
-            <div className="rounded-[1.1rem] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-4">
-              <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--color-heading)]">
-                <Camera className="size-4 text-[var(--color-primary)]" />
-                {photoName ? t("report.selected_file", { name: photoName }) : t("report.attach")}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-                    if (!file) return;
-                    const dataUrl = await imageFileToDataUrl(file);
-                    setReport((current) => ({ ...current, photo_url: dataUrl }));
-                    setPhotoName(file.name);
-                  }}
-                />
-              </label>
-            </div>
-            <div className="hidden sm:block">
-              <Button
-                onClick={() => reportMutation.mutate()}
-                disabled={!report.location_id || !report.revenue || reportMutation.isPending}
-                className="w-full"
-              >
-                {t("report.save")}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      <div className="fixed inset-x-0 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-40 px-4 sm:hidden">
-        <div className="mx-auto max-w-[760px] rounded-[1.15rem] border border-[var(--color-border)] bg-white/92 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)] backdrop-blur">
-          <Button
-            onClick={() => reportMutation.mutate()}
-            disabled={!report.location_id || !report.revenue || reportMutation.isPending}
-            className="w-full"
-          >
-            {t("report.save")}
-          </Button>
-        </div>
-      </div>
+            </label>
+            {photo ? <img src={photo} alt="" className="size-11 rounded-[8px] object-cover" /> : null}
+            <Button size="lg" className="ml-auto" onClick={() => save.mutate()} disabled={!valid || save.isPending}>
+              {t("revenue.save")}
+            </Button>
+          </div>
+        </li>
+      </ListSection>
+
+      {canSeeHistory ? (
+        <ListSection header={t("revenue.history")}>
+          {(historyQuery.data ?? []).map((report) => (
+            <ListRow
+              key={report.id}
+              leading={report.photo_url ? <img src={report.photo_url} alt="" className="size-10 rounded-[8px] object-cover" /> : undefined}
+              title={<span className="font-semibold tabular-nums">{formatMoney(report.revenue, currency, lang)}</span>}
+              subtitle={`${formatDate(report.report_date, lang)} · ${locationName(report.location_id)}`}
+              trailing={
+                canDeleteReports(me) ? (
+                  <button
+                    type="button"
+                    aria-label={t("revenue.delete")}
+                    onClick={() => remove.mutate(report.id)}
+                    className="grid size-10 place-items-center rounded-full text-[#3c3c43] hover:bg-[var(--color-danger-fill)] hover:text-[var(--color-danger)]"
+                  >
+                    <Trash2 className="size-[18px]" />
+                  </button>
+                ) : null
+              }
+            />
+          ))}
+          {!historyQuery.data?.length ? <ListRow title={<span className="text-[var(--color-text-muted)]">{t("revenue.history_empty")}</span>} /> : null}
+        </ListSection>
+      ) : null}
     </AppShell>
   );
 }

@@ -1,61 +1,46 @@
+import type { Currency } from "@/lib/format";
 import type { BillingCheckoutCycle, SubscriptionPlan } from "@/lib/types";
 
-/** Keep in sync with the Stripe prices (STRIPE_PRICE_*) and FREE_MEMBER_LIMIT / FEATURE_MIN_PLAN in the API. */
-export const FREE_MEMBER_LIMIT = 5;
+/**
+ * Prices per location per month. Keep in sync with the Stripe prices
+ * (STRIPE_PRICE_{STARTER,PRO}_{USD,PLN}_*) and FREE_* / STARTER_MEMBERS_PER_LOCATION in the API.
+ * About 25% below 7shifts (Entrée $34.99, The Works $76.99 per location).
+ */
+export const FREE_LIMITS = { locations: 1, people: 15 };
+export const STARTER_PEOPLE_PER_LOCATION = 30;
 
 export type PaidPlan = "standard" | "pro";
+export type PlanKey = "free" | PaidPlan;
 
-export const SEAT_PRICE_PLN: Record<PaidPlan, Record<BillingCheckoutCycle, number>> = {
-  standard: { monthly: 8, annual: 80 },
-  pro: { monthly: 12, annual: 120 },
+export const PRICE_PER_LOCATION: Record<Currency, Record<PaidPlan, Record<BillingCheckoutCycle, number>>> = {
+  USD: { standard: { monthly: 26, annual: 260 }, pro: { monthly: 58, annual: 580 } },
+  PLN: { standard: { monthly: 99, annual: 990 }, pro: { monthly: 219, annual: 2190 } },
 };
 
+/** What 7shifts charges for a comparable plan, per location per month (USD). */
+export const SEVENSHIFTS_USD: Record<PaidPlan, number> = { standard: 34.99, pro: 76.99 };
+
 export type PlanDefinition = {
-  key: "free" | PaidPlan;
-  title: string;
-  tagline: string;
-  price: string;
-  cycle: string;
-  highlights: string[];
+  key: PlanKey;
+  /** i18n keys: plan.<key>.title / .tagline / .f1..f4 */
+  features: number;
 };
 
 export const plans: PlanDefinition[] = [
-  {
-    key: "free",
-    title: "Free",
-    tagline: "Dla małego lokalu",
-    price: "0 zł",
-    cycle: "na zawsze",
-    highlights: [`do ${FREE_MEMBER_LIMIT} osób`, "ręczny grafik i dostępność", "zamiany i prośby", "zadania i kalendarz w telefonie"],
-  },
-  {
-    key: "standard",
-    title: "Standard",
-    tagline: "Grafik bez pracy",
-    price: `${SEAT_PRICE_PLN.standard.monthly} zł`,
-    cycle: "/ osoba / mies.",
-    highlights: ["wszystko z Free, bez limitu osób", "automatyczny grafik", "kontrola Kodeksu pracy", "ewidencja godzin"],
-  },
-  {
-    key: "pro",
-    title: "Pro",
-    tagline: "Pełna kontrola kosztów",
-    price: `${SEAT_PRICE_PLN.pro.monthly} zł`,
-    cycle: "/ osoba / mies.",
-    highlights: ["wszystko ze Standard", "wypłaty i eksport CSV", "przychód i % kosztu pracy", "uprawnienia managerów"],
-  },
+  { key: "free", features: 4 },
+  { key: "standard", features: 4 },
+  { key: "pro", features: 4 },
 ];
 
-export function formatPln(value: number): string {
-  return `${value.toLocaleString("pl-PL", { maximumFractionDigits: 2 })} zł`;
+export function monthlyPrice(plan: PlanKey, currency: Currency): number {
+  return plan === "free" ? 0 : PRICE_PER_LOCATION[currency][plan].monthly;
 }
 
-export function normalizePlan(plan: SubscriptionPlan): "free" | PaidPlan {
+export function normalizePlan(plan: SubscriptionPlan): PlanKey {
   if (plan === "business" || plan === "enterprise") return "pro";
   return plan;
 }
 
-export function planTitle(plan: SubscriptionPlan): string {
-  const key = normalizePlan(plan);
-  return plans.find((item) => item.key === key)?.title ?? plan;
+export function planTitleKey(plan: SubscriptionPlan): string {
+  return `plan.${normalizePlan(plan)}.title`;
 }

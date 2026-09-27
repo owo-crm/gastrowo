@@ -157,7 +157,7 @@ function TaskRow({
   ].filter(Boolean);
 
   return (
-    <article className="rounded-[1rem] border border-[var(--color-border)] bg-white px-3.5 py-3 shadow-[0_10px_26px_rgba(15,23,42,0.05)] transition hover:border-[var(--color-primary)]/20 hover:shadow-[0_14px_28px_rgba(15,23,42,0.08)] sm:px-4">
+    <article className="rounded-[12px] border border-[var(--color-border)] bg-white px-3.5 py-3 transition hover:border-[var(--color-primary)]/20  sm:px-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className={`pr-2 text-[0.95rem] font-semibold leading-5 ${isDone ? "text-[var(--color-text-muted)] line-through" : "text-[var(--color-heading)]"}`}>{task.title}</h3>
@@ -202,18 +202,18 @@ function TaskRow({
             onClick={() => onToggle(task)}
             className={`grid h-8 w-8 place-items-center rounded-full border transition ${
               isDone
-                ? "border-emerald-500 bg-emerald-500 text-white shadow-[0_10px_18px_rgba(16,185,129,0.22)]"
-                : "border-slate-300 bg-white text-slate-300 hover:border-slate-400 hover:text-slate-400"
+                ? "border-emerald-500 bg-emerald-500 text-white "
+                : "border-[var(--color-separator)] bg-white text-[var(--color-text-muted)] hover:border-slate-400 hover:text-[var(--color-text-muted)]"
             } disabled:cursor-not-allowed disabled:opacity-50`}
           >
-            <Check className={`size-4 ${isDone ? "text-white" : "text-slate-500"}`} />
+            <Check className={`size-4 ${isDone ? "text-white" : "text-[var(--color-text-muted)]"}`} />
           </button>
         </div>
       </div>
 
       {!isDone ? (
         <div className="mt-3">
-          <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-[0.85rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 text-xs font-semibold text-[var(--color-heading)] transition hover:bg-white">
+          <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 text-xs font-semibold text-[var(--color-heading)] transition hover:bg-white">
             <Camera className="size-4" />
             {t("tasks.add_photo")}
             <input
@@ -239,7 +239,7 @@ function TaskRow({
               href={photo.photo_url}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-between rounded-[0.85rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-[11px] text-[var(--color-text-muted)] transition hover:bg-white"
+              className="flex items-center justify-between rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-[11px] text-[var(--color-text-muted)] transition hover:bg-white"
             >
               <span>{t("tasks.photo_item", { id: photo.id.slice(0, 6) })}</span>
               <Camera className="size-3.5 text-emerald-600" />
@@ -423,7 +423,7 @@ export function TasksPage() {
       >
         <div className="stagger-children space-y-4">
           <Card className="min-h-0 overflow-hidden">
-            <CardHeader className="border-b border-[var(--color-divider)] pb-3">
+            <CardHeader className="border-b border-[var(--color-separator)] pb-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <CardTitle>{t("tasks.my_visible_tasks")}</CardTitle>
@@ -455,7 +455,7 @@ export function TasksPage() {
                 />
               ))}
               {!visibleStaffTasks.length ? (
-                <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
                   {t("tasks.no_active_tasks")}
                 </div>
               ) : null}
@@ -482,12 +482,12 @@ export function TasksPage() {
       hideBottomNav={taskComposerOpen}
     >
       <div className="stagger-children space-y-4 lg:hidden">
-        <div className="inline-flex rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
+        <div className="inline-flex rounded-[12px] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
           {(["pending", "done"] as const).map((status) => (
             <button
               key={status}
               type="button"
-              className={`rounded-[0.8rem] px-3 py-2 text-sm font-semibold transition ${mobileStatusTab === status ? "bg-white text-[var(--color-primary)]" : "text-[var(--color-text-muted)]"}`}
+              className={`rounded-[10px] px-3 py-2 text-sm font-semibold transition ${mobileStatusTab === status ? "bg-white text-[var(--color-primary-strong)]" : "text-[var(--color-text-muted)]"}`}
               onClick={() => setMobileStatusTab(status)}
             >
               {status === "pending" ? `${t("tasks.pending")} (${columns.pending.length})` : `${t("tasks.done")} (${columns.done.length})`}
@@ -496,7 +496,7 @@ export function TasksPage() {
         </div>
 
         <Card className="min-h-0 overflow-hidden">
-          <CardHeader className="border-b border-[var(--color-divider)] pb-3">
+          <CardHeader className="border-b border-[var(--color-separator)] pb-3">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <CardTitle>{mobileStatusTab === "pending" ? t("tasks.pending_queue") : t("tasks.completed")}</CardTitle>
@@ -525,7 +525,7 @@ export function TasksPage() {
               />
             ))}
             {!mobileTasks.length ? (
-              <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+              <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
                 {t("tasks.no_tasks_in_column")}
               </div>
             ) : null}
@@ -535,7 +535,7 @@ export function TasksPage() {
 
       <div className="hidden min-h-0 gap-5 lg:grid">
         <Card className="min-h-0 overflow-hidden">
-          <CardHeader className="border-b border-[var(--color-divider)] pb-3">
+          <CardHeader className="border-b border-[var(--color-separator)] pb-3">
             <div>
               <CardTitle>{t("tasks.execution_lane")}</CardTitle>
               <CardDescription>{t("tasks.execution_lane_description")}</CardDescription>
@@ -543,13 +543,13 @@ export function TasksPage() {
           </CardHeader>
           <CardContent className="grid min-h-0 gap-4 p-4 xl:grid-cols-2">
             {(["pending", "done"] as const).map((status) => (
-              <section key={status} className="min-h-0 overflow-hidden rounded-[1.1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/55">
-                <div className="flex items-center justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-3">
+              <section key={status} className="min-h-0 overflow-hidden rounded-[12px] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/55">
+                <div className="flex items-center justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-[var(--color-heading)]">{status === "pending" ? t("tasks.pending_queue") : t("tasks.completed")}</p>
                     <p className="text-xs text-[var(--color-text-muted)]">{status === "pending" ? t("tasks.pending_queue_description") : t("tasks.completed_description")}</p>
                   </div>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--color-heading)] shadow-[0_8px_18px_rgba(15,23,42,0.06)]">{columns[status].length}</span>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--color-heading)] ">{columns[status].length}</span>
                 </div>
                 <div className="max-h-[64vh] space-y-3 overflow-y-auto p-3">
                   {columns[status].map((task) => (
@@ -571,7 +571,7 @@ export function TasksPage() {
                     />
                   ))}
                   {!columns[status].length ? (
-                    <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] bg-white px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                    <div className="rounded-[12px] border border-dashed border-[var(--color-border)] bg-white px-4 py-6 text-sm text-[var(--color-text-muted)]">
                       {t("tasks.no_tasks_in_column")}
                     </div>
                   ) : null}
@@ -586,7 +586,7 @@ export function TasksPage() {
         {canCreate && taskComposerOpen ? (
           <OverlayPortal>
             <motion.div
-              className="fixed inset-0 z-[140] bg-slate-950/42 backdrop-blur-sm"
+              className="fixed inset-0 z-[140] bg-slate-950/42 "
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -596,12 +596,12 @@ export function TasksPage() {
               <div className="flex h-full w-full flex-col justify-end px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-16 sm:items-center sm:justify-center sm:p-4">
                 <motion.section
                   {...mobileComposerAnimation()}
-                  className="flex w-full max-h-[calc(100dvh-5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-[0_-24px_60px_rgba(15,23,42,0.18)] sm:max-h-[90dvh] sm:max-w-[760px] sm:rounded-[1.6rem] sm:border sm:border-[var(--color-border)] sm:shadow-[0_26px_80px_rgba(15,23,42,0.18)]"
+                  className="flex w-full max-h-[calc(100dvh-5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[12px] bg-white sm:max-h-[90dvh] sm:max-w-[760px] sm:rounded-[12px] sm:border sm:border-[var(--color-border)] "
                   role="dialog"
                   aria-modal="true"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 sm:px-6 sm:py-5">
+                  <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-4 sm:px-6 sm:py-5">
                     <div className="min-w-0">
                       <p className="text-lg font-semibold text-[var(--color-heading)]">{t("tasks.create_task")}</p>
                       <p className="mt-1 text-sm text-[var(--color-text-muted)]">
@@ -631,7 +631,7 @@ export function TasksPage() {
                       showSubmitButton={false}
                     />
                   </div>
-                  <div className="shrink-0 border-t border-[var(--color-divider)] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-4 sm:px-6 sm:py-5">
+                  <div className="shrink-0 border-t border-[var(--color-separator)] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-4 sm:px-6 sm:py-5">
                     <div className="grid gap-2 sm:flex sm:justify-end">
                       <Button variant="secondary" onClick={closeTaskComposer}>
                         {t("common.cancel")}

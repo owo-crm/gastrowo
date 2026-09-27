@@ -41,8 +41,7 @@ import type {
   WorkerSetup,
   ShiftEndPayload,
   MemberRemovalImpact,
-  MemberRemovalResult,
-} from "@/lib/types";
+  MemberRemovalResult, MemberPosition } from "@/lib/types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -119,7 +118,7 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
-  completeOwnerOnboarding(input: { verification_token: string; full_name: string; organization_name: string; password: string; source: string }) {
+  completeOwnerOnboarding(input: { verification_token: string; full_name: string; organization_name: string; password: string; source: string; country?: "US" | "PL" }) {
     return request<AuthLoginResponse>("/auth/onboarding/owner/complete", {
       method: "POST",
       body: JSON.stringify(input),
@@ -149,8 +148,8 @@ export const api = {
   me(token: string) {
     return request<MeResponse>("/auth/me", {}, token);
   },
-  patchCurrentOrganization(token: string, body: { name: string }) {
-    return request<{ id: string; name: string }>("/organizations/current", {
+  patchCurrentOrganization(token: string, body: { name?: string; country?: "US" | "PL" }) {
+    return request<{ id: string; name: string; country: "US" | "PL"; currency: "USD" | "PLN" }>("/organizations/current", {
       method: "PATCH",
       body: JSON.stringify(body),
     }, token);
@@ -268,6 +267,9 @@ export const api = {
   },
   getWorkerSetup(token: string, userId: string) {
     return request<WorkerSetup>(`/workers/${userId}/setup`, {}, token);
+  },
+  putWorkerPositions(token: string, userId: string, positions: MemberPosition[]) {
+    return request<MemberPosition[]>(`/workers/${userId}/positions`, { method: "PUT", body: JSON.stringify({ positions }) }, token);
   },
   patchWorkerSetup(
     token: string,
@@ -543,6 +545,13 @@ export const api = {
     body: { location_id: string; report_date: string; revenue: string; currency: string; photo_url: string | null },
   ) {
     return request("/reports/revenue", { method: "POST", body: JSON.stringify(body) }, token);
+  },
+  listRevenueReports(token: string, startDate: string, endDate: string) {
+    return request<Array<{ id: string; location_id: string; report_date: string; revenue: string; currency: string; photo_url: string | null }>>(
+      `/reports/revenue?start_date=${startDate}&end_date=${endDate}`,
+      {},
+      token,
+    );
   },
   deleteRevenueReport(token: string, reportId: string) {
     return request<{ deleted: boolean; id: string }>(`/reports/revenue/${reportId}`, { method: "DELETE" }, token);

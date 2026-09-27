@@ -23,6 +23,7 @@ type AuthContextValue = {
     organization_name: string;
     password: string;
     source: string;
+    country?: "US" | "PL";
   }) => Promise<void>;
   verifyInviteJoin: (payload: { email: string; code: string; invite_token: string; full_name?: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -173,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     organization_name: string;
     password: string;
     source: string;
+    country?: "US" | "PL";
   }) => {
     const response = await api.completeOwnerOnboarding(payload);
     await applySession(response.access_token);

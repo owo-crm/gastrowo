@@ -1,20 +1,24 @@
 import { cn } from "@/lib/utils";
 import type { HTMLAttributes } from "react";
 
+/**
+ * A monolithic section, not a floating card: full width, white, separated from the next section
+ * by a hairline. Pages stack sections edge to edge like an iOS plain list.
+ */
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("surface-card rounded-2xl p-4 text-[var(--color-text)] sm:p-5", className)} {...props} />;
+  return <section className={cn("surface-card px-4 py-5 text-[var(--color-text)] sm:px-6", className)} {...props} />;
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("inner-divider mb-3 min-w-0 items-start justify-between gap-3 pb-3 sm:mb-4", className)} {...props} />;
+  return <div className={cn("mb-3 min-w-0 items-start justify-between gap-3", className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn("min-w-0 break-words text-base font-semibold leading-tight text-[var(--color-heading)] sm:text-lg", className)} {...props} />;
+  return <h2 className={cn("min-w-0 break-words text-[17px] font-semibold leading-tight text-black", className)} {...props} />;
 }
 
 export function CardDescription({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn("min-w-0 break-words text-sm font-normal leading-6 text-[var(--color-text-muted)]", className)} {...props} />;
+  return <p className={cn("mt-0.5 min-w-0 break-words text-[14px] leading-5 text-[var(--color-text-muted)]", className)} {...props} />;
 }
 
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

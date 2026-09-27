@@ -14,11 +14,11 @@ const DashboardPage = lazy(() => import("@/pages/dashboard-page").then((module) 
 const BillingPage = lazy(() => import("@/pages/billing-page").then((module) => ({ default: module.BillingPage })));
 const NotesDocumentsPage = lazy(() => import("@/pages/notes-documents-page").then((module) => ({ default: module.NotesDocumentsPage })));
 const PayrollPage = lazy(() => import("@/pages/payroll-page").then((module) => ({ default: module.PayrollPage })));
-const ProfilePage = lazy(() => import("@/pages/profile-page").then((module) => ({ default: module.ProfilePage })));
+const SettingsPage = lazy(() => import("@/pages/settings-page").then((module) => ({ default: module.SettingsPage })));
 const ReportPage = lazy(() => import("@/pages/report-page").then((module) => ({ default: module.ReportPage })));
 const SchedulePage = lazy(() => import("@/pages/schedule-page").then((module) => ({ default: module.SchedulePage })));
 const TasksPage = lazy(() => import("@/pages/tasks-page").then((module) => ({ default: module.TasksPage })));
-const TeamPage = lazy(() => import("@/pages/team-page").then((module) => ({ default: module.TeamPage })));
+const TeamPage = lazy(() => import("@/pages/team/team-page").then((module) => ({ default: module.TeamPage })));
 const WaitlistPage = lazy(() => import("@/pages/waitlist-page").then((module) => ({ default: module.WaitlistPage })));
 const TermsPage = lazy(() => import("@/pages/legal-pages").then((module) => ({ default: module.TermsPage })));
 const PrivacyPolicyPage = lazy(() => import("@/pages/legal-pages").then((module) => ({ default: module.PrivacyPolicyPage })));
@@ -62,14 +62,14 @@ function AuthBootstrapScreen() {
 function ADMINRoute({ children }: { children: JSX.Element }) {
   const { me } = useAuth();
   if (me?.role !== "ADMIN") {
-    return <Navigate to={me?.role === "MANAGER" ? "/report" : "/schedule"} replace />;
+    return <Navigate to={me?.role === "MANAGER" && canAccessReport(me) ? "/overview/revenue" : "/schedule"} replace />;
   }
   return children;
 }
 
 function OverviewRoute({ children }: { children: JSX.Element }) {
   const { me } = useAuth();
-  if (!canViewOverview(me)) return <Navigate to={me?.role === "MANAGER" ? "/report" : "/schedule"} replace />;
+  if (!canViewOverview(me)) return <Navigate to={me?.role === "MANAGER" && canAccessReport(me) ? "/overview/revenue" : "/schedule"} replace />;
   return children;
 }
 
@@ -81,7 +81,7 @@ function ReportAccessRoute({ children }: { children: JSX.Element }) {
 
 function TeamAccessRoute({ children }: { children: JSX.Element }) {
   const { me } = useAuth();
-  if (!canManageTeam(me)) return <Navigate to="/overview" replace />;
+  if (!canManageTeam(me)) return <Navigate to="/schedule" replace />;
   return children;
 }
 
@@ -141,117 +141,41 @@ export function App() {
         }
       />
 
+      <Route path="/overview" element={<ProtectedRoute><OverviewRoute><DashboardPage /></OverviewRoute></ProtectedRoute>} />
+      <Route path="/overview/revenue" element={<ProtectedRoute><ReportAccessRoute><ReportPage /></ReportAccessRoute></ProtectedRoute>} />
+      <Route path="/report" element={<Navigate to="/overview/revenue" replace />} />
+      <Route path="/reports" element={<Navigate to="/overview" replace />} />
+
+      <Route path="/schedule" element={<ProtectedRoute><SchedulePage section="calendar" /></ProtectedRoute>} />
+      <Route path="/schedule/availability" element={<ProtectedRoute><SchedulePage section="availability" /></ProtectedRoute>} />
+      <Route path="/schedule/requests" element={<ProtectedRoute><SchedulePage section="requests" /></ProtectedRoute>} />
       <Route
-        path="/overview"
-        element={
-          <ProtectedRoute>
-            <OverviewRoute>
-              <DashboardPage />
-            </OverviewRoute>
-          </ProtectedRoute>
-        }
+        path="/schedule/hours"
+        element={<ProtectedRoute>{hasPlanFeature(effectiveMe, "timesheets") ? <SchedulePage section="hours" /> : <Navigate to="/settings/billing" replace />}</ProtectedRoute>}
       />
-      <Route
-        path="/report"
-        element={
-          <ProtectedRoute>
-            <ReportAccessRoute>
-              <ReportPage />
-            </ReportAccessRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/schedule"
-        element={
-          <ProtectedRoute>
-            <SchedulePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/timesheets"
-        element={
-          <ProtectedRoute>
-            {hasPlanFeature(effectiveMe, "timesheets") ? <SchedulePage /> : <Navigate to="/schedule" replace />}
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/tasks"
-        element={
-          <ProtectedRoute>
-            <TasksPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/team"
-        element={
-          <ProtectedRoute>
-            <TeamAccessRoute>
-              <TeamPage />
-            </TeamAccessRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/payroll"
-        element={
-          <ProtectedRoute>
-            <PayrollAccessRoute>
-              <PayrollPage />
-            </PayrollAccessRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <ProfilePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/reports"
-        element={
-          <ProtectedRoute>
-            <Navigate to="/overview" replace />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/notes"
-        element={
-          <ProtectedRoute>
-            <NotesAccessRoute>
-              <NotesDocumentsPage />
-            </NotesAccessRoute>
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/timesheets" element={<Navigate to="/schedule/hours" replace />} />
+
+      <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
+
+      <Route path="/team" element={<ProtectedRoute><TeamAccessRoute><TeamPage section="people" /></TeamAccessRoute></ProtectedRoute>} />
+      <Route path="/team/invites" element={<ProtectedRoute><TeamAccessRoute><TeamPage section="invites" /></TeamAccessRoute></ProtectedRoute>} />
+      <Route path="/team/positions" element={<ProtectedRoute><TeamAccessRoute><TeamPage section="positions" /></TeamAccessRoute></ProtectedRoute>} />
+      <Route path="/team/locations" element={<ProtectedRoute><TeamAccessRoute><TeamPage section="locations" /></TeamAccessRoute></ProtectedRoute>} />
+      <Route path="/team/templates" element={<ProtectedRoute><TeamAccessRoute><TeamPage section="templates" /></TeamAccessRoute></ProtectedRoute>} />
+      <Route path="/team/permissions" element={<ProtectedRoute><ADMINRoute><TeamPage section="permissions" /></ADMINRoute></ProtectedRoute>} />
+
+      <Route path="/payroll" element={<ProtectedRoute><PayrollAccessRoute><PayrollPage /></PayrollAccessRoute></ProtectedRoute>} />
+
+      <Route path="/settings" element={<ProtectedRoute><SettingsPage section="profile" /></ProtectedRoute>} />
+      <Route path="/settings/business" element={<ProtectedRoute><SettingsPage section="business" /></ProtectedRoute>} />
+      <Route path="/settings/calendar" element={<ProtectedRoute><SettingsPage section="calendar" /></ProtectedRoute>} />
+      <Route path="/settings/billing" element={<ProtectedRoute><ADMINRoute><BillingPage /></ADMINRoute></ProtectedRoute>} />
+      <Route path="/profile" element={<Navigate to="/settings" replace />} />
+      <Route path="/billing" element={<Navigate to="/settings/billing" replace />} />
+
+      <Route path="/notes" element={<ProtectedRoute><NotesAccessRoute><NotesDocumentsPage /></NotesAccessRoute></ProtectedRoute>} />
       <Route path="/inventory" element={<Navigate to={effectiveToken ? linkedDefaultRoute : "/"} replace />} />
-      <Route
-        path="/billing"
-        element={
-          <ProtectedRoute>
-            <ADMINRoute>
-              <BillingPage />
-            </ADMINRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/waitlist"
-        element={
-          <ProtectedRoute>
-            <ADMINRoute>
-              <WaitlistPage />
-            </ADMINRoute>
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/waitlist" element={<ProtectedRoute><ADMINRoute><WaitlistPage /></ADMINRoute></ProtectedRoute>} />
 
       <Route path="/home" element={<Navigate to="/overview" replace />} />
       <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
