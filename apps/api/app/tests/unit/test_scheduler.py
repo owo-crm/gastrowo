@@ -450,7 +450,7 @@ def test_apply_is_not_blocked_when_shift_is_assigned_even_if_availability_starts
 
 
 def test_scheduler_respects_daily_rest_after_closing_shift(db_session):
-    org = Organization(name="Rest Org")
+    org = Organization(name="Rest Org", country="PL")
     manager = User(email="mgr@rest.local", full_name="Manager", password_hash="x")
     closer = User(email="closer@rest.local", full_name="Closer", password_hash="x")
     db_session.add_all([org, manager, closer])

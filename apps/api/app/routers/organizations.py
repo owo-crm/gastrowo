@@ -40,6 +40,7 @@ from app.schemas import (
     OrganizationSettingsPatch,
 )
 from app.services.auth_email import send_invite_email
+from app.services.labor_rules import default_timezone_for, locale_settings
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, require_feature, sync_stripe_seats
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
@@ -57,6 +58,7 @@ def _serialize_settings(organization: Organization) -> dict:
         manager_can_manage_business_settings=organization.manager_can_manage_business_settings,
         manager_can_access_notes=organization.manager_can_access_notes,
         manager_can_access_inventory=organization.manager_can_access_inventory,
+        **locale_settings(organization),
     ).model_dump(mode="json")
 
 
@@ -158,7 +160,7 @@ def create_organization(
     # One account = one business; otherwise any user could farm unlimited PRO trials.
     if db.scalar(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)) is not None:
         raise HTTPException(status_code=409, detail="This account already belongs to another business")
-    org = Organization(name=payload.name)
+    org = Organization(name=payload.name, country=payload.country)
     db.add(org)
     db.flush()
 
@@ -169,7 +171,7 @@ def create_organization(
         max_hours_per_week=60,
         staff_position=None,
     )
-    location = Location(organization_id=org.id, name="Main Location", timezone="Europe/Warsaw")
+    location = Location(organization_id=org.id, name="Main Location", timezone=default_timezone_for(payload.country))
 
     db.add_all([membership, location])
     db.flush()
@@ -197,19 +199,27 @@ def patch_current_organization(
 ):
     organization = get_current_organization(context, db)
     _require_business_settings_access(context, organization)
-    normalized_name = payload.name.strip()
-    existing = db.scalar(
-        select(Organization).where(
-            Organization.name == normalized_name,
-            Organization.id != organization.id,
+    if payload.name is not None:
+        normalized_name = payload.name.strip()
+        existing = db.scalar(
+            select(Organization).where(
+                Organization.name == normalized_name,
+                Organization.id != organization.id,
+            )
         )
-    )
-    if existing is not None:
-        raise HTTPException(status_code=409, detail="Organization name already exists")
-    organization.name = normalized_name
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="Organization name already exists")
+        organization.name = normalized_name
+    if payload.country is not None and payload.country != organization.country:
+        # Changes currency, labour rules and the payroll CSV format; stored amounts are not converted.
+        previous_default = default_timezone_for(organization.country or "US")
+        for location in db.scalars(select(Location).where(Location.organization_id == organization.id)).all():
+            if location.timezone == previous_default:
+                location.timezone = default_timezone_for(payload.country)
+        organization.country = payload.country
     db.commit()
     db.refresh(organization)
-    return ok({"id": str(organization.id), "name": organization.name})
+    return ok({"id": str(organization.id), "name": organization.name, **locale_settings(organization)})
 
 
 @router.patch("/current/settings")

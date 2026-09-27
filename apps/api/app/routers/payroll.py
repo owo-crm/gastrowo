@@ -19,6 +19,8 @@ from app.models import Location, LocationMembership, OrganizationMembership, Rol
 
 from app.services.worktime import worked_hours as timesheet_hours
 from app.services.billing import require_feature
+from app.services.labor_rules import US_OVERTIME_MULTIPLIER, US_WEEKLY_OVERTIME_HOURS, currency_for, labor_rules_for, organization_country
+from app.services.positions import positions_by_user, rate_for
 
 router = APIRouter(prefix="/payroll", tags=["payroll"])
 
@@ -71,6 +73,11 @@ def _build_payroll_rows(db: Session, organization_id: UUID, start_date: date, en
             return Decimal("0.00")
         return sorted(candidates, key=lambda item: (-item[0], -item[1], item[2]))[0][1]
 
+    member_positions = {str(user_id): rows for user_id, rows in positions_by_user(db, organization_id).items()}
+    us_rules = labor_rules_for(organization_country(db, organization_id)) == "US"
+    # Straight-time hours and pay per person per workweek (Mon-Sun), for the FLSA overtime premium.
+    week_totals: dict[tuple[str, date], list[Decimal]] = defaultdict(lambda: [Decimal("0"), Decimal("0")])
+
     payroll_acc: dict[str, dict[str, Decimal]] = {}
     for item in confirmed_timesheets:
         user_key = str(item.user_id)
@@ -85,6 +92,8 @@ def _build_payroll_rows(db: Session, organization_id: UUID, start_date: date, en
                 shift_rate = rates_by_user_location.get((user_key, str(shift.location_id)))
                 if shift_rate is not None:
                     resolved_rate = shift_rate
+                # A rate set for the position worked (e.g. bartender vs server) wins over the location rate.
+                resolved_rate = rate_for(member_positions.get(user_key), shift.staff_position, resolved_rate)
         entry = payroll_acc.get(user_key)
         if entry is None:
             entry = {
@@ -96,8 +105,24 @@ def _build_payroll_rows(db: Session, organization_id: UUID, start_date: date, en
             payroll_acc[user_key] = entry
         entry["approved_hours"] += worked_hours
         entry["payroll_pln"] += worked_hours * resolved_rate
+        week = week_totals[(user_key, item.work_date - timedelta(days=item.work_date.weekday()))]
+        week[0] += Decimal(str(worked_hours))
+        week[1] += Decimal(str(worked_hours)) * resolved_rate
         if item.is_restricted_entry:
             entry["restricted_hours"] += worked_hours
+
+    overtime_by_user: dict[str, tuple[Decimal, Decimal]] = {}
+    if us_rules:
+        limit = Decimal(str(US_WEEKLY_OVERTIME_HOURS))
+        for (user_key, _week), (hours, pay) in week_totals.items():
+            if hours <= limit:
+                continue
+            overtime_hours = hours - limit
+            # Regular rate = straight pay / hours; overtime adds the extra half on top of straight time.
+            premium = overtime_hours * (pay / hours) * Decimal(str(US_OVERTIME_MULTIPLIER - 1))
+            current_hours, current_premium = overtime_by_user.get(user_key, (Decimal("0"), Decimal("0")))
+            overtime_by_user[user_key] = (current_hours + overtime_hours, current_premium + premium)
+            payroll_acc[user_key]["payroll_pln"] += premium
 
     rows: list[dict] = []
     for user_key, membership in memberships_by_org_user.items():
@@ -128,6 +153,10 @@ def _build_payroll_rows(db: Session, organization_id: UUID, start_date: date, en
         }
         if restricted_hours > 0:
             row["restricted_hours"] = str(restricted_hours)
+        overtime = overtime_by_user.get(user_key)
+        if overtime:
+            row["overtime_hours"] = str(overtime[0].quantize(Decimal("0.01")))
+            row["overtime_premium"] = str(overtime[1].quantize(Decimal("0.01")))
         rows.append(row)
 
     rows.sort(key=lambda item: (-Decimal(item["payroll_pln"]), item["full_name"].lower()))
@@ -172,6 +201,7 @@ def payroll_summary(
             "viewer_scope": "self" if context.membership.role == RoleEnum.STAFF else "team",
             "total_hours": str(total_hours.quantize(Decimal("0.01"))),
             "total_payroll_pln": str(total_payroll.quantize(Decimal("0.01"))),
+            "currency": currency_for(organization_country(db, context.membership.organization_id)),
             "rows": rows,
         }
     )
@@ -193,8 +223,8 @@ def export_payroll_csv(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    """Payroll for the accountant, in the spreadsheet format of the business's country."""
     require_feature(db, context.membership.organization_id, "payroll")
-    """Payroll for the accountant: semicolon-separated with decimal commas, as Polish Excel expects."""
     organization = get_current_organization(context, db)
     if context.membership.role == RoleEnum.MANAGER and not can_view_payroll(context.membership, organization):
         raise HTTPException(status_code=403, detail="Manager payroll access is disabled in this workspace")
@@ -202,24 +232,37 @@ def export_payroll_csv(
         raise HTTPException(status_code=422, detail="end_date must not be before start_date")
 
     rows = _build_payroll_rows(db, context.membership.organization_id, start_date, end_date)
+    country = organization_country(db, context.membership.organization_id)
+    currency = currency_for(country)
+    polish = country == "PL"
+    # Polish Excel expects ";" and decimal commas; US spreadsheets expect "," and decimal points.
+    number = _polish_decimal if polish else (lambda value: value)
     buffer = io.StringIO()
-    writer = csv.writer(buffer, delimiter=";", lineterminator="\r\n")
-    writer.writerow(["Pracownik", "Stanowisko", "Rola", "Godziny zatwierdzone", "Stawka PLN/h", "Wynagrodzenie PLN", "Godziny poza grafikiem"])
+    writer = csv.writer(buffer, delimiter=";" if polish else ",", lineterminator="\r\n")
+    if polish:
+        header = ["Pracownik", "Stanowisko", "Rola", "Godziny zatwierdzone", f"Stawka {currency}/h", f"Wynagrodzenie {currency}", "Godziny poza grafikiem"]
+    else:
+        header = ["Employee", "Position", "Role", "Approved hours", f"Rate {currency}/h", f"Gross pay {currency}", "Unscheduled hours", "Overtime hours", f"Overtime premium {currency}"]
+    writer.writerow(header)
     for row in rows:
-        writer.writerow(
-            [
-                _safe_cell(row["full_name"]),
-                _safe_cell(row["staff_position"] or ""),
-                row["role"],
-                _polish_decimal(row["approved_hours"]),
-                _polish_decimal(row["hourly_rate_default_pln"]),
-                _polish_decimal(row["payroll_pln"]),
-                _polish_decimal(row.get("restricted_hours", "0.00")),
-            ]
-        )
+        cells = [
+            _safe_cell(row["full_name"]),
+            _safe_cell(row["staff_position"] or ""),
+            row["role"],
+            number(row["approved_hours"]),
+            number(row["hourly_rate_default_pln"]),
+            number(row["payroll_pln"]),
+            number(row.get("restricted_hours", "0.00")),
+        ]
+        if not polish:
+            cells += [row.get("overtime_hours", "0.00"), row.get("overtime_premium", "0.00")]
+        writer.writerow(cells)
     total_hours = sum((Decimal(row["approved_hours"]) for row in rows), Decimal("0.00"))
     total_payroll = sum((Decimal(row["payroll_pln"]) for row in rows), Decimal("0.00"))
-    writer.writerow(["RAZEM", "", "", _polish_decimal(f"{total_hours:.2f}"), "", _polish_decimal(f"{total_payroll:.2f}"), ""])
+    total_row = ["RAZEM" if polish else "TOTAL", "", "", number(f"{total_hours:.2f}"), "", number(f"{total_payroll:.2f}"), ""]
+    if not polish:
+        total_row += ["", ""]
+    writer.writerow(total_row)
 
     filename = f"payroll_{start_date.isoformat()}_{end_date.isoformat()}.csv"
     # BOM so Excel detects UTF-8 and shows Polish characters correctly.

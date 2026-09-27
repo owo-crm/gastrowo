@@ -398,6 +398,9 @@ def _notify_manager_and_ADMIN_about_request(
         )
 
 
+SOFT_REQUEST_ISSUES = {"weekly_overtime", "staff_position_mismatch"}
+
+
 def _ensure_request_assignment_valid(
     db: Session,
     organization_id: UUID,
@@ -412,8 +415,10 @@ def _ensure_request_assignment_valid(
         shift=shift,
         exclude_assignment_ids=exclude_assignment_ids,
     )
-    if issues:
-        raise HTTPException(status_code=422, detail=f"Cannot approve request: {', '.join(issues)}")
+    # Overtime and a different position are the manager's call when they approve; they don't block it.
+    blocking = [issue for issue in issues if issue not in SOFT_REQUEST_ISSUES]
+    if blocking:
+        raise HTTPException(status_code=422, detail=f"Cannot approve request: {', '.join(blocking)}")
 
 
 def _approve_pickup_request(db: Session, organization_id: UUID, request_item: ShiftRequest) -> None:

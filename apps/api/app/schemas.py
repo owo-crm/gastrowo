@@ -69,6 +69,9 @@ class OrganizationSettingsOut(APIModel):
     manager_can_manage_business_settings: bool = False
     manager_can_access_notes: bool = True
     manager_can_access_inventory: bool = True
+    country: str = "US"
+    currency: str = "USD"
+    labor_rules: str = "US"
 
 
 class MeOut(APIModel):
@@ -86,12 +89,17 @@ class MeOut(APIModel):
     is_platform_admin: bool = False
 
 
+Country = Literal["US", "PL"]
+
+
 class OrganizationCreate(BaseModel):
     name: str = Field(min_length=2, max_length=160)
+    country: Country = "US"
 
 
 class OrganizationPatch(BaseModel):
-    name: str = Field(min_length=2, max_length=160)
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    country: Country | None = None
 
 
 class OrganizationSettingsPatch(BaseModel):
@@ -197,6 +205,7 @@ class OwnerOnboardingCompleteRequest(BaseModel):
     organization_name: str = Field(min_length=2, max_length=160)
     password: str = Field(min_length=8, max_length=128)
     source: str = Field(min_length=2, max_length=80)
+    country: Country = "US"
 
 
 class InviteJoinVerifyRequest(BaseModel):
@@ -322,16 +331,33 @@ class UserMembershipOut(APIModel):
 
 
 class StaffPositionPatch(BaseModel):
+    """Set the primary position. Any name works (Server, Host, Kucharz…); it is added to the catalog."""
+
     staff_position: str = Field(min_length=2, max_length=80)
 
     @model_validator(mode="after")
-    def validate_allowed_position(self):
-        allowed = {"Cook", "Waiter", "Bartender", "Manager"}
-        normalized = self.staff_position.strip()
-        if normalized not in allowed:
-            raise ValueError("staff_position must be one of: Cook, Waiter, Bartender, Manager")
-        self.staff_position = normalized
+    def normalize_position(self):
+        self.staff_position = " ".join(self.staff_position.split())
+        if len(self.staff_position) < 2:
+            raise ValueError("staff_position must have at least 2 characters")
         return self
+
+
+class MemberPositionItem(BaseModel):
+    position: str = Field(min_length=2, max_length=80)
+    # None means "use the person's rate at the location".
+    hourly_rate: Decimal | None = Field(default=None, ge=0)
+    is_primary: bool = False
+
+
+class MemberPositionsPut(BaseModel):
+    positions: list[MemberPositionItem] = Field(max_length=12)
+
+
+class MemberPositionOut(APIModel):
+    position: str
+    hourly_rate: Decimal | None = None
+    is_primary: bool
 
 
 class LocationMemberOut(APIModel):
@@ -364,6 +390,7 @@ class WorkerSetupOut(APIModel):
     full_name: str
     role: RoleEnum
     staff_position: str | None = None
+    positions: list[MemberPositionOut] = []
     locations: list[WorkerSetupLocationItem]
     permission_overrides: MembershipPermissionOverridesOut
 

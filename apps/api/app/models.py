@@ -154,6 +154,8 @@ class Organization(Base):
     manager_can_manage_business_settings: Mapped[bool] = mapped_column(Boolean, default=False)
     manager_can_access_notes: Mapped[bool] = mapped_column(Boolean, default=True)
     manager_can_access_inventory: Mapped[bool] = mapped_column(Boolean, default=True)
+    # "US" or "PL": drives currency, labour rules and CSV format. Businesses created before this existed are Polish.
+    country: Mapped[str] = mapped_column(String(2), default="US")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
@@ -303,6 +305,20 @@ class ScheduleWeeklyOverride(Base):
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
     )
+
+
+class MemberPosition(Base):
+    """A position a team member can work. One is primary; a rate here overrides the location rate."""
+
+    __tablename__ = "member_positions"
+    __table_args__ = (UniqueConstraint("organization_id", "user_id", "position", name="uq_member_position"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    position: Mapped[str] = mapped_column(String(80))
+    hourly_rate: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class PositionCatalog(Base):

@@ -48,6 +48,7 @@ from app.schemas import (
     SessionBootstrapResponse,
 )
 from app.services.auth_email import send_otp_email
+from app.services.labor_rules import default_timezone_for, locale_settings
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, sync_stripe_seats
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -226,6 +227,7 @@ def _settings_out(organization: Organization | None) -> OrganizationSettingsOut 
         manager_can_manage_business_settings=organization.manager_can_manage_business_settings,
         manager_can_access_notes=organization.manager_can_access_notes,
         manager_can_access_inventory=organization.manager_can_access_inventory,
+        **locale_settings(organization),
     )
 
 
@@ -342,7 +344,7 @@ def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, response:
         password_hash=hash_password(payload.password),
         onboarding_source=payload.source.strip(),
     )
-    org = Organization(name=payload.organization_name.strip())
+    org = Organization(name=payload.organization_name.strip(), country=payload.country)
     db.add_all([user, org])
     db.flush()
     membership = OrganizationMembership(
@@ -352,7 +354,7 @@ def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, response:
         max_hours_per_week=60,
         staff_position=None,
     )
-    location = Location(organization_id=org.id, name="Main Location", timezone="Europe/Warsaw")
+    location = Location(organization_id=org.id, name="Main Location", timezone=default_timezone_for(payload.country))
     db.add_all([membership, location])
     db.flush()
     db.add(LocationMembership(location_id=location.id, user_id=user.id))

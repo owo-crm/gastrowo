@@ -26,6 +26,8 @@ from app.models import (
     User,
 )
 from app.services.billing import organization_plan, plan_allows
+from app.services.labor_rules import labor_rules_for, organization_country, weekly_overtime_issue
+from app.services.positions import is_primary_position, position_names, positions_by_user, rate_for
 
 
 @dataclass
@@ -518,6 +520,9 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
     role_buckets: dict[RoleEnum, list[OrganizationMembership]] = defaultdict(list)
     for membership, _ in memberships:
         role_buckets[membership.role].append(membership)
+    member_positions = positions_by_user(db, organization_id)
+    country = organization_country(db, organization_id)
+    polish_rules = labor_rules_for(country) == "PL"
 
     location_memberships = db.scalars(
         select(LocationMembership)
@@ -589,9 +594,9 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
                 reasons.append("location_priority_blocked")
 
             if demand.required_role == RoleEnum.STAFF:
-                membership_position = (membership.staff_position or "Staff").strip().lower()
-                template_position = (demand.staff_position or "Staff").strip().lower()
-                if membership_position != template_position:
+                # Anyone who can work this position fits, not only people whose main position it is.
+                wanted = (demand.staff_position or "Staff").strip().lower()
+                if wanted not in (position_names(membership, member_positions.get(membership.user_id)) or {"staff"}):
                     reasons.append("staff_position_mismatch")
 
             availability_week = availability_week_by_user.get(membership.user_id)
@@ -627,13 +632,14 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
             )
             if has_overlap:
                 reasons.append("overlap")
-            else:
+            elif polish_rules:
                 reasons.extend(
                     labour_code_rest_issues(
                         [*windows_by_user.get(membership.user_id, []), *boundary_windows_by_user.get(membership.user_id, [])],
                         (demand.date, demand.start_time, demand.end_time),
                     )
                 )
+            reasons.extend(weekly_overtime_issue(country, current_hours + shift_hours))
 
             if reasons:
                 rejected_for_demand[membership.user_id] = RejectedCandidate(
@@ -656,6 +662,8 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
             key=lambda item: (
                 0 if demand.preferred_user_id and item[0].user_id == demand.preferred_user_id else 1,
                 -item[1].priority,
+                # Among equals, prefer people for whom this is their main position.
+                0 if is_primary_position(item[0], member_positions.get(item[0].user_id), demand.staff_position) else 1,
                 item[2],
                 item[3].full_name.lower(),
                 str(item[0].user_id),
@@ -691,7 +699,10 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
 
         for membership, location_member, _, user, _start_covered in selected:
             updated_hours = hours_by_user.get(membership.user_id, 0.0) + shift_hours
-            cost_pln = _decimal_hour_cost(Decimal(location_member.hourly_rate_pln), shift_hours)
+            cost_pln = _decimal_hour_cost(
+                rate_for(member_positions.get(membership.user_id), demand.staff_position, location_member.hourly_rate_pln),
+                shift_hours,
+            )
             planned_assignments.append(
                 PlannedAssignment(
                     shift_key=demand.shift_key,
@@ -1040,6 +1051,11 @@ def collect_assignment_validation_issues(
 
     if membership.role != shift.required_role:
         issues.append("role_mismatch")
+    elif shift.required_role == RoleEnum.STAFF and shift.staff_position:
+        rows = positions_by_user(db, organization_id).get(user_id)
+        if shift.staff_position.strip().lower() not in position_names(membership, rows):
+            issues.append("staff_position_mismatch")
+    country = organization_country(db, organization_id)
 
     location_membership = db.scalar(
         select(LocationMembership).where(
@@ -1089,16 +1105,22 @@ def collect_assignment_validation_issues(
                 Shift.date <= week_start + timedelta(days=7),
             )
         ).all()
-        issues.extend(
-            labour_code_rest_issues(
-                [
-                    (row_shift.date, row_shift.start_time, row_shift.end_time)
-                    for row_assignment, row_shift in rest_rows
-                    if not (exclude_assignment_ids and row_assignment.id in exclude_assignment_ids)
-                ],
-                (shift.date, shift.start_time, shift.end_time),
+        kept_rows = [
+            row_shift for row_assignment, row_shift in rest_rows if not (exclude_assignment_ids and row_assignment.id in exclude_assignment_ids)
+        ]
+        if labor_rules_for(country) == "PL":
+            issues.extend(
+                labour_code_rest_issues(
+                    [(row_shift.date, row_shift.start_time, row_shift.end_time) for row_shift in kept_rows],
+                    (shift.date, shift.start_time, shift.end_time),
+                )
             )
+        week_hours = sum(
+            shift_duration_hours(row_shift.start_time, row_shift.end_time)
+            for row_shift in kept_rows
+            if week_start <= row_shift.date <= week_start + timedelta(days=6)
         )
+        issues.extend(weekly_overtime_issue(country, week_hours + shift_duration_hours(shift.start_time, shift.end_time)))
     availability_week = db.scalar(
         select(AvailabilityWeek).where(
             AvailabilityWeek.organization_id == organization_id,
