@@ -25,6 +25,7 @@ services:
       APP_ENV: production
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       PLATFORM_ADMIN_EMAILS: ${PLATFORM_ADMIN_EMAILS:-}
+      DEV_LOGIN_SECRET: ${DEV_LOGIN_SECRET:-}
     depends_on:
       - db
     command: >

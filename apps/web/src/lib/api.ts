@@ -98,8 +98,8 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
-  devLogin() {
-    return request<AuthLoginResponse>("/auth/dev-login", { method: "POST" });
+  devLogin(secret?: string | null) {
+    return request<AuthLoginResponse>("/auth/dev-login", { method: "POST", body: JSON.stringify({ secret: secret ?? null }) });
   },
   loginWithPassword(input: { email: string; password: string }) {
     return request<AuthLoginResponse>("/auth/login/password", {

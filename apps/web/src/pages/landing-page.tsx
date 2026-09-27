@@ -192,7 +192,7 @@ export function LandingPage() {
               </ul>
             </nav>
             <div className="flex items-center gap-4">
-              <DevLoginButton className="hidden sm:inline-flex" />
+              <DevLoginButton className="max-sm:hidden" />
               <Link to={SIGNIN_URL} className="text-sm font-medium text-[var(--color-heading)] transition hover:text-[var(--color-primary)]">
                 Zaloguj
               </Link>

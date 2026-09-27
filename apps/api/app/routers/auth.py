@@ -34,6 +34,7 @@ from app.models import (
     hash_auth_session_token,
 )
 from app.schemas import (
+    DevLoginRequest,
     InviteJoinVerifyRequest,
     LoginRequest,
     MeOut,
@@ -388,10 +389,16 @@ def login_with_password(payload: LoginRequest, response: Response, db: Session =
     return ok(_issue_auth_payload(user, memberships))
 
 
+def _dev_login_allowed(secret: str | None) -> bool:
+    if settings.dev_login_secret and secret:
+        return hmac.compare_digest(secret.encode("utf-8"), settings.dev_login_secret.encode("utf-8"))
+    return settings.dev_login_enabled and settings.app_env != "production"
+
+
 @router.post("/dev-login")
-def dev_login(response: Response, db: Session = Depends(get_db)):
-    """One-click admin login for local/staging testing; invisible unless DEV_LOGIN_ENABLED is set."""
-    if not settings.dev_login_enabled or settings.app_env == "production":
+def dev_login(response: Response, payload: DevLoginRequest | None = None, db: Session = Depends(get_db)):
+    """One-click admin login for testing: DEV_LOGIN_ENABLED outside production, or DEV_LOGIN_SECRET anywhere."""
+    if not _dev_login_allowed(payload.secret if payload else None):
         raise HTTPException(status_code=404, detail="Not Found")
 
     if settings.dev_login_email:
