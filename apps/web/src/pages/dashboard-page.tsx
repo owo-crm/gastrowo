@@ -550,7 +550,7 @@ export function DashboardPage() {
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-lg font-bold tracking-[-0.04em] text-slate-950">{t("dashboard.revenue_trend")}</p>
-                    <p className="text-sm text-slate-500">{t("dashboard.revenue_trend_description")}</p>
+                    <p className="text-sm text-slate-500">{t(periodMode === "monthly" ? "dashboard.revenue_trend_description_monthly" : "dashboard.revenue_trend_description_weekly")}</p>
                   </div>
                   <div className="flex items-center gap-4 text-sm">
                     <span className="inline-flex items-center gap-2 text-slate-600"><span className="size-2.5 rounded-full bg-[#2563eb]" /> {t("dashboard.revenue")}</span>

@@ -1184,8 +1184,6 @@ function AppliedTimetableBoard({
                   const borderColor = entry.isConflict ? "#ef4444" : entry.isOpen ? "#fca5a5" : hexToRgba(tone.accent, 0.38);
                   const rowStart = Math.max(1, Math.round((entry.startMinutes - startMinutes) / 60) + 1);
                   const rowSpan = Math.max(1, Math.round(entry.durationMinutes / 60) + 1);
-                  const repeatedLabelCount = Math.max(1, rowSpan);
-
                   return (
                     <div
                       key={entry.key}
@@ -1211,18 +1209,13 @@ function AppliedTimetableBoard({
                             {entry.positionLabel}{"\n"}{entry.metaLabel}
                           </p>
                         ) : (
-                          <div
-                            className="grid h-full items-stretch"
-                            style={{ gridTemplateRows: `repeat(${repeatedLabelCount}, minmax(0, 1fr))` }}
-                          >
-                            {Array.from({ length: repeatedLabelCount }).map((_, labelIndex) => (
-                              <p
-                                key={`${entry.key}-label-${labelIndex}`}
-                                className={`flex items-center whitespace-pre-line font-semibold text-[var(--color-heading)] ${compact ? "text-[9px] leading-3" : "text-[10px] leading-3.5"}`}
-                              >
-                                {namesLabel || t("schedule.assigned_label")}
-                              </p>
-                            ))}
+                          <div className="pt-1" title={`${formatTime(entry.startTime)}-${formatTime(entry.endTime)} ${entry.assignedNames.join(", ")}`}>
+                            <p className={`whitespace-pre-line font-semibold text-[var(--color-heading)] ${compact ? "text-[9px] leading-3" : "text-[10px] leading-3.5"}`}>
+                              {namesLabel || t("schedule.assigned_label")}
+                            </p>
+                            <p className={`mt-0.5 text-[var(--color-text-muted)] ${compact ? "text-[8px] leading-3" : "text-[9px] leading-3"}`}>
+                              {formatTime(entry.startTime)}–{formatTime(entry.endTime)}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -1416,6 +1409,7 @@ export function SchedulePage() {
     return t("schedule.status_pending");
   };
   const deltaText = (shift: Shift | null, entry: TimesheetEntry) => {
+    if (!shift && entry.shift_id && !entry.is_restricted_entry) return "";
     if (!shift || entry.is_restricted_entry) return t("schedule.extra_entry");
     const plannedMinutes = durationMinutes(shift.start_time, shift.end_time);
     const reportedMinutes = durationMinutes(entry.arrived_at, entry.left_at);
@@ -2285,9 +2279,18 @@ export function SchedulePage() {
   ) => {
     const availableSlots = managerAvailabilitySlotsByUserDay[member.id]?.[dayIso] ?? [];
     const hasAvailability = availableSlots.length > 0;
-    const fullyAvailable = availableSlots.some(
-      (slot) => timeToMinutes(slot.start_time) <= timeToMinutes(startTime) && timeToMinutes(slot.end_time) >= timeToMinutes(endTime),
-    );
+    const submittedThisWeek = Object.values(managerAvailabilitySlotsByUserDay[member.id] ?? {}).some((slots) => slots.length > 0);
+    // Overnight ranges (e.g. 18:00-02:00) end on the next day, so compare them on a 0-48h scale.
+    const toRange = (from: string, to: string) => {
+      const start = timeToMinutes(from);
+      const end = timeToMinutes(to);
+      return [start, end <= start ? end + 24 * 60 : end] as const;
+    };
+    const [wantedStart, wantedEnd] = toRange(startTime, endTime);
+    const fullyAvailable = availableSlots.some((slot) => {
+      const [slotStart, slotEnd] = toRange(slot.start_time, slot.end_time);
+      return slotStart <= wantedStart && slotEnd >= wantedEnd;
+    });
     const hasConflict = Object.values(previewEntriesByDate)
       .flat()
       .some(
@@ -2309,7 +2312,9 @@ export function SchedulePage() {
       };
     }
     if (!hasAvailability) {
-      return { rank: 2, tone: "muted" as const, label: t("schedule.no_submitted_availability") };
+      return submittedThisWeek
+        ? { rank: 3, tone: "warning" as const, label: t("schedule.day_off_in_availability") }
+        : { rank: 2, tone: "muted" as const, label: t("schedule.no_submitted_availability") };
     }
     return { rank: 3, tone: "warning" as const, label: t("schedule.unavailable_for_selected_time") };
   };
@@ -3393,11 +3398,13 @@ export function SchedulePage() {
                           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                             {shift
                               ? `${shift.staff_position ?? shift.required_role} • ${shift.date} ${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`
-                              : t("schedule.extra_hours_without_shift")}
+                              : entry.shift_id
+                                ? t("schedule.planned_entry")
+                                : t("schedule.extra_hours_without_shift")}
                           </p>
-                          <p className={`mt-1 text-xs font-semibold ${deltaLabel.startsWith("+") ? "text-amber-700" : deltaLabel.startsWith("-") ? "text-sky-700" : "text-emerald-700"}`}>
+                          {deltaLabel ? <p className={`mt-1 text-xs font-semibold ${deltaLabel.startsWith("+") ? "text-amber-700" : deltaLabel.startsWith("-") ? "text-sky-700" : "text-emerald-700"}`}>
                             {deltaLabel === t("schedule.extra_entry") ? t("schedule.extra_entry") : t("schedule.delta_vs_plan", { delta: deltaLabel })}
-                          </p>
+                          </p> : null}
                           {entry.note ? <p className="mt-2 text-sm text-[var(--color-heading)]">{entry.note}</p> : null}
                         </div>
                         <Badge className={timesheetStatusClass(entry.status)}>{statusText(entry.status)}</Badge>
