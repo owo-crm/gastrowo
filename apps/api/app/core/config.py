@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     stripe_portal_return_url: str | None = None
     # Comma-separated emails of GastrOWO staff allowed to read platform-wide data (e.g. waitlist leads).
     platform_admin_emails: str = ""
+    # Test-only one-click login (POST /auth/dev-login). Refused in production.
+    dev_login_enabled: bool = False
+    dev_login_email: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 
@@ -45,6 +48,8 @@ class Settings(BaseSettings):
             if self.secret_key in {"change-me-in-dev", "replace-with-a-long-random-secret"} or len(self.secret_key) < 32:
                 raise ValueError("SECRET_KEY must be set to a random value of at least 32 characters in production")
             self.auth_session_secure_cookie = True
+            if self.dev_login_enabled:
+                raise ValueError("DEV_LOGIN_ENABLED must not be set in production")
         return self
 
     @property

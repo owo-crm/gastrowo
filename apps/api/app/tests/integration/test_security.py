@@ -71,3 +71,38 @@ def test_database_url_is_normalized_for_psycopg2():
     assert settings.database_url == "postgresql+psycopg2://user:pass@db:5432/app"
     settings = Settings(database_url="postgresql+psycopg://user:pass@db:5432/app")
     assert settings.database_url == "postgresql+psycopg2://user:pass@db:5432/app"
+
+
+def test_dev_login_is_hidden_unless_enabled(client):
+    assert client.post("/auth/dev-login").status_code == 404
+
+
+def test_dev_login_signs_in_as_admin(client, monkeypatch):
+    from app.core.config import settings
+
+    email = "owner@devlogin.com"
+    code = _start_owner_signup(client, email)
+    verify = client.post("/auth/otp/verify", json={"email": email, "code": code, "purpose": "owner_signup"})
+    client.post(
+        "/auth/onboarding/owner/complete",
+        json={
+            "verification_token": verify.json()["data"]["verification_token"],
+            "organization_name": "Dev Login Org",
+            "full_name": "Owner",
+            "email": email,
+            "password": "Owner123!",
+            "source": "Google",
+        },
+    )
+
+    monkeypatch.setattr(settings, "dev_login_enabled", True)
+    login = client.post("/auth/dev-login")
+    assert login.status_code == 200
+    assert login.json()["data"]["role"] == "ADMIN"
+    me = client.get("/auth/me", headers={"Authorization": f"Bearer {login.json()['data']['access_token']}"})
+    assert me.json()["data"]["email"] == email
+
+
+def test_production_rejects_dev_login():
+    with pytest.raises(ValueError):
+        Settings(app_env="production", secret_key="x" * 40, dev_login_enabled=True)
