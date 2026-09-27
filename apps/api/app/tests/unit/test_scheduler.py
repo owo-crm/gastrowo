@@ -440,3 +440,54 @@ def test_apply_is_not_blocked_when_shift_is_assigned_even_if_availability_starts
 
     applied_plan = apply_week_schedule(db_session, org.id, monday, manager.id)
     assert applied_plan.created_assignments == 1
+
+
+def test_scheduler_respects_daily_rest_after_closing_shift(db_session):
+    org = Organization(name="Rest Org")
+    manager = User(email="mgr@rest.local", full_name="Manager", password_hash="x")
+    closer = User(email="closer@rest.local", full_name="Closer", password_hash="x")
+    db_session.add_all([org, manager, closer])
+    db_session.flush()
+
+    location = Location(organization_id=org.id, name="Gdynia", timezone="Europe/Warsaw")
+    db_session.add(location)
+    db_session.flush()
+    db_session.add_all(
+        [
+            OrganizationMembership(organization_id=org.id, user_id=manager.id, role=RoleEnum.MANAGER, max_hours_per_week=50),
+            OrganizationMembership(organization_id=org.id, user_id=closer.id, role=RoleEnum.STAFF, max_hours_per_week=40),
+            LocationMembership(location_id=location.id, user_id=closer.id, hourly_rate_pln=Decimal("30.00"), priority=5),
+        ]
+    )
+
+    monday = date(2026, 4, 20)
+    add_full_week_availability(
+        db_session=db_session,
+        organization_id=org.id,
+        user_id=closer.id,
+        week_start=monday,
+        desired_hours=40,
+        submitted_by=manager.id,
+        start_hour=0,
+        end_hour=23,
+    )
+    # Monday closing 15:00-23:00, Tuesday opening 07:00-15:00: only 8h of rest in between.
+    for day_of_week, start, end in ((0, time(15, 0), time(23, 0)), (1, time(7, 0), time(15, 0))):
+        db_session.add(
+            ShiftTemplate(
+                organization_id=org.id,
+                location_id=location.id,
+                day_of_week=day_of_week,
+                start_time=start,
+                end_time=end,
+                required_role=RoleEnum.STAFF,
+                required_count=1,
+            )
+        )
+    db_session.commit()
+
+    plan = plan_week_schedule(db_session, org.id, monday)
+
+    assert [item.date for item in plan.assignments] == [monday]
+    rejected = [item for item in plan.rejected_candidates if item.user_id == closer.id]
+    assert any("daily_rest_violation" in item.reasons for item in rejected)

@@ -173,6 +173,80 @@ def shifts_overlap(a_date: date, a_start: time, a_end: time, b_date: date, b_sta
     return a_start_dt < b_end_dt and b_start_dt < a_end_dt
 
 
+# Polish Labour Code: art. 132 (11h uninterrupted rest in every 24h "doba pracownicza")
+# and art. 133 (35h uninterrupted rest in every week).
+MIN_DAILY_REST_HOURS = 11
+MIN_WEEKLY_REST_HOURS = 35
+
+ShiftWindow = tuple[date, time, time]
+
+
+def _window_bounds(window: ShiftWindow) -> tuple[datetime, datetime]:
+    shift_date, start, end = window
+    start_dt = datetime.combine(shift_date, start)
+    end_dt = datetime.combine(shift_date, end)
+    if end_dt <= start_dt:
+        end_dt += timedelta(days=1)
+    return start_dt, end_dt
+
+
+def _longest_rest_hours(intervals: list[tuple[datetime, datetime]], period_start: datetime, period_end: datetime) -> float:
+    cursor = period_start
+    longest = timedelta(0)
+    for start_dt, end_dt in sorted(intervals):
+        if end_dt <= period_start or start_dt >= period_end:
+            continue
+        longest = max(longest, max(start_dt, period_start) - cursor)
+        cursor = max(cursor, min(end_dt, period_end))
+    longest = max(longest, period_end - cursor)
+    return longest.total_seconds() / 3600
+
+
+def labour_code_rest_issues(existing_windows: list[ShiftWindow], new_window: ShiftWindow) -> list[str]:
+    """Return rest-time violations caused by adding new_window to an employee's shifts."""
+    intervals = [_window_bounds(window) for window in [*existing_windows, new_window]]
+    new_start, new_end = _window_bounds(new_window)
+    issues: list[str] = []
+
+    # Every doba starting at a shift start that touches the new shift must keep an 11h break.
+    for doba_start, _ in intervals:
+        doba_end = doba_start + timedelta(hours=24)
+        if doba_end <= new_start - timedelta(hours=24) or doba_start >= new_end:
+            continue
+        if _longest_rest_hours(intervals, doba_start, doba_end) < MIN_DAILY_REST_HOURS:
+            issues.append("daily_rest_violation")
+            break
+
+    week_start = datetime.combine(new_window[0] - timedelta(days=new_window[0].weekday()), time.min)
+    if _longest_rest_hours(intervals, week_start, week_start + timedelta(days=7)) < MIN_WEEKLY_REST_HOURS:
+        issues.append("weekly_rest_violation")
+    return issues
+
+
+def _load_boundary_windows(
+    db: Session,
+    organization_id: UUID,
+    week_start: date,
+    week_end: date,
+    user_id: UUID | None = None,
+) -> dict[UUID, list[ShiftWindow]]:
+    """Shifts on the days around the planned week, needed to check rest across the week boundary."""
+    query = (
+        select(Assignment, Shift)
+        .join(Shift, Shift.id == Assignment.shift_id)
+        .where(
+            Shift.organization_id == organization_id,
+            Shift.date.in_([week_start - timedelta(days=1), week_end + timedelta(days=1)]),
+        )
+    )
+    if user_id is not None:
+        query = query.where(Assignment.user_id == user_id)
+    windows: dict[UUID, list[ShiftWindow]] = defaultdict(list)
+    for assignment, shift in db.execute(query).all():
+        windows[assignment.user_id].append((shift.date, shift.start_time, shift.end_time))
+    return windows
+
+
 def is_available_for_shift(slots: list[AvailabilitySlot], shift_day: int, shift_start: time, shift_end: time) -> bool:
     shift_hours = shift_duration_hours(shift_start, shift_end)
     # Allow realistic non-perfect windows (for example 11:00-17:00 shift and 12:00-18:00 preference).
@@ -473,6 +547,8 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
         replaced_location_id=location_id,
     )
 
+    boundary_windows_by_user = _load_boundary_windows(db, organization_id, week_start, week_end)
+
     planned_assignments: list[PlannedAssignment] = []
     rejected_candidates: list[RejectedCandidate] = []
     open_shifts: list[OpenShiftSummary] = []
@@ -541,6 +617,13 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
             )
             if has_overlap:
                 reasons.append("overlap")
+            else:
+                reasons.extend(
+                    labour_code_rest_issues(
+                        [*windows_by_user.get(membership.user_id, []), *boundary_windows_by_user.get(membership.user_id, [])],
+                        (demand.date, demand.start_time, demand.end_time),
+                    )
+                )
 
             if reasons:
                 rejected_for_demand[membership.user_id] = RejectedCandidate(
@@ -984,6 +1067,28 @@ def collect_assignment_validation_issues(
             break
 
     week_start = shift.date - timedelta(days=shift.date.weekday())
+    if "overlap" not in issues:
+        rest_rows = db.execute(
+            select(Assignment, Shift)
+            .join(Shift, Shift.id == Assignment.shift_id)
+            .where(
+                Assignment.user_id == user_id,
+                Shift.organization_id == organization_id,
+                Shift.id != shift.id,
+                Shift.date >= week_start - timedelta(days=1),
+                Shift.date <= week_start + timedelta(days=7),
+            )
+        ).all()
+        issues.extend(
+            labour_code_rest_issues(
+                [
+                    (row_shift.date, row_shift.start_time, row_shift.end_time)
+                    for row_assignment, row_shift in rest_rows
+                    if not (exclude_assignment_ids and row_assignment.id in exclude_assignment_ids)
+                ],
+                (shift.date, shift.start_time, shift.end_time),
+            )
+        )
     availability_week = db.scalar(
         select(AvailabilityWeek).where(
             AvailabilityWeek.organization_id == organization_id,
