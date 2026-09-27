@@ -812,3 +812,32 @@ def test_rematerializing_preview_does_not_duplicate_or_resurrect_shifts(client):
     assert deleted.status_code == 200, deleted.text
     assert client.post("/schedule/preview/materialize", headers=auth_header(ADMIN_token), json=body).status_code == 200
     assert [row["day_of_week"] for row in active_slots()] == [0, 0]
+
+
+def test_pending_invites_list_cancel_and_join_with_name(client):
+    ADMIN_token, location_id = signup_ADMIN(client, organization_name="Invites Org", email="ADMIN@invites.com")
+    for _ in range(2):
+        sent = client.post("/organizations/members/link-by-email", headers=auth_header(ADMIN_token), json={"email": "new@invites.com"})
+        assert sent.status_code == 200
+    client.post("/organizations/members/link-by-email", headers=auth_header(ADMIN_token), json={"email": "other@invites.com"})
+
+    pending = client.get("/organizations/invites", headers=auth_header(ADMIN_token)).json()["data"]
+    assert sorted(item["email"] for item in pending) == ["new@invites.com", "other@invites.com"]
+
+    other = next(item for item in pending if item["email"] == "other@invites.com")
+    assert client.delete(f"/organizations/invites/{other['id']}", headers=auth_header(ADMIN_token)).status_code == 200
+
+    invite_link = client.post("/organizations/members/link-by-email", headers=auth_header(ADMIN_token), json={"email": "new@invites.com"})
+    token = invite_link.json()["data"]["debug_join_link"].split("token=")[1]
+    client.post("/auth/otp/send", json={"email": "new@invites.com", "purpose": "invite_join", "invite_token": token})
+    joined = client.post(
+        "/auth/invites/join/verify",
+        json={"email": "new@invites.com", "code": sent_code("new@invites.com"), "invite_token": token, "full_name": "Nowa Kelnerka"},
+    )
+    assert joined.status_code == 200
+    users = client.get("/users", headers=auth_header(ADMIN_token)).json()["data"]
+    assert any(user["full_name"] == "Nowa Kelnerka" for user in users)
+    assert client.get("/organizations/invites", headers=auth_header(ADMIN_token)).json()["data"] == []
+    members = client.get(f"/locations/{location_id}/members", headers=auth_header(ADMIN_token)).json()["data"]
+    new_member = next(item for item in members if item.get("full_name") == "Nowa Kelnerka")
+    assert new_member["priority"] == 3

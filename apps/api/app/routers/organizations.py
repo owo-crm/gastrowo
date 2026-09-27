@@ -5,7 +5,7 @@ import uuid
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -40,7 +40,7 @@ from app.schemas import (
     OrganizationSettingsPatch,
 )
 from app.services.auth_email import send_invite_email
-from app.services.billing import build_subscription_summary, require_feature, sync_stripe_seats
+from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, require_feature, sync_stripe_seats
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -251,6 +251,14 @@ def link_member_by_email(
     normalized_email = payload.email.lower()
     user = db.scalar(select(User).where(User.email == normalized_email))
     if user is None:
+        # Re-inviting replaces the previous link instead of piling up pending invites.
+        db.execute(
+            delete(InviteToken).where(
+                InviteToken.organization_id == context.membership.organization_id,
+                InviteToken.email == normalized_email,
+                InviteToken.accepted_at.is_(None),
+            )
+        )
         invite_token = uuid.uuid4().hex
         invite = InviteToken(
             organization_id=context.membership.organization_id,
@@ -303,7 +311,7 @@ def link_member_by_email(
     for location_id in location_ids:
         exists = db.scalar(select(LocationMembership).where(LocationMembership.location_id == location_id, LocationMembership.user_id == user.id))
         if exists is None:
-            db.add(LocationMembership(location_id=location_id, user_id=user.id, priority=0, hourly_rate_pln=0))
+            db.add(LocationMembership(location_id=location_id, user_id=user.id, priority=DEFAULT_LOCATION_PRIORITY, hourly_rate_pln=0))
 
     db.commit()
     sync_stripe_seats(db, context.membership.organization_id)
@@ -397,3 +405,42 @@ def remove_member(
             removed=True,
         ).model_dump(mode="json")
     )
+
+
+@router.get("/invites")
+def list_pending_invites(
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    """Invites that were sent but not accepted yet, so owners can see who is still missing."""
+    organization = get_current_organization(context, db)
+    if not can_manage_team(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
+    invites = db.scalars(
+        select(InviteToken)
+        .where(InviteToken.organization_id == context.membership.organization_id, InviteToken.accepted_at.is_(None))
+        .order_by(InviteToken.expires_at.desc())
+    ).all()
+    return ok(
+        [
+            {"id": str(item.id), "email": item.email, "expires_at": item.expires_at}
+            for item in invites
+        ]
+    )
+
+
+@router.delete("/invites/{invite_id}")
+def cancel_invite(
+    invite_id: UUID,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    organization = get_current_organization(context, db)
+    if not can_manage_team(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
+    invite = db.get(InviteToken, invite_id)
+    if invite is None or invite.organization_id != context.membership.organization_id:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    db.delete(invite)
+    db.commit()
+    return ok({"deleted": True, "id": str(invite_id)})

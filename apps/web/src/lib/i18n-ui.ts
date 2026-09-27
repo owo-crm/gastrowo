@@ -3,6 +3,12 @@ import type { Lang } from "@/lib/i18n";
 /** Strings for the redesigned shell, onboarding and flows added during the 2026-09 UX pass. */
 export const uiTranslations: Record<Lang, Record<string, string>> = {
   en: {
+    "login.owner_body": "I run the restaurant and set up the team.",
+    "login.worker_body": "I work in a restaurant. I sign in with a code from my email.",
+    "login.business_name_placeholder": "e.g. Bistro Pod Lipą",
+    "login.full_name": "Your name",
+    "team.add_worker_title": "Invite a team member",
+    "team.send_invite": "Send invite",
     "nav.group.daily": "Every day",
     "nav.group.business": "Business",
     "nav.group.manage": "Management",
@@ -68,6 +74,12 @@ export const uiTranslations: Record<Lang, Record<string, string>> = {
     "overview.add_revenue": "Add revenue",
   },
   pl: {
+    "login.owner_body": "Prowadzę lokal i ustawiam zespół.",
+    "login.worker_body": "Pracuję w lokalu. Loguję się kodem z maila.",
+    "login.business_name_placeholder": "np. Bistro Pod Lipą",
+    "login.full_name": "Imię i nazwisko",
+    "team.add_worker_title": "Zaproś osobę do zespołu",
+    "team.send_invite": "Wyślij zaproszenie",
     "nav.group.daily": "Na co dzień",
     "nav.group.business": "Biznes",
     "nav.group.manage": "Zarządzanie",
@@ -133,6 +145,12 @@ export const uiTranslations: Record<Lang, Record<string, string>> = {
     "overview.add_revenue": "Dodaj utarg",
   },
   ru: {
+    "login.owner_body": "Я владелец заведения и настраиваю команду.",
+    "login.worker_body": "Я работаю в заведении. Вхожу по коду из письма.",
+    "login.business_name_placeholder": "например, Bistro Pod Lipą",
+    "login.full_name": "Имя и фамилия",
+    "team.add_worker_title": "Пригласить в команду",
+    "team.send_invite": "Отправить приглашение",
     "nav.group.daily": "Каждый день",
     "nav.group.business": "Бизнес",
     "nav.group.manage": "Управление",

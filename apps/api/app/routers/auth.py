@@ -48,7 +48,7 @@ from app.schemas import (
     SessionBootstrapResponse,
 )
 from app.services.auth_email import send_otp_email
-from app.services.billing import build_subscription_summary, sync_stripe_seats
+from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, sync_stripe_seats
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -440,7 +440,8 @@ def verify_invite_join(payload: InviteJoinVerifyRequest, response: Response, db:
 
     user = db.scalar(select(User).where(User.email == email))
     if user is None:
-        user = User(email=email, full_name=_pretty_name_from_email(email), password_hash="")
+        name = (payload.full_name or "").strip() or _pretty_name_from_email(email)
+        user = User(email=email, full_name=name[:120], password_hash="")
         db.add(user)
         db.flush()
     else:
@@ -464,7 +465,7 @@ def verify_invite_join(payload: InviteJoinVerifyRequest, response: Response, db:
             select(LocationMembership).where(LocationMembership.location_id == location_id, LocationMembership.user_id == user.id)
         )
         if exists is None:
-            db.add(LocationMembership(location_id=location_id, user_id=user.id, priority=0, hourly_rate_pln=0))
+            db.add(LocationMembership(location_id=location_id, user_id=user.id, priority=DEFAULT_LOCATION_PRIORITY, hourly_rate_pln=0))
 
     db.delete(invite)
     db.add(

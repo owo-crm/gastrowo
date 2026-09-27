@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Lock, Mail } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -280,7 +280,7 @@ export function LoginPage() {
     setIsSubmitting(true);
     try {
       setFieldErrors({});
-      await verifyInviteJoin({ email: effectiveEmail, code: otpCode, invite_token: inviteToken });
+      await verifyInviteJoin({ email: effectiveEmail, code: otpCode, invite_token: inviteToken, full_name: fullName.trim() || undefined });
       toast.success(t("login.business_joined"));
       searchParams.delete("token");
       searchParams.delete("email");
@@ -305,6 +305,10 @@ export function LoginPage() {
         <Input value={effectiveEmail} disabled />
       </div>
       {renderInlineError("email")}
+      <div className="space-y-2">
+        <label htmlFor="invite-full-name" className="text-sm font-medium text-[var(--color-heading)]">{t("login.full_name")}</label>
+        <Input id="invite-full-name" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder={t("login.full_name_placeholder")} autoComplete="name" />
+      </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Button type="button" onClick={() => handleSendCode("invite_join")} disabled={isSubmitting}>
           <Mail className="size-4" /> {t("login.send_code")}
@@ -641,16 +645,6 @@ export function LoginPage() {
             </div>
             <Card className="w-full rounded-[1.9rem] border border-[rgba(148,163,184,0.16)] bg-white/98 p-2 shadow-[0_28px_65px_rgba(15,23,42,0.08)]">
               <CardHeader className="p-5 pb-3 md:p-6 md:pb-3">
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {[(mode === "onboarding" ? t("login.mode.onboarding_title") : null), t("login.mode.signin_title"), t("login.mode.join_title")].filter(Boolean).map((label) => (
-                    <span
-                      key={label as string}
-                      className="rounded-full border border-[rgba(216,225,236,0.92)] bg-[rgba(243,247,251,0.86)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]"
-                    >
-                      {label}
-                    </span>
-                  ))}
-                </div>
                 <CardTitle className="text-[2rem] tracking-tight">
                   {isInviteJoin ? t("login.mode.join_title") : mode === "signin" ? t("login.mode.signin_title") : t("login.mode.onboarding_title")}
                 </CardTitle>

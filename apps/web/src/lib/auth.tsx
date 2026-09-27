@@ -24,7 +24,7 @@ type AuthContextValue = {
     password: string;
     source: string;
   }) => Promise<void>;
-  verifyInviteJoin: (payload: { email: string; code: string; invite_token: string }) => Promise<void>;
+  verifyInviteJoin: (payload: { email: string; code: string; invite_token: string; full_name?: string }) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -174,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await applySession(response.access_token);
   };
 
-  const verifyInviteJoin = async (payload: { email: string; code: string; invite_token: string }) => {
+  const verifyInviteJoin = async (payload: { email: string; code: string; invite_token: string; full_name?: string }) => {
     const response = await api.verifyInviteJoin(payload);
     await applySession(response.access_token);
   };

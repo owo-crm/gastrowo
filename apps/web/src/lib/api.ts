@@ -125,7 +125,7 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
-  verifyInviteJoin(input: { email: string; code: string; invite_token: string }) {
+  verifyInviteJoin(input: { email: string; code: string; invite_token: string; full_name?: string }) {
     return request<AuthLoginResponse>("/auth/invites/join/verify", {
       method: "POST",
       body: JSON.stringify(input),
@@ -212,6 +212,12 @@ export const api = {
   },
   listLocationMembers(token: string, locationId: string) {
     return request<LocationMember[]>(`/locations/${locationId}/members`, {}, token);
+  },
+  listInvites(token: string) {
+    return request<Array<{ id: string; email: string; expires_at: string }>>("/organizations/invites", {}, token);
+  },
+  cancelInvite(token: string, inviteId: string) {
+    return request<{ deleted: boolean; id: string }>(`/organizations/invites/${inviteId}`, { method: "DELETE" }, token);
   },
   linkMemberByEmail(
     token: string,
