@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CheckCircle2, Clock3, Coins, CreditCard, FilePlus2, LogOut, MoreHorizontal, Settings, Trash2, X, XCircle } from "lucide-react";
+import { Bell, CheckCircle2, Lock, Clock3, Coins, CreditCard, FilePlus2, LogOut, MoreHorizontal, Settings, Trash2, X, XCircle } from "lucide-react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand-logo";
@@ -227,7 +227,7 @@ function SidebarLink({ item }: { item: NavItem }) {
       className={({ isActive }) =>
         cn(
           "flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition",
-          isActive
+          isActive && !item.locked
             ? "bg-[var(--color-accent)] font-semibold text-[var(--color-primary)]"
             : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]",
         )
@@ -235,6 +235,7 @@ function SidebarLink({ item }: { item: NavItem }) {
     >
       <item.icon className="size-[1.1rem] shrink-0" aria-hidden />
       <span>{t(`nav.${item.key}`)}</span>
+      {item.locked ? <Lock className="ml-auto size-3.5 shrink-0" aria-label={t("nav.locked")} /> : null}
     </NavLink>
   );
 }
@@ -270,7 +271,7 @@ function MobileNav({ items }: { items: NavItem[] }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const primary = items.length > MOBILE_PRIMARY_COUNT + 1 ? items.slice(0, MOBILE_PRIMARY_COUNT) : items;
   const secondary = items.length > MOBILE_PRIMARY_COUNT + 1 ? items.slice(MOBILE_PRIMARY_COUNT) : [];
-  const moreActive = secondary.some((item) => location.pathname.startsWith(item.to)) || location.pathname.startsWith("/profile");
+  const moreActive = secondary.some((item) => !item.locked && location.pathname.startsWith(item.to)) || location.pathname.startsWith("/profile");
 
   useEffect(() => setMoreOpen(false), [location.pathname]);
 
@@ -296,7 +297,7 @@ function MobileNav({ items }: { items: NavItem[] }) {
             </div>
             <div className="space-y-1">
               {secondary.map((item) => (
-                <SidebarLink key={item.to} item={item} />
+                <SidebarLink key={item.key} item={item} />
               ))}
               <SidebarLink item={{ to: "/profile", key: "profile", icon: Settings, group: "manage" }} />
             </div>
@@ -309,8 +310,8 @@ function MobileNav({ items }: { items: NavItem[] }) {
       <nav className="fixed inset-x-0 bottom-0 z-[120] border-t border-[var(--color-border)] bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Menu">
         <ul className="mx-auto flex max-w-lg">
           {primary.map((item) => (
-            <li key={item.to} className="flex flex-1">
-              <NavLink to={item.to} className={({ isActive }) => tabClass(isActive)}>
+            <li key={item.key} className="flex flex-1">
+              <NavLink to={item.to} className={({ isActive }) => tabClass(isActive && !item.locked)}>
                 <item.icon className="size-5" aria-hidden />
                 <span className="truncate">{t(`nav.${item.key}`)}</span>
               </NavLink>
@@ -364,7 +365,7 @@ export function AppShell({
                 <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{t(`nav.group.${group}`)}</p>
                 <div className="space-y-0.5">
                   {groupItems.map((item) => (
-                    <SidebarLink key={item.to} item={item} />
+                    <SidebarLink key={item.key} item={item} />
                   ))}
                 </div>
               </div>
