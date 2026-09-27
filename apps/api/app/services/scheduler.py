@@ -25,6 +25,7 @@ from app.models import (
     ScheduleWeeklyOverride,
     User,
 )
+from app.services.billing import organization_plan, plan_allows
 
 
 @dataclass
@@ -548,6 +549,8 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
     )
 
     boundary_windows_by_user = _load_boundary_windows(db, organization_id, week_start, week_end)
+    # Free keeps manual scheduling: only people the manager picked in the preview are placed.
+    auto_assign = plan_allows(organization_plan(db, organization_id), "auto_schedule")
 
     planned_assignments: list[PlannedAssignment] = []
     rejected_candidates: list[RejectedCandidate] = []
@@ -562,6 +565,8 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
     for demand in demand_specs:
         shift_hours = shift_duration_hours(demand.start_time, demand.end_time)
         candidates = role_buckets.get(demand.required_role, [])
+        if not auto_assign:
+            candidates = [item for item in candidates if item.user_id == demand.preferred_user_id]
         eligible: list[tuple[OrganizationMembership, LocationMembership, float, User, bool]] = []
         rejected_for_demand: dict[UUID, RejectedCandidate] = {}
 

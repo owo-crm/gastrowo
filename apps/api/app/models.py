@@ -88,6 +88,7 @@ class NotificationTypeEnum(str, Enum):
 
 class SubscriptionPlanEnum(str, Enum):
     FREE = "free"
+    STANDARD = "standard"
     PRO = "pro"
     BUSINESS = "business"
     ENTERPRISE = "enterprise"

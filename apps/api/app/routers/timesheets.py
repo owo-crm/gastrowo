@@ -14,6 +14,7 @@ from app.db import get_db
 from app.models import Assignment, RoleEnum, Shift, Timesheet, TimesheetStatusEnum
 from app.schemas import TimesheetCreate, TimesheetEntry, TimesheetReviewAction
 from app.services.notifications import notify_admins_and_managers, notify_users
+from app.services.billing import require_feature
 
 router = APIRouter(prefix="/timesheets", tags=["timesheets"])
 
@@ -50,6 +51,7 @@ def create_timesheet(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.STAFF)),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "timesheets")
     organization_id = context.membership.organization_id
     work_date = payload.work_date
     is_restricted = payload.shift_id is None
@@ -141,6 +143,7 @@ def list_timesheets(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.STAFF)),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "timesheets")
     if context.membership.role == RoleEnum.STAFF and scope != "my":
         raise HTTPException(status_code=403, detail="Staff can only view own timesheets")
 
@@ -175,6 +178,7 @@ def review_timesheet(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "timesheets")
     item = db.get(Timesheet, timesheet_id)
     if item is None or item.organization_id != context.membership.organization_id:
         raise HTTPException(status_code=404, detail="Timesheet not found")

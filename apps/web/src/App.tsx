@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
-import { canAccessNotes, canAccessReport, canManageTeam, canViewOverview, canViewPayroll } from "@/lib/access";
+import { canAccessNotes, canAccessReport, canManageTeam, canViewOverview, canViewPayroll, hasPlanFeature } from "@/lib/access";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { BillingPage } from "@/pages/billing-page";
 import { LandingPage } from "@/pages/landing-page";
@@ -78,6 +78,7 @@ function NotesAccessRoute({ children }: { children: JSX.Element }) {
 
 function PayrollAccessRoute({ children }: { children: JSX.Element }) {
   const { me } = useAuth();
+  if (!hasPlanFeature(me, "payroll")) return <Navigate to="/schedule" replace />;
   if (me?.role === "STAFF" || me?.role === "ADMIN") return children;
   if (me?.role === "MANAGER" && canViewPayroll(me)) return children;
   return <Navigate to="/schedule" replace />;
@@ -89,12 +90,10 @@ export function App() {
   const effectiveMe = hasExplicitLogoutGuard ? null : me;
   const hasUnresolvedSession = Boolean(effectiveToken && !effectiveMe);
   const linkedDefaultRoute = effectiveMe?.is_linked
-    ? effectiveMe.role === "ADMIN"
+    ? canViewOverview(effectiveMe)
       ? "/overview"
-      : effectiveMe.role === "MANAGER"
-        ? canViewOverview(effectiveMe)
-          ? "/overview"
-          : "/report"
+      : effectiveMe.role === "MANAGER" && canAccessReport(effectiveMe)
+        ? "/report"
         : "/schedule"
     : effectiveMe
       ? "/pending-link"
@@ -166,7 +165,7 @@ export function App() {
         path="/timesheets"
         element={
           <ProtectedRoute>
-            <SchedulePage />
+            {hasPlanFeature(effectiveMe, "timesheets") ? <SchedulePage /> : <Navigate to="/schedule" replace />}
           </ProtectedRoute>
         }
       />

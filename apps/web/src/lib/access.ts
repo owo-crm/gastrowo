@@ -56,15 +56,25 @@ export function getMembershipPermissionOverrides(me?: MeResponse | null): Member
   };
 }
 
+export type PlanFeature = "auto_schedule" | "timesheets" | "payroll" | "revenue" | "permissions";
+
+/** Whether the workspace plan includes a feature. Older API responses without the list keep everything visible. */
+export function hasPlanFeature(me: MeResponse | null | undefined, feature: PlanFeature): boolean {
+  const features = me?.subscription?.features;
+  return features ? features.includes(feature) : true;
+}
+
 export function canViewOverview(me?: MeResponse | null): boolean {
   const settings = getOrganizationSettings(me);
   const overrides = getMembershipPermissionOverrides(me);
+  if (!hasPlanFeature(me, "revenue")) return false;
   return me?.role === "ADMIN" || (me?.role === "MANAGER" && resolve(overrides.manager_can_view_full_dashboard_override, settings.manager_can_view_full_dashboard));
 }
 
 export function canAccessReport(me?: MeResponse | null): boolean {
   const settings = getOrganizationSettings(me);
   const overrides = getMembershipPermissionOverrides(me);
+  if (!hasPlanFeature(me, "revenue")) return false;
   if (me?.role === "ADMIN") return true;
   if (me?.role === "MANAGER") {
     return resolve(overrides.manager_can_submit_revenue_reports_override, settings.manager_can_submit_revenue_reports);
@@ -103,6 +113,7 @@ export function canAccessInventory(me?: MeResponse | null): boolean {
 export function canViewPayroll(me?: MeResponse | null): boolean {
   const settings = getOrganizationSettings(me);
   const overrides = getMembershipPermissionOverrides(me);
+  if (!hasPlanFeature(me, "payroll")) return false;
   return me?.role === "ADMIN" || (me?.role === "MANAGER" && resolve(overrides.manager_can_view_payroll_override, settings.manager_can_view_payroll));
 }
 

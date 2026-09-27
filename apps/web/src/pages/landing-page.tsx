@@ -19,7 +19,7 @@ import { Link } from "react-router-dom";
 import { BrandLogo } from "@/components/brand-logo";
 import { DevLoginButton } from "@/components/dev-login-button";
 import { trackMarketingEvent } from "@/lib/marketing-analytics";
-import { PRO_SEAT_PRICE_PLN, formatPln, plans } from "@/lib/plans";
+import { SEAT_PRICE_PLN, formatPln, plans } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 const SIGNUP_URL = "/login?mode=onboarding";
@@ -75,7 +75,7 @@ const steps = [
 const faqItems = [
   {
     q: "Ile kosztuje Gastrostuff?",
-    a: "Do 5 osób korzystasz za darmo, bez limitu czasu. Powyżej tego plan Pro kosztuje 9 zł za osobę miesięcznie (rocznie 2 miesiące taniej), a lokali możesz mieć ile chcesz. Każde nowe konto dostaje 30 dni Pro za darmo."
+    a: "Do 5 osób korzystasz za darmo, bez limitu czasu. Standard kosztuje 8 zł, a Pro 12 zł za osobę miesięcznie (rocznie 2 miesiące taniej). Lokali możesz mieć ile chcesz. Każde nowe konto dostaje 30 dni Pro za darmo."
   },
   {
     q: "Czy potrzebuję karty płatniczej, żeby zacząć?",
@@ -224,7 +224,7 @@ export function LandingPage() {
                     Zobacz, jak działa
                   </a>
                 </div>
-                <p className="mt-5 text-sm text-[var(--color-text-muted)]">30 dni Pro gratis · bez karty · 9 zł za osobę, lokale bez limitu</p>
+                <p className="mt-5 text-sm text-[var(--color-text-muted)]">30 dni Pro gratis · bez karty · od 8 zł za osobę, lokale bez limitu</p>
               </motion.div>
 
               <motion.div {...reveal} className="mx-auto mt-14 max-w-5xl sm:mt-16">
@@ -270,12 +270,12 @@ export function LandingPage() {
             <SectionContainer>
               <SectionHeading
                 eyebrow="Cennik"
-                title="9 zł za osobę. Nic więcej."
-                body="Do 5 osób za darmo na zawsze. Lokale bez limitu w każdym planie. Każde nowe konto zaczyna od 30 dni Pro."
+                title="Płacisz za osoby, nie za lokale"
+                body="Do 5 osób za darmo na zawsze. Każde nowe konto zaczyna od 30 dni planu Pro."
               />
-              <div className="mx-auto mt-12 grid max-w-3xl gap-4 md:grid-cols-2">
+              <div className="mx-auto mt-12 grid max-w-5xl gap-4 md:grid-cols-3">
                 {plans.map((plan) => {
-                  const featured = plan.key === "pro";
+                  const featured = plan.key === "standard";
                   return (
                     <motion.div
                       key={plan.key}
@@ -289,6 +289,7 @@ export function LandingPage() {
                         <h3 className="text-base font-semibold text-[var(--color-heading)]">{plan.title}</h3>
                         {featured ? <span className="rounded-full bg-[var(--color-accent)] px-2.5 py-0.5 text-xs font-semibold text-[var(--color-primary)]">Najczęściej wybierany</span> : null}
                       </div>
+                      <p className="mt-1 text-sm text-[var(--color-text-muted)]">{plan.tagline}</p>
                       <p className="mt-4">
                         <span className="text-4xl font-bold tracking-tight text-[var(--color-heading)]">{plan.price}</span>{" "}
                         <span className="text-sm text-[var(--color-text-muted)]">{plan.cycle}</span>
@@ -308,13 +309,13 @@ export function LandingPage() {
                           !featured && "border border-[var(--color-border)] bg-white text-[var(--color-heading)] hover:bg-[var(--color-surface-muted)] hover:opacity-100",
                         )}
                       >
-                        {featured ? "Wypróbuj 30 dni gratis" : "Zacznij za darmo"}
+                        {plan.key === "free" ? "Zacznij za darmo" : "Wypróbuj 30 dni gratis"}
                       </SignupLink>
                     </motion.div>
                   );
                 })}
               </div>
-              <p className="mt-6 text-center text-sm text-[var(--color-text-muted)]">Przykład: zespół 15 osób to {formatPln(15 * PRO_SEAT_PRICE_PLN.monthly)} miesięcznie.</p>
+              <p className="mt-6 text-center text-sm text-[var(--color-text-muted)]">Przykład: zespół 15 osób to {formatPln(15 * SEAT_PRICE_PLN.standard.monthly)} miesięcznie w Standard. Rocznie 2 miesiące gratis.</p>
             </SectionContainer>
           </section>
 

@@ -12,6 +12,7 @@ from app.core.permissions import can_manage_business_settings, can_manage_team, 
 from app.db import get_db
 from app.models import Location, LocationMembership, OrganizationMembership, RoleEnum, User
 from app.schemas import WorkerSetupOut, WorkerSetupPatch
+from app.services.billing import require_feature
 
 router = APIRouter(prefix="/workers", tags=["workers"])
 
@@ -132,6 +133,7 @@ def patch_worker_setup(
             row.hourly_rate_pln = item.hourly_rate_pln
 
     if payload.permission_overrides is not None:
+        require_feature(db, context.membership.organization_id, "permissions")
         if not can_manage_business_settings(context.membership, organization):
             raise HTTPException(status_code=403, detail="Business permission overrides are disabled for this account")
         overrides = payload.permission_overrides.model_dump()

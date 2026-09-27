@@ -1,4 +1,4 @@
-"""Plan rules: Free for small teams, Pro billed per active team member, locations never limited."""
+"""Plan rules: Free for small teams, Standard and Pro billed per team member, locations never limited."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from importlib import import_module
 import logging
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,26 @@ from app.schemas import SubscriptionSummaryOut
 logger = logging.getLogger("gastrowo.billing")
 
 FREE_MEMBER_LIMIT = 5
+
+# Legacy Business/Enterprise subscriptions keep everything Pro has.
+_PLAN_RANK = {
+    SubscriptionPlanEnum.FREE: 0,
+    SubscriptionPlanEnum.STANDARD: 1,
+    SubscriptionPlanEnum.PRO: 2,
+    SubscriptionPlanEnum.BUSINESS: 2,
+    SubscriptionPlanEnum.ENTERPRISE: 2,
+}
+
+# Feature -> cheapest plan that includes it. Free keeps manual scheduling, availability, swaps and tasks.
+FEATURE_MIN_PLAN = {
+    "auto_schedule": SubscriptionPlanEnum.STANDARD,
+    "timesheets": SubscriptionPlanEnum.STANDARD,
+    "payroll": SubscriptionPlanEnum.PRO,
+    "revenue": SubscriptionPlanEnum.PRO,
+    "permissions": SubscriptionPlanEnum.PRO,
+}
+
+PLAN_NAMES = {SubscriptionPlanEnum.STANDARD: "Standard", SubscriptionPlanEnum.PRO: "Pro"}
 
 
 def get_or_create_subscription(db: Session, organization_id: UUID) -> OrganizationSubscription:
@@ -54,6 +75,24 @@ def effective_plan(subscription: OrganizationSubscription) -> tuple[Subscription
     return subscription.plan, subscription.status
 
 
+def plan_allows(plan: SubscriptionPlanEnum, feature: str) -> bool:
+    return _PLAN_RANK[plan] >= _PLAN_RANK[FEATURE_MIN_PLAN[feature]]
+
+
+def allowed_features(plan: SubscriptionPlanEnum) -> list[str]:
+    return [feature for feature in FEATURE_MIN_PLAN if plan_allows(plan, feature)]
+
+
+def organization_plan(db: Session, organization_id: UUID) -> SubscriptionPlanEnum:
+    return effective_plan(get_or_create_subscription(db, organization_id))[0]
+
+
+def require_feature(db: Session, organization_id: UUID, feature: str) -> None:
+    if not plan_allows(organization_plan(db, organization_id), feature):
+        plan_name = PLAN_NAMES[FEATURE_MIN_PLAN[feature]]
+        raise HTTPException(status_code=402, detail=f"This feature is available from the {plan_name} plan")
+
+
 def member_cap_for(plan: SubscriptionPlanEnum) -> int | None:
     return FREE_MEMBER_LIMIT if plan == SubscriptionPlanEnum.FREE else None
 
@@ -85,6 +124,7 @@ def build_subscription_summary(db: Session, organization_id: UUID | None) -> Sub
         soft_limit_reached=member_cap is not None and members >= member_cap,
         billable_seats=max(members, 1),
         has_payment_method=bool(subscription.stripe_subscription_id),
+        features=allowed_features(plan),
     )
 
 

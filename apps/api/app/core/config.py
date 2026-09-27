@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     auth_session_secure_cookie: bool = False
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
+    stripe_price_standard_monthly: str = ""
+    stripe_price_standard_annual: str = ""
     stripe_price_pro_monthly: str = ""
     stripe_price_pro_annual: str = ""
     stripe_price_business_monthly: str = ""

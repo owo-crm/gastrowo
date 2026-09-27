@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 import csv
 import io
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -18,6 +18,7 @@ from app.db import get_db
 from app.models import Location, LocationMembership, OrganizationMembership, RoleEnum, Shift, Timesheet, TimesheetStatusEnum, User
 
 from app.services.worktime import worked_hours as timesheet_hours
+from app.services.billing import require_feature
 
 router = APIRouter(prefix="/payroll", tags=["payroll"])
 
@@ -141,6 +142,7 @@ def payroll_summary(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.STAFF)),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "payroll")
     organization = get_current_organization(context, db)
 
     if end_date is None:
@@ -191,6 +193,7 @@ def export_payroll_csv(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "payroll")
     """Payroll for the accountant: semicolon-separated with decimal commas, as Polish Excel expects."""
     organization = get_current_organization(context, db)
     if context.membership.role == RoleEnum.MANAGER and not can_view_payroll(context.membership, organization):

@@ -19,6 +19,7 @@ from app.models import (
     Shift,
     ShiftSourceEnum,
     ShiftTemplate,
+    SubscriptionPlanEnum,
     User,
 )
 from app.services.scheduler import (
@@ -28,6 +29,12 @@ from app.services.scheduler import (
     shift_duration_hours,
     shifts_overlap,
 )
+
+
+@pytest.fixture(autouse=True)
+def paid_plan(monkeypatch):
+    # These tests exercise automatic assignment, which Free workspaces don't get.
+    monkeypatch.setattr("app.services.scheduler.organization_plan", lambda db, organization_id: SubscriptionPlanEnum.PRO)
 
 
 def add_full_week_availability(
@@ -491,3 +498,41 @@ def test_scheduler_respects_daily_rest_after_closing_shift(db_session):
     assert [item.date for item in plan.assignments] == [monday]
     rejected = [item for item in plan.rejected_candidates if item.user_id == closer.id]
     assert any("daily_rest_violation" in item.reasons for item in rejected)
+
+
+def test_free_plan_does_not_auto_assign(db_session, monkeypatch):
+    monkeypatch.setattr("app.services.scheduler.organization_plan", lambda db, organization_id: SubscriptionPlanEnum.FREE)
+    org = Organization(name="Free Org")
+    manager = User(email="mgr@free.local", full_name="Manager", password_hash="x")
+    worker = User(email="worker@free.local", full_name="Worker", password_hash="x")
+    db_session.add_all([org, manager, worker])
+    db_session.flush()
+    location = Location(organization_id=org.id, name="Sopot", timezone="Europe/Warsaw")
+    db_session.add(location)
+    db_session.flush()
+    db_session.add_all(
+        [
+            OrganizationMembership(organization_id=org.id, user_id=manager.id, role=RoleEnum.MANAGER, max_hours_per_week=50),
+            OrganizationMembership(organization_id=org.id, user_id=worker.id, role=RoleEnum.STAFF, max_hours_per_week=40),
+            LocationMembership(location_id=location.id, user_id=worker.id, hourly_rate_pln=Decimal("30.00"), priority=5),
+            ShiftTemplate(
+                organization_id=org.id,
+                location_id=location.id,
+                day_of_week=0,
+                start_time=time(10, 0),
+                end_time=time(18, 0),
+                required_role=RoleEnum.STAFF,
+                required_count=1,
+            ),
+        ]
+    )
+    monday = date(2026, 4, 20)
+    add_full_week_availability(
+        db_session=db_session, organization_id=org.id, user_id=worker.id, week_start=monday, desired_hours=40, submitted_by=manager.id
+    )
+    db_session.commit()
+
+    plan = plan_week_schedule(db_session, org.id, monday)
+
+    assert plan.assignments == []
+    assert len(plan.open_shifts) == 1

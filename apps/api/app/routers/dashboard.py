@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +14,7 @@ from app.core.permissions import can_view_full_dashboard, can_view_payroll
 from app.db import get_db
 from app.models import Assignment, Location, LocationMembership, OrganizationMembership, RevenueReport, RoleEnum, Shift, User
 from app.models import Timesheet, TimesheetStatusEnum
+from app.services.billing import require_feature
 from app.services.scheduler import shift_duration_hours
 
 from app.services.worktime import worked_hours as timesheet_hours
@@ -31,6 +32,7 @@ def owner_dashboard(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "revenue")
     organization = get_current_organization(context, db)
     if not can_view_full_dashboard(context.membership, organization):
         raise HTTPException(status_code=403, detail="Manager dashboard access is disabled in this workspace")

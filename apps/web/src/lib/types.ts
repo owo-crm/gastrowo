@@ -90,7 +90,7 @@ export type MeResponse = {
   subscription: SubscriptionSummary | null;
 };
 
-export type SubscriptionPlan = "free" | "pro" | "business" | "enterprise";
+export type SubscriptionPlan = "free" | "standard" | "pro" | "business" | "enterprise";
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled" | "expired";
 
 export type SubscriptionSummary = {
@@ -106,6 +106,7 @@ export type SubscriptionSummary = {
   soft_limit_reached: boolean;
   billable_seats?: number;
   has_payment_method?: boolean;
+  features?: string[];
 };
 
 export type BillingCheckoutCycle = "monthly" | "annual";

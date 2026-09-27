@@ -38,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { api } from "@/lib/api";
 
+import { hasPlanFeature } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import type { Lang } from "@/lib/i18n";
@@ -1352,6 +1353,7 @@ export function SchedulePage() {
   const isStaff = effectiveRoles.includes("STAFF");
 
   const isManagerView = effectiveRoles.includes("ADMIN") || effectiveRoles.includes("MANAGER");
+  const timesheetsEnabled = hasPlanFeature(me, "timesheets");
   const canEditOwnAvailability = effectiveRoles.includes("STAFF") || effectiveRoles.includes("MANAGER");
   const isADMIN = effectiveRoles.includes("ADMIN");
   const todayDayIndex = (() => {
@@ -1486,7 +1488,7 @@ export function SchedulePage() {
 
     queryFn: () => api.listTimesheets(token!, { scope: "my", start_date: weekStart, end_date: weekEnd }),
 
-    enabled: Boolean(token) && isStaff,
+    enabled: Boolean(token) && isStaff && timesheetsEnabled,
 
   });
 
@@ -1496,7 +1498,7 @@ export function SchedulePage() {
 
     queryFn: () => api.listTimesheets(token!, { scope: "pending", start_date: weekStart, end_date: weekEnd }),
 
-    enabled: Boolean(token) && isManagerView,
+    enabled: Boolean(token) && isManagerView && timesheetsEnabled,
 
   });
 
@@ -2714,9 +2716,11 @@ export function SchedulePage() {
               <div className="grid gap-3">
                 <div className="flex items-start justify-between gap-3">
                   <CardTitle className="text-lg">{t("schedule.my_weekly_calendar")}</CardTitle>
-                  <Button size="sm" variant="secondary" className="h-8 px-2.5 sm:hidden" onClick={() => openExtraTimesheetModal(weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0]?.iso)}>
-                    <FileClock className="size-4" /> {t("schedule.report_extra_hours")}
-                  </Button>
+                  {timesheetsEnabled ? (
+                    <Button size="sm" variant="secondary" className="h-8 px-2.5 sm:hidden" onClick={() => openExtraTimesheetModal(weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0]?.iso)}>
+                      <FileClock className="size-4" /> {t("schedule.report_extra_hours")}
+                    </Button>
+                  ) : null}
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <Button size="sm" variant="secondary" className="h-8 min-w-8 rounded-none border-0 bg-transparent px-1.5 shadow-none hover:bg-transparent" onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
@@ -2729,11 +2733,13 @@ export function SchedulePage() {
                     <ChevronRight className="size-4" />
                   </Button>
                 </div>
-                <div className="hidden sm:flex sm:justify-end">
-                  <Button size="sm" variant="secondary" className="h-8 rounded-none border-0 bg-transparent px-1.5 shadow-none hover:bg-transparent" onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
-                    <FileClock className="size-4" /> {t("schedule.report_extra_hours")}
-                  </Button>
-                </div>
+                {timesheetsEnabled ? (
+                  <div className="hidden sm:flex sm:justify-end">
+                    <Button size="sm" variant="secondary" className="h-8 rounded-none border-0 bg-transparent px-1.5 shadow-none hover:bg-transparent" onClick={() => openExtraTimesheetModal(weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0]?.iso)}>
+                      <FileClock className="size-4" /> {t("schedule.report_extra_hours")}
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </CardHeader>
             <CardContent className="min-h-0 max-w-full overflow-x-hidden">
@@ -2752,7 +2758,7 @@ export function SchedulePage() {
                       </div>
                       {shifts.map((shift) => {
                         const latest = latestTimesheet(myTimesheetsByShiftId[shift.shift_id] ?? []);
-                        const canSubmitReport = shift.is_mine && (!latest || latest.status === "rejected");
+                        const canSubmitReport = timesheetsEnabled && shift.is_mine && (!latest || latest.status === "rejected");
                         return (
                           <div key={`mobile-${shift.shift_id}`} className="surface-card rounded-[1rem] px-4 py-4">
                             <ShiftBlock
@@ -2837,7 +2843,7 @@ export function SchedulePage() {
                         <div className="mt-1.5 space-y-1">
                           {shifts.map((shift) => {
                             const latest = latestTimesheet(myTimesheetsByShiftId[shift.shift_id] ?? []);
-                            const canSubmitReport = shift.is_mine && (!latest || latest.status === "rejected");
+                            const canSubmitReport = timesheetsEnabled && shift.is_mine && (!latest || latest.status === "rejected");
                             return (
                               <div key={shift.shift_id} className="space-y-1">
                                 <ShiftBlock

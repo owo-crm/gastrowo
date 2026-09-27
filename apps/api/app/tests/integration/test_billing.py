@@ -69,3 +69,23 @@ def test_free_plan_can_add_many_locations(client, db_session):
     for name in ("Gdynia", "Sopot", "Gdańsk"):
         created = client.post("/locations", headers=headers, json={"name": name, "timezone": "Europe/Warsaw"})
         assert created.status_code == 200, created.text
+
+
+def test_features_follow_the_plan(client, db_session):
+    free = _workspace(db_session, members=2, plan=SubscriptionPlanEnum.FREE, status=SubscriptionStatusEnum.ACTIVE)
+    standard = _workspace(db_session, members=3, plan=SubscriptionPlanEnum.STANDARD, status=SubscriptionStatusEnum.ACTIVE)
+    pro = _workspace(db_session, members=4, plan=SubscriptionPlanEnum.PRO, status=SubscriptionStatusEnum.ACTIVE)
+    period = {"start_date": "2026-09-01", "end_date": "2026-09-30"}
+
+    assert client.get("/timesheets", headers=free).status_code == 402
+    assert client.get("/payroll/summary", headers=free).status_code == 402
+
+    assert client.get("/timesheets", headers=standard).status_code == 200
+    assert client.get("/payroll/summary", headers=standard).status_code == 402
+    assert client.get("/reports/revenue", headers=standard, params=period).status_code == 402
+
+    assert client.get("/payroll/summary", headers=pro).status_code == 200
+    assert client.get("/reports/revenue", headers=pro, params=period).status_code == 200
+
+    features = client.get("/organizations/current/subscription", headers=standard).json()["data"]["features"]
+    assert features == ["auto_schedule", "timesheets"]

@@ -40,7 +40,7 @@ from app.schemas import (
     OrganizationSettingsPatch,
 )
 from app.services.auth_email import send_invite_email
-from app.services.billing import build_subscription_summary, sync_stripe_seats
+from app.services.billing import build_subscription_summary, require_feature, sync_stripe_seats
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -218,6 +218,7 @@ def patch_current_organization_settings(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
+    require_feature(db, context.membership.organization_id, "permissions")
     organization = get_current_organization(context, db)
     _require_business_settings_access(context, organization)
     organization.staff_can_submit_revenue_reports = payload.staff_can_submit_revenue_reports

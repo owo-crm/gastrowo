@@ -53,8 +53,10 @@ def _get_stripe():
 
 
 def _price_id_for(plan: SubscriptionPlanEnum, billing_cycle: str) -> str:
-    # Only Pro is sold now; Business prices remain in _plan_from_price_id for existing subscriptions.
+    # Business prices remain in _plan_from_price_id only for existing subscriptions.
     mapping = {
+        (SubscriptionPlanEnum.STANDARD, "monthly"): settings.stripe_price_standard_monthly,
+        (SubscriptionPlanEnum.STANDARD, "annual"): settings.stripe_price_standard_annual,
         (SubscriptionPlanEnum.PRO, "monthly"): settings.stripe_price_pro_monthly,
         (SubscriptionPlanEnum.PRO, "annual"): settings.stripe_price_pro_annual,
     }
@@ -87,6 +89,8 @@ def _status_from_stripe(raw_status: str | None) -> SubscriptionStatusEnum:
 
 def _plan_from_price_id(price_id: str | None) -> tuple[SubscriptionPlanEnum, str] | None:
     reverse_mapping = {
+        settings.stripe_price_standard_monthly: (SubscriptionPlanEnum.STANDARD, "monthly"),
+        settings.stripe_price_standard_annual: (SubscriptionPlanEnum.STANDARD, "annual"),
         settings.stripe_price_pro_monthly: (SubscriptionPlanEnum.PRO, "monthly"),
         settings.stripe_price_pro_annual: (SubscriptionPlanEnum.PRO, "annual"),
         settings.stripe_price_business_monthly: (SubscriptionPlanEnum.BUSINESS, "monthly"),
@@ -151,12 +155,12 @@ def create_checkout_session(
     _require_billing_access(context, organization)
     stripe = _get_stripe()
     subscription = _get_subscription(db, context.membership.organization_id)
-    if payload.plan != SubscriptionPlanEnum.PRO:
-        raise HTTPException(status_code=422, detail="Only the Pro plan can be purchased")
+    if payload.plan not in (SubscriptionPlanEnum.STANDARD, SubscriptionPlanEnum.PRO):
+        raise HTTPException(status_code=422, detail="Only the Standard and Pro plans can be purchased")
     if subscription.stripe_subscription_id:
         raise HTTPException(status_code=409, detail="This workspace already has a subscription; manage it in the billing portal")
     price_id = _price_id_for(payload.plan, payload.billing_cycle)
-    # Pro is priced per team member; the quantity follows the team afterwards (sync_stripe_seats).
+    # Paid plans are priced per team member; the quantity follows the team afterwards (sync_stripe_seats).
     seats = max(count_members(db, context.membership.organization_id), 1)
 
     session = stripe.checkout.Session.create(
