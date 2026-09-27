@@ -43,6 +43,8 @@ class ShiftDemand:
     source: str
     override_id: UUID | None = None
     preferred_user_id: UUID | None = None
+    # Template this slot comes from, also when it is an override of that template; None for custom shifts.
+    source_template_id: UUID | None = None
 
 
 @dataclass
@@ -338,6 +340,7 @@ def _load_demand_specs(db: Session, organization_id: UUID, week_start: date, loc
             staff_position=template.staff_position,
             required_count=template.required_count,
             source="template",
+            source_template_id=template.id,
         )
         for template in templates
     ]
@@ -382,6 +385,7 @@ def _load_demand_specs(db: Session, organization_id: UUID, week_start: date, loc
                     staff_position=template.staff_position,
                     required_count=template.required_count,
                     source="template",
+                    source_template_id=template.id,
                 )
             )
             continue
@@ -404,6 +408,7 @@ def _load_demand_specs(db: Session, organization_id: UUID, week_start: date, loc
                     source="override",
                     override_id=override.id,
                     preferred_user_id=override.assigned_user_id,
+                    source_template_id=template.id,
                 )
             )
 

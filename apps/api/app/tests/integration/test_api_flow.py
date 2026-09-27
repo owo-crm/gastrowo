@@ -786,3 +786,29 @@ def test_timesheet_restricted_entry_requires_review_and_staff_scope_limits(clien
     )
     assert corrected.status_code == 200
     assert corrected.json()["data"]["status"] == "corrected"
+
+
+def test_rematerializing_preview_does_not_duplicate_or_resurrect_shifts(client):
+    ADMIN_token, location_id = signup_ADMIN(client, organization_name="Rematerialize Org", email="ADMIN@remat.com")
+    monday = current_monday()
+    create_template(client, ADMIN_token=ADMIN_token, location_id=location_id, day_of_week=0, required_count=2)
+    create_template(client, ADMIN_token=ADMIN_token, location_id=location_id, day_of_week=1, required_count=1)
+    body = {"week_start": monday.isoformat(), "location_id": location_id}
+
+    def active_slots() -> list[dict]:
+        rows = client.get("/schedule/overrides", headers=auth_header(ADMIN_token), params={"week_start": monday.isoformat()}).json()["data"]
+        return [row for row in rows if not row["is_deleted"]]
+
+    for _ in range(3):
+        assert client.post("/schedule/preview/materialize", headers=auth_header(ADMIN_token), json=body).status_code == 200
+        assert len(active_slots()) == 3
+
+    tuesday = next(row for row in active_slots() if row["day_of_week"] == 1)
+    deleted = client.patch(
+        "/schedule/preview/edits",
+        headers=auth_header(ADMIN_token),
+        json={"week_start": monday.isoformat(), "action": "delete", "shift_key": f"override:{tuesday['id']}"},
+    )
+    assert deleted.status_code == 200, deleted.text
+    assert client.post("/schedule/preview/materialize", headers=auth_header(ADMIN_token), json=body).status_code == 200
+    assert [row["day_of_week"] for row in active_slots()] == [0, 0]

@@ -89,3 +89,27 @@ def test_features_follow_the_plan(client, db_session):
 
     features = client.get("/organizations/current/subscription", headers=standard).json()["data"]["features"]
     assert features == ["auto_schedule", "timesheets"]
+
+
+def test_notifications_list_and_staff_can_read_locations(client, db_session):
+    from uuid import UUID
+
+    from app.models import InAppNotification, NotificationTypeEnum
+
+    headers = _workspace(db_session, members=2, plan=SubscriptionPlanEnum.PRO, status=SubscriptionStatusEnum.ACTIVE)
+    me = client.get("/auth/me", headers=headers).json()["data"]
+    db_session.add(
+        InAppNotification(
+            organization_id=UUID(me["active_organization_id"]),
+            user_id=UUID(me["id"]),
+            type=NotificationTypeEnum.TEAM,
+            title="Invite accepted",
+            body="Kamil joined your business",
+        )
+    )
+    db_session.commit()
+    listed = client.get("/notifications", headers=headers)
+    assert listed.status_code == 200
+    assert listed.json()["data"]["items"][0]["type"] == "team"
+    staff_locations = client.get("/locations", headers=headers)
+    assert staff_locations.status_code == 200

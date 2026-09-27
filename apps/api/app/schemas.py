@@ -437,8 +437,9 @@ class ShiftTemplateCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_template(self):
-        if self.end_time <= self.start_time:
-            raise ValueError("end_time must be later than start_time")
+        # end before start means the shift ends after midnight (bars, late kitchens)
+        if self.end_time == self.start_time:
+            raise ValueError("end_time must differ from start_time")
         if self.required_role == RoleEnum.STAFF and (self.staff_position is None or not self.staff_position.strip()):
             raise ValueError("staff_position is required when required_role is STAFF")
         if self.required_role != RoleEnum.STAFF:
@@ -471,8 +472,9 @@ class ShiftTemplatePatch(BaseModel):
 
     @model_validator(mode="after")
     def validate_template(self):
-        if self.end_time <= self.start_time:
-            raise ValueError("end_time must be later than start_time")
+        # end before start means the shift ends after midnight (bars, late kitchens)
+        if self.end_time == self.start_time:
+            raise ValueError("end_time must differ from start_time")
         if self.required_role == RoleEnum.STAFF and (self.staff_position is None or not self.staff_position.strip()):
             raise ValueError("staff_position is required when required_role is STAFF")
         if self.required_role != RoleEnum.STAFF:
@@ -672,8 +674,9 @@ class WeeklyShiftOverrideIn(BaseModel):
 
     @model_validator(mode="after")
     def validate_override(self):
-        if self.end_time <= self.start_time:
-            raise ValueError("end_time must be later than start_time")
+        # end before start means the shift ends after midnight (bars, late kitchens)
+        if self.end_time == self.start_time:
+            raise ValueError("end_time must differ from start_time")
         if self.is_deleted:
             self.assigned_user_id = None
         elif self.required_count <= 0:
@@ -874,11 +877,3 @@ class TimesheetEntry(APIModel):
     reviewed_at: datetime | None
     created_at: datetime
     updated_at: datetime
-
-
-class NotificationOut(APIModel):
-    id: UUID
-    title: str
-    body: str
-    read_at: datetime | None
-    created_at: datetime

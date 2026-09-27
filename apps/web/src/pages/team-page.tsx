@@ -683,7 +683,7 @@ export function TeamPage() {
     for (const item of templatesQuery.data ?? []) {
       const hasName = Boolean(item.template_name?.trim());
       const hasPosition = item.required_role !== "STAFF" || Boolean(item.staff_position?.trim());
-      const hasWindow = item.end_time > item.start_time;
+      const hasWindow = item.end_time !== item.start_time;
       if (hasName && hasPosition && hasWindow) completed.add(item.day_of_week);
     }
     return completed;
@@ -694,12 +694,12 @@ export function TeamPage() {
   const templateValidationIssues: string[] = [];
   if (templateInput.template_name.trim().length < 2) templateValidationIssues.push("Template name must be at least 2 characters.");
   if (Number(templateInput.required_count) < 1) templateValidationIssues.push("People per shift must be at least 1.");
-  if (templateInput.shift_1_end <= templateInput.shift_1_start) templateValidationIssues.push("Shift 1 end must be later than shift 1 start.");
+  if (templateInput.shift_1_end === templateInput.shift_1_start) templateValidationIssues.push("Shift 1 start and end must differ.");
   if (templateInput.required_role === "STAFF" && !templateInput.staff_position.trim()) {
     templateValidationIssues.push("Position is required for staff templates.");
   }
-  if (templateInput.shift_count === "2" && templateInput.shift_2_end <= templateInput.shift_2_start) {
-    templateValidationIssues.push("Shift 2 end must be later than shift 2 start.");
+  if (templateInput.shift_count === "2" && templateInput.shift_2_end === templateInput.shift_2_start) {
+    templateValidationIssues.push("Shift 2 start and end must differ.");
   }
   const templateInputValid = templateValidationIssues.length === 0;
 
