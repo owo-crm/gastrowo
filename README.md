@@ -1,6 +1,7 @@
 # GastrOWO MVP Monorepo
 
 Full project documentation: [docs/PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUMENTATION.md)
+Audit and competitive roadmap (Sep 2026): [docs/AUDIT_2026-09.md](docs/AUDIT_2026-09.md)
 Compatibility-safe spec repack: [docs/WORKDISH_SPEC_REPACK.md](docs/WORKDISH_SPEC_REPACK.md)
 
 ## Stack
