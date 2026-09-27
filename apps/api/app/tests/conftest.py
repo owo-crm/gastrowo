@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 from app.db import get_db
 from app.main import app
 from app.models import Base
+from app.tests.otp_outbox import SENT_CODES
 
 TEST_DATABASE_URL = "sqlite+pysqlite:///:memory:"
 
@@ -27,6 +28,16 @@ def reset_db() -> Generator[None, None, None]:
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
+
+
+@pytest.fixture(autouse=True)
+def capture_otp_emails(monkeypatch: pytest.MonkeyPatch) -> None:
+    SENT_CODES.clear()
+
+    def fake_send_otp_email(*, email: str, code: str, **_: object) -> None:
+        SENT_CODES[email] = code
+
+    monkeypatch.setattr("app.routers.auth.send_otp_email", fake_send_otp_email)
 
 
 @pytest.fixture()

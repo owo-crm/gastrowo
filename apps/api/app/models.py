@@ -483,4 +483,5 @@ class OtpChallenge(Base):
     invite_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))

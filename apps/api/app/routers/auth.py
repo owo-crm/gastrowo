@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import hmac
+import secrets
 from uuid import UUID
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
@@ -18,6 +20,7 @@ from app.models import (
     InviteToken,
     Location,
     LocationMembership,
+    NotificationTypeEnum,
     Organization,
     OrganizationMembership,
     OrganizationSubscription,
@@ -51,6 +54,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 NIL_ORG_ID = str(UUID(int=0))
 OTP_EXPIRES_SECONDS = 300
 OTP_REUSE_MIN_SECONDS = 60
+OTP_RESEND_COOLDOWN_SECONDS = 30
+OTP_MAX_FAILED_ATTEMPTS = 5
 
 
 def utc_now() -> datetime:
@@ -199,10 +204,16 @@ def _create_otp_challenge(db: Session, *, email: str, purpose: OtpPurposeEnum, i
         )
     )
     now = utc_now()
-    if existing is not None and utc_value(existing.expires_at) > now + timedelta(seconds=OTP_REUSE_MIN_SECONDS):
+    if existing is not None and utc_value(existing.created_at) > now - timedelta(seconds=OTP_RESEND_COOLDOWN_SECONDS):
+        raise HTTPException(status_code=429, detail="Please wait before requesting another code")
+    if (
+        existing is not None
+        and existing.failed_attempts < OTP_MAX_FAILED_ATTEMPTS
+        and utc_value(existing.expires_at) > now + timedelta(seconds=OTP_REUSE_MIN_SECONDS)
+    ):
         return existing.code
 
-    code = str(int(datetime.now(UTC).timestamp() * 1000) % 1000000).zfill(6)
+    code = f"{secrets.randbelow(1_000_000):06d}"
     db.execute(delete(OtpChallenge).where(OtpChallenge.email == email, OtpChallenge.purpose == purpose))
     db.add(
         OtpChallenge(
@@ -225,21 +236,25 @@ def _consume_otp(
     code: str,
     invite_token: str | None = None,
 ) -> OtpChallenge:
+    # Look up the challenge by email + purpose only and compare the code in constant time,
+    # so every wrong guess is counted against the challenge (brute-force protection).
     challenge = db.scalar(
-        select(OtpChallenge).where(
-            OtpChallenge.email == email,
-            OtpChallenge.purpose == purpose,
-            OtpChallenge.code == code,
-        )
+        select(OtpChallenge)
+        .where(OtpChallenge.email == email, OtpChallenge.purpose == purpose)
+        .order_by(OtpChallenge.created_at.desc())
     )
     if challenge is None:
-        raise HTTPException(status_code=401, detail="Invalid code")
-    if challenge.invite_token != invite_token:
         raise HTTPException(status_code=401, detail="Invalid code")
     if challenge.consumed_at is not None:
         raise HTTPException(status_code=409, detail="Code already used")
     if utc_value(challenge.expires_at) < utc_now():
         raise HTTPException(status_code=410, detail="Code expired")
+    if challenge.failed_attempts >= OTP_MAX_FAILED_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Too many attempts. Request a new code")
+    if not hmac.compare_digest(challenge.code, code) or challenge.invite_token != invite_token:
+        challenge.failed_attempts += 1
+        db.commit()
+        raise HTTPException(status_code=401, detail="Invalid code")
     challenge.consumed_at = utc_now()
     db.commit()
     return challenge
@@ -298,7 +313,7 @@ def send_otp(payload: OtpSendRequest, db: Session = Depends(get_db)):
         subtitle = "Use this code to join the invited business."
 
     code = _create_otp_challenge(db, email=email, purpose=payload.purpose, invite_token=payload.invite_token)
-    send_otp_email(email=email, code=code, title=title, subtitle=subtitle)
+    send_otp_email(email=email, code=code, title=title, subtitle=subtitle, expires_in_minutes=OTP_EXPIRES_SECONDS // 60)
     return ok(
         OtpSendResponse(
             sent=True,
@@ -560,4 +575,3 @@ def me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
         subscription=_build_subscription_summary(db, active_membership.organization_id if active_membership else None),
     )
     return ok(payload_out.model_dump(mode="json"))
-    NotificationTypeEnum,

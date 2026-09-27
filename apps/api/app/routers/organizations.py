@@ -204,6 +204,9 @@ def create_organization(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # One account = one business; otherwise any user could farm unlimited PRO trials.
+    if db.scalar(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)) is not None:
+        raise HTTPException(status_code=409, detail="This account already belongs to another business")
     org = Organization(name=payload.name)
     db.add(org)
     db.flush()

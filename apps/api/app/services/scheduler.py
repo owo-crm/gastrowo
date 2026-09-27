@@ -276,13 +276,15 @@ def _load_demand_specs(db: Session, organization_id: UUID, week_start: date, loc
     if not overrides:
         return base_specs
 
-    override_by_template_id: dict[UUID, ScheduleWeeklyOverride] = {}
+    # A template can be replaced by several single-slot overrides (materialized preview),
+    # so keep every override per template instead of only the last one.
+    overrides_by_template_id: dict[UUID, list[ScheduleWeeklyOverride]] = defaultdict(list)
     custom_overrides: list[ScheduleWeeklyOverride] = []
     for item in sorted(overrides, key=lambda row: row.updated_at):
         if item.location_id not in valid_location_ids:
             continue
         if item.source_template_id is not None:
-            override_by_template_id[item.source_template_id] = item
+            overrides_by_template_id[item.source_template_id].append(item)
         else:
             custom_overrides.append(item)
 
@@ -290,8 +292,8 @@ def _load_demand_specs(db: Session, organization_id: UUID, week_start: date, loc
 
     for template in templates:
         template_shift_date = week_start + timedelta(days=template.day_of_week)
-        override = override_by_template_id.get(template.id)
-        if override is None:
+        template_overrides = overrides_by_template_id.get(template.id)
+        if not template_overrides:
             merged_specs.append(
                 ShiftDemand(
                     shift_key=_build_shift_key(template.id, template_shift_date),
@@ -309,26 +311,26 @@ def _load_demand_specs(db: Session, organization_id: UUID, week_start: date, loc
             )
             continue
 
-        if override.is_deleted or override.required_count <= 0:
-            continue
-
-        merged_specs.append(
-            ShiftDemand(
-                shift_key=f"override:{override.id}:{template_shift_date.isoformat()}",
-                template_id=override.id,
-                location_id=override.location_id,
-                location_name=location_name_by_id.get(override.location_id, "Location"),
-                date=template_shift_date,
-                start_time=override.start_time,
-                end_time=override.end_time,
-                required_role=override.required_role,
-                staff_position=override.staff_position,
-                required_count=override.required_count,
-                source="override",
-                override_id=override.id,
-                preferred_user_id=override.assigned_user_id,
+        for override in template_overrides:
+            if override.is_deleted or override.required_count <= 0:
+                continue
+            merged_specs.append(
+                ShiftDemand(
+                    shift_key=f"override:{override.id}:{template_shift_date.isoformat()}",
+                    template_id=override.id,
+                    location_id=override.location_id,
+                    location_name=location_name_by_id.get(override.location_id, "Location"),
+                    date=template_shift_date,
+                    start_time=override.start_time,
+                    end_time=override.end_time,
+                    required_role=override.required_role,
+                    staff_position=override.staff_position,
+                    required_count=override.required_count,
+                    source="override",
+                    override_id=override.id,
+                    preferred_user_id=override.assigned_user_id,
+                )
             )
-        )
 
     for item in custom_overrides:
         if item.is_deleted or item.required_count <= 0:
