@@ -104,6 +104,8 @@ export type SubscriptionSummary = {
   member_cap: number | null;
   location_cap: number | null;
   soft_limit_reached: boolean;
+  billable_seats?: number;
+  has_payment_method?: boolean;
 };
 
 export type BillingCheckoutCycle = "monthly" | "annual";

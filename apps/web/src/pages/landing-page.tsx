@@ -17,8 +17,9 @@ import {
 import { Link } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand-logo";
+import { DevLoginButton } from "@/components/dev-login-button";
 import { trackMarketingEvent } from "@/lib/marketing-analytics";
-import { plans } from "@/lib/plans";
+import { PRO_SEAT_PRICE_PLN, formatPln, plans } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 const SIGNUP_URL = "/login?mode=onboarding";
@@ -74,7 +75,7 @@ const steps = [
 const faqItems = [
   {
     q: "Ile kosztuje Gastrostuff?",
-    a: "Plan Free jest darmowy dla 1 lokalu i 5 osób. Pro kosztuje 89 zł za lokal miesięcznie, niezależnie od liczby pracowników do 25. Każde nowe konto dostaje 30 dni Pro za darmo.",
+    a: "Do 5 osób korzystasz za darmo, bez limitu czasu. Powyżej tego plan Pro kosztuje 9 zł za osobę miesięcznie (rocznie 2 miesiące taniej), a lokali możesz mieć ile chcesz. Każde nowe konto dostaje 30 dni Pro za darmo."
   },
   {
     q: "Czy potrzebuję karty płatniczej, żeby zacząć?",
@@ -90,7 +91,7 @@ const faqItems = [
   },
   {
     q: "Czy obsłużę kilka lokali?",
-    a: "Tak. Każdy lokal ma własne szablony zmian, stawki i zespół, a właściciel widzi wszystko w jednym miejscu. Plan Business obejmuje do 5 lokali.",
+    a: "Tak, i nie płacisz za lokale. Każdy lokal ma własne szablony zmian, stawki i zespół, a właściciel widzi wszystko w jednym miejscu.",
   },
 ];
 
@@ -191,6 +192,7 @@ export function LandingPage() {
               </ul>
             </nav>
             <div className="flex items-center gap-4">
+              <DevLoginButton className="hidden sm:inline-flex" />
               <Link to={SIGNIN_URL} className="text-sm font-medium text-[var(--color-heading)] transition hover:text-[var(--color-primary)]">
                 Zaloguj
               </Link>
@@ -222,7 +224,7 @@ export function LandingPage() {
                     Zobacz, jak działa
                   </a>
                 </div>
-                <p className="mt-5 text-sm text-[var(--color-text-muted)]">30 dni Pro gratis · bez karty · płacisz za lokal, nie za pracownika</p>
+                <p className="mt-5 text-sm text-[var(--color-text-muted)]">30 dni Pro gratis · bez karty · 9 zł za osobę, lokale bez limitu</p>
               </motion.div>
 
               <motion.div {...reveal} className="mx-auto mt-14 max-w-5xl sm:mt-16">
@@ -266,8 +268,12 @@ export function LandingPage() {
 
           <section id="cennik" className="scroll-mt-16 py-20 sm:py-28">
             <SectionContainer>
-              <SectionHeading eyebrow="Cennik" title="Płacisz za lokal, nie za każdego pracownika" body="Każde nowe konto zaczyna od 30 dni planu Pro za darmo." />
-              <div className="mx-auto mt-12 grid max-w-5xl gap-4 md:grid-cols-3">
+              <SectionHeading
+                eyebrow="Cennik"
+                title="9 zł za osobę. Nic więcej."
+                body="Do 5 osób za darmo na zawsze. Lokale bez limitu w każdym planie. Każde nowe konto zaczyna od 30 dni Pro."
+              />
+              <div className="mx-auto mt-12 grid max-w-3xl gap-4 md:grid-cols-2">
                 {plans.map((plan) => {
                   const featured = plan.key === "pro";
                   return (
@@ -308,6 +314,7 @@ export function LandingPage() {
                   );
                 })}
               </div>
+              <p className="mt-6 text-center text-sm text-[var(--color-text-muted)]">Przykład: zespół 15 osób to {formatPln(15 * PRO_SEAT_PRICE_PLN.monthly)} miesięcznie.</p>
             </SectionContainer>
           </section>
 

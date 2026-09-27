@@ -16,6 +16,7 @@ from app.core.permissions import can_manage_business_settings
 from app.db import get_db
 from app.models import Organization, OrganizationSubscription, RoleEnum, SubscriptionPlanEnum, SubscriptionStatusEnum
 from app.schemas import BillingCheckoutSessionOut, BillingCheckoutSessionRequest, BillingPortalSessionOut
+from app.services.billing import count_members
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -52,11 +53,10 @@ def _get_stripe():
 
 
 def _price_id_for(plan: SubscriptionPlanEnum, billing_cycle: str) -> str:
+    # Only Pro is sold now; Business prices remain in _plan_from_price_id for existing subscriptions.
     mapping = {
         (SubscriptionPlanEnum.PRO, "monthly"): settings.stripe_price_pro_monthly,
         (SubscriptionPlanEnum.PRO, "annual"): settings.stripe_price_pro_annual,
-        (SubscriptionPlanEnum.BUSINESS, "monthly"): settings.stripe_price_business_monthly,
-        (SubscriptionPlanEnum.BUSINESS, "annual"): settings.stripe_price_business_annual,
     }
     price_id = mapping.get((plan, billing_cycle), "")
     if not price_id:
@@ -151,11 +151,17 @@ def create_checkout_session(
     _require_billing_access(context, organization)
     stripe = _get_stripe()
     subscription = _get_subscription(db, context.membership.organization_id)
+    if payload.plan != SubscriptionPlanEnum.PRO:
+        raise HTTPException(status_code=422, detail="Only the Pro plan can be purchased")
+    if subscription.stripe_subscription_id:
+        raise HTTPException(status_code=409, detail="This workspace already has a subscription; manage it in the billing portal")
     price_id = _price_id_for(payload.plan, payload.billing_cycle)
+    # Pro is priced per team member; the quantity follows the team afterwards (sync_stripe_seats).
+    seats = max(count_members(db, context.membership.organization_id), 1)
 
     session = stripe.checkout.Session.create(
         mode="subscription",
-        line_items=[{"price": price_id, "quantity": 1}],
+        line_items=[{"price": price_id, "quantity": seats}],
         success_url=settings.billing_success_url,
         cancel_url=settings.billing_cancel_url,
         allow_promotion_codes=True,

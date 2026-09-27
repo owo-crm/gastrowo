@@ -6,7 +6,7 @@ import secrets
 from uuid import UUID
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -45,9 +45,9 @@ from app.schemas import (
     OrganizationSettingsOut,
     OwnerOnboardingCompleteRequest,
     SessionBootstrapResponse,
-    SubscriptionSummaryOut,
 )
 from app.services.auth_email import send_otp_email
+from app.services.billing import build_subscription_summary, sync_stripe_seats
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -87,55 +87,6 @@ def _issue_auth_payload(user: User, memberships: list[OrganizationMembership]) -
         "role": active_membership.role if active_membership else None,
         "status": "linked" if memberships else "pending_link",
     }
-
-
-def _build_subscription_summary(db: Session, organization_id: UUID | None) -> SubscriptionSummaryOut | None:
-    if organization_id is None:
-        return None
-    subscription = db.scalar(select(OrganizationSubscription).where(OrganizationSubscription.organization_id == organization_id))
-    if subscription is None:
-        subscription = OrganizationSubscription(
-            organization_id=organization_id,
-            plan=SubscriptionPlanEnum.FREE,
-            status=SubscriptionStatusEnum.ACTIVE,
-            billing_cycle="monthly",
-        )
-        db.add(subscription)
-        db.flush()
-
-    active_members_count = db.scalar(
-        select(func.count()).select_from(OrganizationMembership).where(OrganizationMembership.organization_id == organization_id)
-    ) or 0
-    active_locations_count = db.scalar(
-        select(func.count()).select_from(Location).where(Location.organization_id == organization_id)
-    ) or 0
-
-    member_cap = None
-    location_cap = None
-    if subscription.plan == SubscriptionPlanEnum.FREE:
-        member_cap = 5
-        location_cap = 1
-    elif subscription.plan == SubscriptionPlanEnum.PRO:
-        member_cap = 25
-    elif subscription.plan == SubscriptionPlanEnum.BUSINESS:
-        location_cap = 5
-
-    soft_limit_reached = bool(
-        (member_cap is not None and active_members_count >= member_cap)
-        or (location_cap is not None and active_locations_count >= location_cap)
-    )
-    return SubscriptionSummaryOut(
-        plan=subscription.plan,
-        status=subscription.status,
-        billing_cycle=subscription.billing_cycle,
-        trial_ends_at=subscription.trial_ends_at,
-        current_period_ends_at=subscription.current_period_ends_at,
-        active_members_count=active_members_count,
-        active_locations_count=active_locations_count,
-        member_cap=member_cap,
-        location_cap=location_cap,
-        soft_limit_reached=soft_limit_reached,
-    )
 
 
 def _set_auth_session_cookie(response: Response, session_token: str) -> None:
@@ -437,6 +388,30 @@ def login_with_password(payload: LoginRequest, response: Response, db: Session =
     return ok(_issue_auth_payload(user, memberships))
 
 
+@router.post("/dev-login")
+def dev_login(response: Response, db: Session = Depends(get_db)):
+    """One-click admin login for local/staging testing; invisible unless DEV_LOGIN_ENABLED is set."""
+    if not settings.dev_login_enabled or settings.app_env == "production":
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    if settings.dev_login_email:
+        user = db.scalar(select(User).where(User.email == settings.dev_login_email.lower()))
+    else:
+        user = db.scalar(
+            select(User)
+            .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+            .where(OrganizationMembership.role == RoleEnum.ADMIN)
+            .order_by(User.created_at)
+        )
+    if user is None:
+        raise HTTPException(status_code=404, detail="No admin account to log in as")
+
+    memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)).all()
+    _create_remembered_session(db, response, user, memberships)
+    db.commit()
+    return ok(_issue_auth_payload(user, memberships))
+
+
 @router.post("/invites/join/verify")
 def verify_invite_join(payload: InviteJoinVerifyRequest, response: Response, db: Session = Depends(get_db)):
     email = payload.email.lower()
@@ -500,6 +475,7 @@ def verify_invite_join(payload: InviteJoinVerifyRequest, response: Response, db:
     _create_remembered_session(db, response, user, [membership])
     db.commit()
     db.refresh(user)
+    sync_stripe_seats(db, organization_id)
     return ok(_issue_auth_payload(user, [membership]))
 
 
@@ -572,7 +548,7 @@ def me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
         is_linked=bool(memberships),
         memberships=[MembershipOut.model_validate(item) for item in memberships],
         organization_settings=_settings_out(organization),
-        subscription=_build_subscription_summary(db, active_membership.organization_id if active_membership else None),
+        subscription=build_subscription_summary(db, active_membership.organization_id if active_membership else None),
         is_platform_admin=user.email.lower() in settings.parsed_platform_admin_emails,
     )
     return ok(payload_out.model_dump(mode="json"))

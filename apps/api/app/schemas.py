@@ -217,6 +217,8 @@ class SubscriptionSummaryOut(APIModel):
     member_cap: int | None = None
     location_cap: int | None = None
     soft_limit_reached: bool = False
+    billable_seats: int = 1
+    has_payment_method: bool = False
 
 
 class BillingCheckoutSessionRequest(BaseModel):
