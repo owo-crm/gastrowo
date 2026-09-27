@@ -46,6 +46,11 @@ import type {
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
+/** Absolute URL of an API path, also when VITE_API_URL is relative (e.g. "/api" behind the proxy). */
+export function apiAbsoluteUrl(path: string): string {
+  return new URL(`${API_URL}${path}`, window.location.origin).toString();
+}
+
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   let response: Response;
   try {
@@ -554,6 +559,9 @@ export const api = {
       throw new Error(payload?.error?.message ?? `Request failed: ${response.status}`);
     }
     return response.blob();
+  },
+  getCalendarFeed(token: string) {
+    return request<{ path: string; expires_in_days: number }>("/calendar/feed", {}, token);
   },
   listNotifications(token: string, limit = 20) {
     return request<NotificationListResponse>(`/notifications?limit=${limit}`, {}, token);

@@ -15,6 +15,7 @@ from app.routers import (
     auth,
     availability,
     billing,
+    calendar,
     dashboard,
     locations,
     marketing,
@@ -91,6 +92,7 @@ app.include_router(positions.router)
 app.include_router(availability.router)
 app.include_router(schedule.router)
 app.include_router(shifts.router)
+app.include_router(calendar.router)
 app.include_router(timesheets.router)
 app.include_router(tasks.router)
 app.include_router(reports.router)

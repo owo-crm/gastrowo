@@ -727,6 +727,23 @@ def test_timesheet_assigned_shift_submit_and_manager_review(client):
     assert staff_export.status_code == 403
 
 
+    feed = client.get("/calendar/feed", headers=auth_header(staff_token))
+    assert feed.status_code == 200
+    feed_path = feed.json()["data"]["path"]
+    ics = client.get(feed_path)
+    assert ics.status_code == 200
+    assert ics.headers["content-type"].startswith("text/calendar")
+    body = ics.text
+    assert body.startswith("BEGIN:VCALENDAR") and "END:VCALENDAR" in body
+    assert body.count("BEGIN:VEVENT") == 1
+    assert f"DTSTART;TZID=Europe/Warsaw:{monday.strftime('%Y%m%d')}T080000" in body
+
+    # The feed token is not an API credential.
+    feed_token = feed_path.removeprefix("/calendar/").removesuffix(".ics")
+    assert client.get("/auth/me", headers=auth_header(feed_token)).status_code == 401
+    assert client.get("/calendar/not-a-token.ics").status_code == 404
+
+
 def test_timesheet_restricted_entry_requires_review_and_staff_scope_limits(client):
     ADMIN_token, location_id = signup_ADMIN(client, organization_name="Timesheet Restrict Org", email="ADMIN@timesheet2.com")
     staff_token = invite_accept_login(
