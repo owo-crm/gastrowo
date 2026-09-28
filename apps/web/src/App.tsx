@@ -22,6 +22,7 @@ const PlatformPage = lazy(() => import("@/pages/platform-page").then((module) =>
 const TasksPage = lazy(() => import("@/pages/tasks-page").then((module) => ({ default: module.TasksPage })));
 const TeamPage = lazy(() => import("@/pages/team/team-page").then((module) => ({ default: module.TeamPage })));
 const WaitlistPage = lazy(() => import("@/pages/waitlist-page").then((module) => ({ default: module.WaitlistPage })));
+const HowItWorksPage = lazy(() => import("@/pages/how-it-works-page").then((module) => ({ default: module.HowItWorksPage })));
 const TermsPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.TermsPageEn })));
 const PrivacyPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.PrivacyPageEn })));
 const CookiesPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.CookiesPageEn })));
@@ -171,6 +172,7 @@ export function App() {
         element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : hasUnresolvedSession ? <PendingLinkPage /> : <LoginPage />}
       />
       <Route path="/kiosk" element={<KioskPage />} />
+      <Route path="/how-it-works" element={<HowItWorksPage />} />
       <Route path="/terms" element={<TermsPageEn />} />
       <Route path="/privacy" element={<PrivacyPageEn />} />
       <Route path="/cookies" element={<CookiesPageEn />} />
