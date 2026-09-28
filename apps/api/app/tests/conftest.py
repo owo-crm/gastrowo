@@ -61,3 +61,8 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+@pytest.fixture(autouse=True)
+def no_real_push(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Pushes are sent on a background thread against the real database; tests opt in explicitly.
+    monkeypatch.setattr("app.services.push._submit", lambda items: None)

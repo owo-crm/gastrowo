@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 720
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
     frontend_url: str = "http://localhost:5173"
+    # Contact the push services see in our VAPID claims; they use it if our pushes misbehave.
+    push_contact_email: str = "support@gastrostuff.pl"
     resend_api_key: str = ""
     resend_from_email: str = "noreply@info.owocrm.com"
     auth_session_cookie_name: str = "gastrowo_session"

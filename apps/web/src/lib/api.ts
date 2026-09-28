@@ -676,4 +676,13 @@ export const api = {
   platformAudit(token: string) {
     return request<PlatformLogItem[]>("/platform/audit?limit=30", {}, token);
   },
+  pushKey() {
+    return request<{ public_key: string }>("/push/key");
+  },
+  pushSubscribe(token: string, body: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+    return request<{ subscribed: boolean }>("/push/subscribe", { method: "POST", body: JSON.stringify(body) }, token);
+  },
+  pushUnsubscribe(token: string, endpoint: string) {
+    return request<{ subscribed: boolean }>("/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }, token);
+  },
 };
