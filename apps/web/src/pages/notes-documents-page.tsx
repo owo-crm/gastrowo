@@ -536,7 +536,7 @@ export function NotesDocumentsPage() {
 
   const renderRecordEditor = () => (
     <div className="space-y-4">
-      <div className="inline-flex rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
+      <div className="inline-flex rounded-[12px] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
         {([
           { key: "note", label: "Note", icon: StickyNote },
           { key: "document", label: "Document", icon: FileText },
@@ -558,8 +558,8 @@ export function NotesDocumentsPage() {
               }))
             }
             className={cn(
-              "inline-flex min-h-10 items-center gap-2 rounded-[0.8rem] px-4 py-2 text-sm font-semibold transition",
-              recordDraft.type === option.key ? "bg-white text-[var(--color-primary)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-heading)]",
+              "inline-flex min-h-10 items-center gap-2 rounded-[10px] px-4 py-2 text-sm font-semibold transition",
+              recordDraft.type === option.key ? "bg-white text-[var(--color-primary-strong)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-heading)]",
             )}
           >
             <option.icon className="size-4" />
@@ -582,7 +582,7 @@ export function NotesDocumentsPage() {
       </div>
 
       {recordDraft.type === "document" ? (
-        <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
+        <div className="rounded-[12px] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[var(--color-heading)]">{recordDraft.file_name ?? "No file selected yet"}</p>
@@ -591,7 +591,7 @@ export function NotesDocumentsPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl2 border border-[var(--color-border)] bg-white px-3 text-sm font-semibold text-[var(--color-heading)] transition hover:bg-[var(--color-surface-muted)]">
+              <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-[12px] border border-[var(--color-border)] bg-white px-3 text-sm font-semibold text-[var(--color-heading)] transition hover:bg-[var(--color-surface-muted)]">
                 <Upload className="size-4" />
                 {recordDraft.file_name ? "Replace file" : "Upload file"}
                 <input
@@ -650,15 +650,15 @@ export function NotesDocumentsPage() {
       hideBottomNav={Boolean(editorModal)}
     >
       <div className="space-y-5">
-        <div className="inline-flex flex-wrap items-center gap-2 rounded-[1.1rem] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
+        <div className="inline-flex flex-wrap items-center gap-2 rounded-[12px] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
               className={cn(
-                "inline-flex min-h-10 items-center gap-2 rounded-[0.9rem] px-4 py-2 text-sm font-semibold transition",
-                activeTab === tab.key ? "bg-white text-[var(--color-primary)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-heading)]",
+                "inline-flex min-h-10 items-center gap-2 rounded-[12px] px-4 py-2 text-sm font-semibold transition",
+                activeTab === tab.key ? "bg-white text-[var(--color-primary-strong)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-heading)]",
               )}
             >
               <tab.icon className="size-4" />
@@ -686,20 +686,20 @@ export function NotesDocumentsPage() {
                   return (
                     <article
                       key={item.id}
-                      className="overflow-hidden rounded-[1.35rem] border border-[var(--color-border)] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.06)]"
+                      className="overflow-hidden rounded-[12px] border border-[var(--color-border)] bg-white "
                     >
                       <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex min-w-0 gap-4">
-                          <div className={cn("grid size-12 shrink-0 place-items-center rounded-[1rem]", recordToneClass(item.type))}>
+                          <div className={cn("grid size-12 shrink-0 place-items-center rounded-[12px]", recordToneClass(item.type))}>
                             <Icon className="size-5" />
                           </div>
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{item.title}</h3>
+                              <h3 className="text-lg font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{item.title}</h3>
                               <Badge className={cn("border-transparent", item.type === "document" ? "bg-rose-50 text-rose-700" : "bg-blue-50 text-blue-700")}>
                                 {item.type === "document" ? "Document" : "Note"}
                               </Badge>
-                              {item.file_size_bytes ? <Badge className="border-slate-200 bg-slate-100 text-slate-700">{formatBytes(item.file_size_bytes)}</Badge> : null}
+                              {item.file_size_bytes ? <Badge className="border-[var(--color-separator)] bg-[var(--color-grouped)] text-black">{formatBytes(item.file_size_bytes)}</Badge> : null}
                             </div>
                             {item.description ? <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">{item.description}</p> : null}
                             {item.type === "document" && item.file_data_url ? (
@@ -708,9 +708,9 @@ export function NotesDocumentsPage() {
                                 download={item.file_name ?? item.title}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-[var(--color-heading)] transition hover:bg-white"
+                                className="mt-3 inline-flex items-center gap-2 rounded-full border border-[var(--color-separator)] bg-[var(--color-grouped)] px-3 py-1.5 text-sm font-semibold text-[var(--color-heading)] transition hover:bg-white"
                               >
-                                <FileText className="size-4 text-[var(--color-primary)]" />
+                                <FileText className="size-4 text-[var(--color-primary-strong)]" />
                                 Open attachment
                               </a>
                             ) : null}
@@ -749,7 +749,7 @@ export function NotesDocumentsPage() {
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--color-divider)] px-5 py-3 text-sm text-[var(--color-text-muted)]">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--color-separator)] px-5 py-3 text-sm text-[var(--color-text-muted)]">
                         <span className="inline-flex items-center gap-1.5">
                           <UserRound className="size-4" /> {item.author}
                         </span>
@@ -785,15 +785,15 @@ export function NotesDocumentsPage() {
             <section className="grid gap-4 md:grid-cols-2">
               {sortedContacts.length ? (
                 sortedContacts.map((contact, index) => (
-                  <Card key={contact.id} className="overflow-hidden border border-[var(--color-border)] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.06)]">
+                  <Card key={contact.id} className="overflow-hidden border border-[var(--color-border)] bg-white ">
                     <CardContent className="space-y-4 p-5">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{contactDisplayName(contact)}</p>
+                          <p className="text-lg font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{contactDisplayName(contact)}</p>
                           <p className="mt-1 text-sm font-medium text-[var(--color-text-muted)]">{contactRoleLabel(contact)}</p>
                           {contact.company && contact.company !== contactDisplayName(contact) ? <p className="mt-1 text-sm text-[var(--color-text-muted)]">{contact.company}</p> : null}
                         </div>
-                        <div className={cn("grid size-11 shrink-0 place-items-center rounded-[1rem]", contactToneClass(index))}>
+                        <div className={cn("grid size-11 shrink-0 place-items-center rounded-[12px]", contactToneClass(index))}>
                           <Phone className="size-5" />
                         </div>
                       </div>
@@ -801,37 +801,37 @@ export function NotesDocumentsPage() {
                       <div className="grid gap-2 text-sm text-[var(--color-text-muted)]">
                         {contact.phone ? (
                           <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-2 hover:text-[var(--color-heading)]">
-                            <Phone className="size-4 text-[var(--color-primary)]" />
+                            <Phone className="size-4 text-[var(--color-primary-strong)]" />
                             {contact.phone}
                           </a>
                         ) : null}
                         {contact.email ? (
                           <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-2 hover:text-[var(--color-heading)]">
-                            <Mail className="size-4 text-[var(--color-primary)]" />
+                            <Mail className="size-4 text-[var(--color-primary-strong)]" />
                             {contact.email}
                           </a>
                         ) : null}
                         {contact.location ? (
                           <p className="inline-flex items-center gap-2">
-                            <MapPin className="size-4 text-[var(--color-primary)]" />
+                            <MapPin className="size-4 text-[var(--color-primary-strong)]" />
                             {contact.location}
                           </p>
                         ) : null}
                         {contact.responseWindow ? (
                           <p className="inline-flex items-center gap-2">
-                            <Clock3 className="size-4 text-[var(--color-primary)]" />
+                            <Clock3 className="size-4 text-[var(--color-primary-strong)]" />
                             {contact.responseWindow}
                           </p>
                         ) : null}
                       </div>
 
                       {contact.note ? (
-                        <div className="rounded-[1rem] bg-[var(--color-surface-muted)] px-4 py-3 text-sm leading-6 text-[var(--color-text-muted)]">
+                        <div className="rounded-[12px] bg-[var(--color-surface-muted)] px-4 py-3 text-sm leading-6 text-[var(--color-text-muted)]">
                           {contact.note}
                         </div>
                       ) : null}
 
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-divider)] pt-3 text-xs text-[var(--color-text-muted)]">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-separator)] pt-3 text-xs text-[var(--color-text-muted)]">
                         <span className="inline-flex items-center gap-1.5">
                           <Building2 className="size-3.5" />
                           {formatRelativeTimestamp(contact.updated_at, {
@@ -890,7 +890,7 @@ export function NotesDocumentsPage() {
         {editorModal ? (
           <OverlayPortal>
             <motion.div
-              className="fixed inset-0 z-[140] bg-slate-950/42 backdrop-blur-sm"
+              className="fixed inset-0 z-[140] bg-slate-950/42 "
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -900,14 +900,14 @@ export function NotesDocumentsPage() {
               <div className="flex h-full w-full flex-col justify-end px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-16 sm:items-center sm:justify-center sm:p-4">
                 <motion.section
                   {...closeModalAnimation()}
-                  className="flex w-full max-h-[calc(100dvh-5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-[0_-24px_60px_rgba(15,23,42,0.18)] sm:max-h-[90dvh] sm:max-w-[760px] sm:rounded-[1.6rem] sm:border sm:border-[var(--color-border)] sm:shadow-[0_26px_80px_rgba(15,23,42,0.18)]"
+                  className="flex w-full max-h-[calc(100dvh-5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[12px] bg-white sm:max-h-[90dvh] sm:max-w-[760px] sm:rounded-[12px] sm:border sm:border-[var(--color-border)] "
                   role="dialog"
                   aria-modal="true"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 sm:px-6 sm:py-5">
+                  <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-4 sm:px-6 sm:py-5">
                     <div className="min-w-0">
-                      <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">
+                      <p className="text-lg font-semibold tracking-[-0.01em] text-[var(--color-heading)]">
                         {editorModal.kind === "record"
                           ? editorModal.mode === "edit"
                             ? "Edit note or document"
@@ -936,7 +936,7 @@ export function NotesDocumentsPage() {
                     {editorModal.kind === "record" ? renderRecordEditor() : renderContactEditor()}
                   </div>
 
-                  <div className="shrink-0 border-t border-[var(--color-divider)] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-4 sm:px-6 sm:py-5">
+                  <div className="shrink-0 border-t border-[var(--color-separator)] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-4 sm:px-6 sm:py-5">
                     <div className="grid gap-2 sm:flex sm:justify-end">
                       <Button variant="secondary" onClick={closeEditorModal}>
                         {t("common.cancel")}

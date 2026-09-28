@@ -23,6 +23,27 @@ def get_db() -> Session:
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_runtime_schema_compat()
+    _backfill_member_positions()
+
+
+def _backfill_member_positions() -> None:
+    """Give everyone who only has the old single `staff_position` a matching primary position row."""
+    from sqlalchemy import select
+
+    from app.models import MemberPosition, OrganizationMembership
+
+    with SessionLocal() as db:
+        existing = {(row.organization_id, row.user_id) for row in db.scalars(select(MemberPosition)).all()}
+        memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.staff_position.is_not(None))).all()
+        added = False
+        for membership in memberships:
+            position = (membership.staff_position or "").strip()
+            if not position or (membership.organization_id, membership.user_id) in existing:
+                continue
+            db.add(MemberPosition(organization_id=membership.organization_id, user_id=membership.user_id, position=position, is_primary=True))
+            added = True
+        if added:
+            db.commit()
 
 
 def _ensure_runtime_schema_compat() -> None:
@@ -230,6 +251,11 @@ def _ensure_runtime_schema_compat() -> None:
             connection.execute(text("CREATE INDEX ix_auth_sessions_organization_id ON auth_sessions (organization_id)"))
             connection.execute(text("CREATE INDEX ix_auth_sessions_token_hash ON auth_sessions (token_hash)"))
             connection.execute(text("CREATE INDEX ix_auth_sessions_expires_at ON auth_sessions (expires_at)"))
+
+        if "organizations" in tables:
+            organization_columns = {column["name"] for column in inspector.get_columns("organizations")}
+            if "country" not in organization_columns:
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN country VARCHAR(2) NOT NULL DEFAULT 'PL'"))
 
         if "organization_memberships" in tables:
             membership_columns = {column["name"] for column in inspector.get_columns("organization_memberships")}

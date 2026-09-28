@@ -88,10 +88,10 @@ export function Select({ className, options, value, onChange, disabled, id, name
         data-name={name}
         disabled={disabled}
         className={cn(
-          "flex h-10 w-full items-center justify-between gap-3 rounded-xl2 border border-[var(--color-border)] bg-white px-3 text-left text-sm text-[var(--color-heading)] outline-none transition sm:h-11",
-          "focus-visible:border-[var(--color-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgba(47,111,237,0.18)]",
+          "flex h-11 w-full items-center justify-between gap-3 rounded-xl bg-[rgba(118,118,128,0.12)] px-3 text-left text-[15px] text-black outline-none transition",
+          "focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]",
           "disabled:cursor-not-allowed disabled:opacity-50",
-          open && "border-[var(--color-primary)] ring-2 ring-[color:rgba(47,111,237,0.18)]",
+          open && "ring-2 ring-[var(--color-primary)]",
           className,
         )}
         onClick={() => setOpen((current) => !current)}
@@ -105,7 +105,7 @@ export function Select({ className, options, value, onChange, disabled, id, name
             <div
               ref={menuRef}
               style={menuStyle}
-              className="surface-elevated overflow-hidden rounded-[1.2rem] p-1.5"
+              className="overflow-hidden rounded-2xl bg-white/90 p-1.5 shadow-[var(--shadow-float)] backdrop-blur-xl"
             >
               <div className="max-h-[inherit] overflow-y-auto">
                 {options.map((option) => {
@@ -115,11 +115,11 @@ export function Select({ className, options, value, onChange, disabled, id, name
                       key={option.value}
                       type="button"
                       className={cn(
-                        "flex min-h-11 w-full items-center justify-between gap-3 rounded-[0.95rem] px-3 py-2 text-left text-sm transition",
+                        "flex min-h-11 w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-[15px] transition",
                         "sm:min-h-11 min-h-10",
                         isSelected
-                          ? "bg-[var(--color-primary)] text-white [&_svg]:text-white hover:bg-[#245fd1]"
-                          : "text-[var(--color-heading)] hover:bg-[var(--color-surface-muted)]",
+                          ? "font-semibold text-[var(--color-primary-strong)] hover:bg-[var(--color-grouped)]"
+                          : "text-black hover:bg-[var(--color-grouped)]",
                       )}
                       onClick={() => handleSelect(option.value)}
                     >

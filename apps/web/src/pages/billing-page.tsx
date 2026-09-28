@@ -1,46 +1,39 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Check, CreditCard, MapPin, Users2 } from "lucide-react";
+import { AlertTriangle, Check, CreditCard } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { ListRow, ListSection } from "@/components/ui/list";
+import { Segmented } from "@/components/ui/segmented";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { currencyOf, formatDate, formatMoney } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
-import { FREE_MEMBER_LIMIT, SEAT_PRICE_PLN, formatPln, normalizePlan, planTitle, plans, type PaidPlan } from "@/lib/plans";
+import { PRICE_PER_LOCATION, SEVENSHIFTS_USD, normalizePlan, planTitleKey, plans, type PaidPlan } from "@/lib/plans";
 import { useToast } from "@/lib/toast";
 import type { BillingCheckoutCycle, SubscriptionSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-function formatDate(value: string | null): string | null {
-  if (!value) return null;
-  return new Date(value).toLocaleDateString("pl-PL", { day: "numeric", month: "long", year: "numeric" });
-}
+type Translate = (key: string, params?: Record<string, string | number>) => string;
 
-function peopleLabel(count: number): string {
-  if (count === 1) return "osoba";
-  const lastDigit = count % 10;
-  const lastTwo = count % 100;
-  return lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 12 || lastTwo > 14) ? "osoby" : "osób";
-}
-
-function statusBadge(subscription: SubscriptionSummary): { label: string; className: string } {
+function statusBadge(subscription: SubscriptionSummary, t: Translate, lang: Parameters<typeof formatDate>[1]) {
   if (subscription.status === "trialing") {
-    const ends = formatDate(subscription.trial_ends_at);
-    return { label: ends ? `Trial Pro do ${ends}` : "Trial Pro", className: "border-blue-200 bg-blue-50 text-blue-700" };
+    const ends = subscription.trial_ends_at ? formatDate(subscription.trial_ends_at, lang, { month: "long", day: "numeric" }) : null;
+    return { tone: "blue" as const, label: ends ? t("billing.trial_until", { date: ends }) : t("billing.trial") };
   }
-  if (subscription.status === "past_due") return { label: "Zaległa płatność", className: "border-red-200 bg-red-50 text-red-700" };
-  if (subscription.plan === "free") return { label: "Plan Free", className: "border-slate-200 bg-slate-50 text-slate-700" };
-  return { label: `${planTitle(subscription.plan)} aktywny`, className: "border-emerald-200 bg-emerald-50 text-emerald-700" };
+  if (subscription.status === "past_due") return { tone: "red" as const, label: t("billing.past_due") };
+  if (subscription.plan === "free") return { tone: "neutral" as const, label: t("plan.free.title") };
+  return { tone: "green" as const, label: t("billing.active") };
 }
 
 export function BillingPage() {
   const { token, me } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const toast = useToast();
   const [cycle, setCycle] = useState<BillingCheckoutCycle>("monthly");
+  const currency = currencyOf(me);
 
   const subscriptionQuery = useQuery({
     queryKey: ["subscription"],
@@ -53,141 +46,119 @@ export function BillingPage() {
   const checkoutMutation = useMutation({
     mutationFn: (plan: PaidPlan) => api.createCheckoutSession(token!, { plan, billing_cycle: cycle }),
     onSuccess: (session) => window.location.assign(session.url),
-    onError: (error) => toast.error("Nie udało się otworzyć płatności", error instanceof Error ? error.message : undefined),
+    onError: (error) => toast.error(t("billing.checkout_failed"), error instanceof Error ? error.message : undefined),
   });
-
   const portalMutation = useMutation({
     mutationFn: () => api.createBillingPortalSession(token!),
     onSuccess: (session) => window.location.assign(session.url),
-    onError: (error) => toast.error("Nie udało się otworzyć panelu płatności", error instanceof Error ? error.message : undefined),
+    onError: (error) => toast.error(t("billing.portal_failed"), error instanceof Error ? error.message : undefined),
   });
 
-  const seats = subscription?.billable_seats ?? Math.max(subscription?.active_members_count ?? 1, 1);
+  const locations = subscription?.billable_locations ?? Math.max(subscription?.active_locations_count ?? 1, 1);
   const currentPlan = subscription ? normalizePlan(subscription.plan) : null;
   const isTrial = subscription?.status === "trialing";
   const hasPaidSubscription = Boolean(subscription?.has_payment_method);
-  const atFreeLimit = currentPlan === "free" && (subscription?.active_members_count ?? 0) >= FREE_MEMBER_LIMIT;
-  const badge = subscription ? statusBadge(subscription) : null;
-  const periodEnd = formatDate(subscription?.current_period_ends_at ?? null);
+  const atLimit = Boolean(subscription?.member_cap && subscription.active_members_count >= subscription.member_cap);
+  const badge = subscription ? statusBadge(subscription, t, lang) : null;
+  const perPeriod = cycle === "monthly" ? t("billing.per_month") : t("billing.per_year");
 
   return (
-    <AppShell title={t("billing.title")} subtitle="Płacisz tylko za osoby w zespole. Lokale bez limitu.">
-      <div className="mx-auto max-w-4xl space-y-5">
-        {atFreeLimit ? (
-          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <p>
-              Plan Free obejmuje do {FREE_MEMBER_LIMIT} osób. Aby zaprosić kolejne, wybierz Standard lub Pro.
-            </p>
+    <AppShell title={t("sub.billing")} subtitle={t("billing.subtitle")} flush>
+      <div>
+        {atLimit ? (
+          <div className="mx-4 mb-4 flex items-start gap-3 rounded-2xl bg-[var(--color-warning-fill)] px-4 py-3 text-[15px] text-[#7a3700] sm:mx-6">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0" />
+            <p className="text-[#7a3700]">{t("billing.limit_reached", { count: subscription?.member_cap ?? 0 })}</p>
           </div>
         ) : null}
 
-        <Card className="rounded-2xl border border-[var(--color-border)] p-5 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-sm text-[var(--color-text-muted)]">Twój plan</p>
-              <p className="mt-1 text-3xl font-bold tracking-tight text-[var(--color-heading)]">{subscription ? planTitle(subscription.plan) : "…"}</p>
-              {periodEnd && hasPaidSubscription ? <p className="mt-1 text-sm text-[var(--color-text-muted)]">Następna płatność: {periodEnd}</p> : null}
-            </div>
-            {badge ? <Badge className={badge.className}>{badge.label}</Badge> : null}
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <div className="flex items-center gap-3 rounded-xl bg-[var(--color-surface-muted)] px-4 py-3">
-              <Users2 className="size-4 text-[var(--color-primary)]" />
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">Zespół</p>
-                <p className="text-sm font-semibold text-[var(--color-heading)]">
-                  {subscription ? `${subscription.active_members_count}${subscription.member_cap ? ` / ${subscription.member_cap}` : ""} osób` : "–"}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-xl bg-[var(--color-surface-muted)] px-4 py-3">
-              <MapPin className="size-4 text-[var(--color-primary)]" />
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">Lokale</p>
-                <p className="text-sm font-semibold text-[var(--color-heading)]">{subscription ? `${subscription.active_locations_count} · bez limitu` : "–"}</p>
-              </div>
-            </div>
-          </div>
-        </Card>
+        <ListSection header={t("billing.your_plan")}>
+          <ListRow
+            title={<span className="text-[20px] font-semibold">{subscription ? t(planTitleKey(subscription.plan)) : "…"}</span>}
+            trailing={badge ? <Badge tone={badge.tone}>{badge.label}</Badge> : null}
+          />
+          <ListRow
+            title={t("billing.people")}
+            trailing={subscription ? `${subscription.active_members_count}${subscription.member_cap ? ` / ${subscription.member_cap}` : ""}` : "–"}
+          />
+          <ListRow
+            title={t("billing.locations")}
+            trailing={subscription ? `${subscription.active_locations_count}${subscription.location_cap ? ` / ${subscription.location_cap}` : ""}` : "–"}
+          />
+          {hasPaidSubscription && subscription?.current_period_ends_at ? (
+            <ListRow title={t("billing.next_payment")} trailing={formatDate(subscription.current_period_ends_at, lang, { year: "numeric", month: "long", day: "numeric" })} />
+          ) : null}
+          {hasPaidSubscription ? (
+            <ListRow
+              title={<span className="font-semibold text-[var(--color-primary-strong)]">{portalMutation.isPending ? t("billing.opening") : t("billing.manage")}</span>}
+              onClick={() => portalMutation.mutate()}
+              chevron
+            />
+          ) : null}
+        </ListSection>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-[var(--color-heading)]">Wybierz plan</h2>
-          <div className="inline-flex rounded-xl border border-[var(--color-border)] bg-white p-1" role="group" aria-label="Okres rozliczeniowy">
-            {(["monthly", "annual"] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setCycle(item)}
-                aria-pressed={cycle === item}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-sm font-semibold transition",
-                  cycle === item ? "bg-[var(--color-heading)] text-white" : "text-[var(--color-text-muted)] hover:text-[var(--color-heading)]",
-                )}
-              >
-                {item === "monthly" ? "Miesięcznie" : "Rocznie −17%"}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3 pt-6 sm:px-6">
+          <h2 className="text-[20px] font-semibold text-black">{t("billing.choose_plan")}</h2>
+          <Segmented
+            ariaLabel={t("billing.cycle")}
+            value={cycle}
+            onChange={setCycle}
+            options={[
+              { value: "monthly", label: t("billing.monthly") },
+              { value: "annual", label: t("billing.annual") },
+            ]}
+          />
         </div>
 
-        <section className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-3 px-4 sm:px-6 md:grid-cols-3">
           {plans.map((plan) => {
             const isCurrent = currentPlan === plan.key;
             const paid = plan.key !== "free" ? plan.key : null;
-            const seatPrice = paid ? SEAT_PRICE_PLN[paid][cycle] : 0;
+            const price = paid ? PRICE_PER_LOCATION[currency][paid][cycle] : 0;
+            const saving = paid && currency === "USD" ? Math.round((1 - PRICE_PER_LOCATION.USD[paid].monthly / SEVENSHIFTS_USD[paid]) * 100) : null;
             return (
-              <Card
-                key={plan.key}
-                className={cn("flex flex-col rounded-2xl border p-5", isCurrent ? "border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]" : "border-[var(--color-border)]")}
-              >
+              <section key={plan.key} className={cn("ios-island flex flex-col px-5 py-6", isCurrent && "ring-2 ring-[var(--color-primary-strong)]")}>
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-base font-semibold text-[var(--color-heading)]">{plan.title}</h3>
-                  {isCurrent ? <Badge className="border-blue-200 bg-blue-50 text-blue-700">{isTrial ? "Trial" : "Aktualny"}</Badge> : null}
+                  <h3 className="text-[20px] font-semibold text-black">{t(`plan.${plan.key}.title`)}</h3>
+                  {isCurrent ? <Badge tone="blue">{isTrial ? t("billing.trial") : t("billing.current")}</Badge> : null}
                 </div>
-                <p className="mt-1 text-sm text-[var(--color-text-muted)]">{plan.tagline}</p>
-                <p className="mt-4">
-                  <span className="text-3xl font-bold tracking-tight text-[var(--color-heading)]">{paid ? formatPln(seatPrice) : plan.price}</span>{" "}
-                  <span className="text-sm text-[var(--color-text-muted)]">{paid ? (cycle === "monthly" ? "/ osoba / mies." : "/ osoba / rok") : plan.cycle}</span>
+                <p className="mt-0.5 text-[15px] text-[var(--color-text-muted)]">{t(`plan.${plan.key}.tagline`)}</p>
+                <p className="mt-4 flex flex-wrap items-baseline gap-x-1.5">
+                  <span className="text-[34px] font-semibold leading-none tracking-tight text-black">{formatMoney(price, currency, lang)}</span>
+                  <span className="text-[14px] text-[var(--color-text-muted)]">
+                    {paid ? (cycle === "monthly" ? t("plan.per_location_month") : t("billing.per_location_year")) : t("plan.forever")}
+                  </span>
                 </p>
+                {saving ? <p className="mt-1.5 text-[14px] font-semibold text-[var(--color-success)]">{t("plan.cheaper_than", { percent: saving })}</p> : null}
                 {paid ? (
-                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                    Twój zespół: <span className="font-semibold text-[var(--color-heading)]">{formatPln(seats * seatPrice)}</span> {cycle === "monthly" ? "/ mies." : "/ rok"}
+                  <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
+                    {t("billing.your_total", { count: locations, total: formatMoney(price * locations, currency, lang), period: perPeriod })}
                   </p>
                 ) : null}
-                <ul className="mt-5 flex-1 space-y-2">
-                  {plan.highlights.map((item) => (
-                    <li key={item} className="flex items-start gap-2 text-sm text-[var(--color-heading)]">
-                      <Check className="mt-0.5 size-4 shrink-0 text-[var(--color-primary)]" /> {item}
+                <ul className="mt-5 flex-1 space-y-2.5">
+                  {Array.from({ length: plan.features }, (_, index) => (
+                    <li key={index} className="flex items-start gap-2.5 text-[15px] text-black">
+                      <Check className="mt-0.5 size-[18px] shrink-0 text-[var(--color-success)]" strokeWidth={3} /> {t(`plan.${plan.key}.f${index + 1}`)}
                     </li>
                   ))}
                 </ul>
                 {paid && !hasPaidSubscription ? (
                   <Button
+                    size="lg"
                     className="mt-6 w-full"
-                    variant={plan.key === "standard" ? "default" : "secondary"}
+                    variant={plan.key === "standard" ? "default" : "tinted"}
                     onClick={() => checkoutMutation.mutate(paid)}
                     disabled={checkoutMutation.isPending || !token}
                   >
-                    <CreditCard className="size-4" />
-                    {checkoutMutation.isPending && checkoutMutation.variables === paid ? "Otwieranie…" : `Wybierz ${plan.title}`}
+                    <CreditCard className="size-5" />
+                    {checkoutMutation.isPending && checkoutMutation.variables === paid ? t("billing.opening") : t("billing.choose", { plan: t(`plan.${plan.key}.title`) })}
                   </Button>
                 ) : null}
-              </Card>
+              </section>
             );
           })}
-        </section>
-
-        <p className="text-sm text-[var(--color-text-muted)]">
-          Płacisz za osoby w zespole ({seats} {peopleLabel(seats)} teraz). Kwota zmienia się sama, gdy dodajesz lub usuwasz osoby. Lokale bez limitu w każdym planie.
-        </p>
-
-        {hasPaidSubscription ? (
-          <Button onClick={() => portalMutation.mutate()} disabled={portalMutation.isPending}>
-            <CreditCard className="size-4" />
-            {portalMutation.isPending ? "Otwieranie…" : "Zmień plan lub zarządzaj płatnościami"}
-          </Button>
-        ) : null}
+        </div>
+        <p className="px-4 py-4 text-[14px] text-[var(--color-text-muted)] sm:px-6">{t("billing.footer")}</p>
       </div>
     </AppShell>
   );

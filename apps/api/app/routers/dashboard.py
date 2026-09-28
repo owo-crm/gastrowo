@@ -15,6 +15,8 @@ from app.db import get_db
 from app.models import Assignment, Location, LocationMembership, OrganizationMembership, RevenueReport, RoleEnum, Shift, User
 from app.models import Timesheet, TimesheetStatusEnum
 from app.services.billing import require_feature
+from app.services.labor_rules import currency_for, organization_country
+from app.services.positions import positions_by_user, rate_for
 from app.services.scheduler import shift_duration_hours
 
 from app.services.worktime import worked_hours as timesheet_hours
@@ -79,10 +81,10 @@ def owner_dashboard(
 
     labor_by_day: dict[str, Decimal] = defaultdict(lambda: Decimal("0.00"))
     labor_by_location: dict[str, Decimal] = defaultdict(lambda: Decimal("0.00"))
-    for _, shift, location_membership in assignment_rows:
-        cost = (Decimal(location_membership.hourly_rate_pln) * Decimal(str(shift_duration_hours(shift.start_time, shift.end_time)))).quantize(
-            Decimal("0.01")
-        )
+    member_positions = positions_by_user(db, context.membership.organization_id)
+    for assignment, shift, location_membership in assignment_rows:
+        rate = rate_for(member_positions.get(assignment.user_id), shift.staff_position, location_membership.hourly_rate_pln)
+        cost = (rate * Decimal(str(shift_duration_hours(shift.start_time, shift.end_time)))).quantize(Decimal("0.01"))
         labor_by_day[shift.date.isoformat()] += cost
         labor_by_location[str(shift.location_id)] += cost
 
@@ -213,6 +215,7 @@ def owner_dashboard(
                 shift_rate = rates_by_user_location.get((user_key, str(shift.location_id)))
                 if shift_rate is not None:
                     resolved_rate = shift_rate
+                resolved_rate = rate_for(member_positions.get(item.user_id), shift.staff_position, resolved_rate)
         entry = payroll_acc.get(user_key)
         if entry is None:
             entry = {
@@ -267,4 +270,5 @@ def owner_dashboard(
         },
         "employee_payroll": payroll_visible_rows,
     }
+    response["currency"] = currency_for(organization_country(db, context.membership.organization_id))
     return ok(response)

@@ -22,7 +22,7 @@ function LegalLayout({
   sections: LegalSection[];
 }) {
   return (
-    <div className="min-h-dvh bg-[linear-gradient(180deg,#f8fbff,#eef4fb)] text-[var(--color-text)]">
+    <div className="min-h-dvh bg-white text-[var(--color-text)]">
       <div className="mx-auto max-w-[920px] px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex items-center justify-between gap-4">
           <Link to="/" className="shrink-0">
@@ -33,18 +33,18 @@ function LegalLayout({
           </Link>
         </div>
 
-        <article className="mt-6 rounded-[2rem] border border-[rgba(148,163,184,0.16)] bg-white/98 p-5 shadow-[0_28px_65px_rgba(15,23,42,0.08)] sm:p-8">
-          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[#2563eb]">Dokumentacja serwisu</p>
-          <h1 className="mt-3 text-[2.2rem] font-extrabold tracking-[-0.06em] text-[var(--color-heading)] sm:text-[3rem]">{title}</h1>
+        <article className="mt-6 rounded-[12px] border border-[rgba(148,163,184,0.16)] bg-white/98 p-5 sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2563eb]">Dokumentacja serwisu</p>
+          <h1 className="mt-3 text-[2.2rem] font-semibold tracking-[-0.01em] text-[var(--color-heading)] sm:text-[3rem]">{title}</h1>
           <p className="mt-3 max-w-[42rem] text-[15px] leading-7 text-[var(--color-text-muted)]">{subtitle}</p>
-          <div className="mt-4 rounded-[1.2rem] border border-[rgba(227,233,243,0.96)] bg-[rgba(248,251,255,0.92)] px-4 py-3 text-sm text-[var(--color-text-muted)]">
+          <div className="mt-4 rounded-[12px] border border-[rgba(227,233,243,0.96)] bg-[rgba(248,251,255,0.92)] px-4 py-3 text-sm text-[var(--color-text-muted)]">
             Data obowiązywania: <span className="font-semibold text-[var(--color-heading)]">{effectiveDate}</span>
           </div>
 
           <div className="mt-8 space-y-8">
             {sections.map((section) => (
               <section key={section.title}>
-                <h2 className="text-[1.15rem] font-bold tracking-[-0.03em] text-[var(--color-heading)] sm:text-[1.35rem]">{section.title}</h2>
+                <h2 className="text-[1.15rem] font-semibold tracking-[-0.01em] text-[var(--color-heading)] sm:text-[1.35rem]">{section.title}</h2>
                 {section.paragraphs?.map((paragraph) => (
                   <p key={paragraph} className="mt-3 text-[15px] leading-7 text-[var(--color-text-muted)]">
                     {paragraph}

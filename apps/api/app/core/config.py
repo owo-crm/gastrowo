@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     stripe_price_pro_annual: str = ""
     stripe_price_business_monthly: str = ""
     stripe_price_business_annual: str = ""
+    # Per-location prices (Stripe quantity = number of locations), one set per currency.
+    stripe_price_starter_usd_monthly: str = ""
+    stripe_price_starter_usd_annual: str = ""
+    stripe_price_pro_usd_monthly: str = ""
+    stripe_price_pro_usd_annual: str = ""
+    stripe_price_starter_pln_monthly: str = ""
+    stripe_price_starter_pln_annual: str = ""
+    stripe_price_pro_pln_monthly: str = ""
+    stripe_price_pro_pln_annual: str = ""
     stripe_checkout_success_url: str | None = None
     stripe_checkout_cancel_url: str | None = None
     stripe_portal_return_url: str | None = None

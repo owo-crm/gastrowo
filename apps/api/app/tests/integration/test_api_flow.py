@@ -715,6 +715,16 @@ def test_timesheet_assigned_shift_submit_and_manager_review(client):
     export = client.get("/payroll/export.csv", headers=auth_header(ADMIN_token), params=period)
     assert export.status_code == 200
     assert export.headers["content-type"].startswith("text/csv")
+    us_lines = export.content.decode("utf-8-sig").strip().splitlines()
+    # New businesses are American: comma separated, decimal points, English headers.
+    assert us_lines[0].startswith("Employee,Position,Role,Approved hours,Rate USD/h")
+    assert ",8.05,29.00,233.45," in next(line for line in us_lines if line.startswith("Staff,"))
+    assert us_lines[-1].startswith("TOTAL,")
+
+    to_poland = client.patch("/organizations/current", headers=auth_header(ADMIN_token), json={"country": "PL"})
+    assert to_poland.status_code == 200
+    assert to_poland.json()["data"]["currency"] == "PLN"
+    export = client.get("/payroll/export.csv", headers=auth_header(ADMIN_token), params=period)
     lines = export.content.decode("utf-8-sig").strip().splitlines()
     assert lines[0].startswith("Pracownik;")
     # Invited users are named from their email until they edit their profile.

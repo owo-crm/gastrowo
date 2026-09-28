@@ -1,5 +1,6 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { uiTranslations } from "@/lib/i18n-ui";
+import { v2Translations } from "@/lib/i18n-v2";
 
 export type Lang = "en" | "pl" | "ru";
 
@@ -1635,7 +1636,17 @@ function interpolate(template: string, params?: Record<string, string | number |
 }
 
 function resolve(lang: Lang, key: string): TranslationValue | undefined {
-  return uiTranslations[lang]?.[key] ?? uiTranslations.en[key] ?? supplementalTranslations[lang]?.[key] ?? translations[lang][key] ?? supplementalTranslations.en[key] ?? translations.en[key];
+  // The user's language always wins over an English string from a newer file.
+  return (
+    v2Translations[lang]?.[key] ??
+    uiTranslations[lang]?.[key] ??
+    supplementalTranslations[lang]?.[key] ??
+    translations[lang][key] ??
+    v2Translations.en[key] ??
+    uiTranslations.en[key] ??
+    supplementalTranslations.en[key] ??
+    translations.en[key]
+  );
 }
 
 export function translateKey(lang: Lang, key: string, params?: Record<string, string | number | null | undefined>) {
@@ -1648,15 +1659,26 @@ export function translateKey(lang: Lang, key: string, params?: Record<string, st
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {
-    const stored = typeof window === "undefined" ? null : window.localStorage.getItem(STORAGE_KEY);
+    let stored: string | null = null;
+    try {
+      stored = typeof window === "undefined" ? null : window.localStorage.getItem(STORAGE_KEY);
+    } catch {
+      stored = null;
+    }
     if (stored === "pl" || stored === "ru" || stored === "en") return stored;
-    // Polish market: default to Polish; Russian/Ukrainian browsers get Russian.
+    // US market first: English by default; Polish and Russian/Ukrainian browsers get their language.
     const browser = typeof navigator === "undefined" ? "" : navigator.language.toLowerCase();
-    return browser.startsWith("ru") || browser.startsWith("uk") ? "ru" : "pl";
+    if (browser.startsWith("pl")) return "pl";
+    if (browser.startsWith("ru") || browser.startsWith("uk")) return "ru";
+    return "en";
   });
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, lang);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, lang);
+    } catch {
+      // Private mode: the choice lasts for this visit.
+    }
     document.documentElement.lang = lang;
   }, [lang]);
 

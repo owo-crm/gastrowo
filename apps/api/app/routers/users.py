@@ -11,6 +11,7 @@ from app.core.envelope import ok
 from app.core.permissions import can_manage_team
 from app.db import get_db
 from app.models import LocationMembership, OrganizationMembership, RoleEnum, User
+from app.services.positions import positions_by_user, replace_member_positions
 from app.schemas import ProfilePatch, StaffPositionPatch
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -56,6 +57,7 @@ def list_users(
         if current is None or rate > current:
             rate_by_user[rate_row.user_id] = rate
 
+    positions = positions_by_user(db, context.membership.organization_id)
     data = []
     for user, membership in rows:
         data.append(
@@ -67,6 +69,7 @@ def list_users(
                 "role": membership.role,
                 "max_hours_per_week": membership.max_hours_per_week,
                 "staff_position": membership.staff_position,
+                "positions": [row.position for row in positions.get(user.id, [])] or ([membership.staff_position] if membership.staff_position else []),
                 "hourly_rate_pln": f"{rate_by_user.get(user.id, 0):.2f}",
             }
         )
@@ -104,7 +107,11 @@ def patch_staff_position(
     if membership.role not in (RoleEnum.STAFF, RoleEnum.MANAGER):
         raise HTTPException(status_code=422, detail="Position can be assigned only to STAFF or MANAGER")
     next_position = payload.staff_position.strip()
-    membership.staff_position = next_position
+    # The new primary position goes first; the person keeps the other positions they can work.
+    current = positions_by_user(db, membership.organization_id).get(user_id, [])
+    items = [(next_position, next((row.hourly_rate for row in current if row.position.lower() == next_position.lower()), None), True)]
+    items += [(row.position, row.hourly_rate, False) for row in current if row.position.lower() != next_position.lower()]
+    replace_member_positions(db, membership, items)
     membership.role = RoleEnum.MANAGER if next_position == "Manager" else RoleEnum.STAFF
     db.commit()
     return ok({"user_id": str(user_id), "staff_position": membership.staff_position, "role": membership.role})

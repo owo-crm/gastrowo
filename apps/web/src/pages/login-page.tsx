@@ -7,6 +7,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
@@ -39,19 +40,21 @@ function DevHint({ code, label }: { code?: string | null; label: string }) {
 }
 
 function LegalAuthNotice() {
+  const { t } = useLanguage();
+  const link = "font-semibold text-[var(--color-primary-strong)] hover:underline";
   return (
-    <p className="text-sm leading-6 text-[var(--color-text-muted)]">
-      Kontynuując, potwierdzasz zapoznanie się z{" "}
-      <Link to="/regulamin" className="font-semibold text-[var(--color-heading)] hover:text-[var(--color-primary)]">
-        Regulaminem
+    <p className="text-[13px] leading-5 text-[var(--color-text-muted)]">
+      {t("login.legal_prefix")}{" "}
+      <Link to="/regulamin" className={link}>
+        {t("login.legal_terms")}
       </Link>
       ,{" "}
-      <Link to="/polityka-prywatnosci" className="font-semibold text-[var(--color-heading)] hover:text-[var(--color-primary)]">
-        Polityką prywatności
+      <Link to="/polityka-prywatnosci" className={link}>
+        {t("login.legal_privacy")}
       </Link>{" "}
-      i{" "}
-      <Link to="/polityka-cookies" className="font-semibold text-[var(--color-heading)] hover:text-[var(--color-primary)]">
-        Polityką cookies
+      {t("login.legal_and")}{" "}
+      <Link to="/polityka-cookies" className={link}>
+        {t("login.legal_cookies")}
       </Link>
       .
     </p>
@@ -82,6 +85,8 @@ export function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [organizationName, setOrganizationName] = useState("");
   const [source, setSource] = useState<SourceOption | "">("");
+  // US first; Polish browsers start on Poland. The owner can change it here or later in Settings.
+  const [country, setCountry] = useState<"US" | "PL">(() => (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("pl") ? "PL" : "US"));
   const [passwordLogin, setPasswordLogin] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -239,6 +244,7 @@ export function LoginPage() {
         organization_name: organizationName.trim(),
         password,
         source,
+        country,
       });
       toast.success(t("login.business_created"));
     } catch (error) {
@@ -297,7 +303,7 @@ export function LoginPage() {
     <div className="space-y-5">
       <StepPill current={1} total={1} label={t("login.step", { current: 1, total: 1 })} />
       <div>
-        <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.invite.title")}</h2>
+        <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.invite.title")}</h2>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.invite.body")}</p>
       </div>
       <div className="space-y-2">
@@ -344,7 +350,7 @@ export function LoginPage() {
   const renderSignin = () => (
     <div className="space-y-5">
       <div>
-        <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.signin.title")}</h2>
+        <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.signin.title")}</h2>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.signin.body")}</p>
       </div>
       <div className="space-y-2">
@@ -381,7 +387,7 @@ export function LoginPage() {
           <Button type="button" className="w-full" onClick={handlePasswordLogin} disabled={isSubmitting || !effectiveEmail || !loginPassword}>
             {t("login.signin_with_password")}
           </Button>
-          <button type="button" className="text-sm text-[var(--color-primary)]" onClick={() => setPasswordLogin(false)}>
+          <button type="button" className="text-sm text-[var(--color-primary-strong)]" onClick={() => setPasswordLogin(false)}>
             {t("login.use_code_instead")}
           </button>
         </div>
@@ -421,14 +427,17 @@ export function LoginPage() {
         {!passwordLogin ? (
           <button
             type="button"
-            className="inline-flex max-w-full items-start gap-2 text-left text-sm leading-5 text-[var(--color-primary)]"
+            className="inline-flex max-w-full items-start gap-2 text-left text-sm leading-5 text-[var(--color-primary-strong)]"
             onClick={() => setPasswordLogin(true)}
           >
             <Lock className="mt-0.5 size-4 shrink-0" /> <span>{t("login.use_password_instead")}</span>
           </button>
         ) : null}
-        <p className="max-w-full text-sm leading-6 text-[var(--color-text-muted)]">
-          Potrzebujesz nowego dostępu? <Link to="/" className="font-semibold text-[var(--color-primary)]">Zostaw email na stronie głównej</Link> i odbierz miesiąc darmowego dostępu oraz 50% zniżki na pierwszy płatny miesiąc.
+        <p className="max-w-full text-[14px] leading-6 text-[var(--color-text-muted)]">
+          {t("login.no_account")}{" "}
+          <Link to="/login?mode=onboarding" className="font-semibold text-[var(--color-primary-strong)]">
+            {t("login.create_account")}
+          </Link>
         </p>
         <LegalAuthNotice />
       </div>
@@ -441,7 +450,7 @@ export function LoginPage() {
         <div className="space-y-5">
           <StepPill current={1} total={4} label={t("login.step", { current: 1, total: 4 })} />
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step1.title")}</h2>
+            <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.onboarding.step1.title")}</h2>
             <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step1.body")}</p>
           </div>
           <div className="space-y-2">
@@ -453,7 +462,7 @@ export function LoginPage() {
               type="button"
               onClick={() => setPersona("owner")}
               className={cn(
-                "rounded-[1.2rem] border px-4 py-4 text-left transition",
+                "rounded-[12px] border px-4 py-4 text-left transition",
                 persona === "owner" ? "border-[var(--color-primary)] bg-[rgba(47,111,237,0.08)]" : "border-[var(--color-border)] bg-white",
               )}
             >
@@ -464,7 +473,7 @@ export function LoginPage() {
               type="button"
               onClick={() => setPersona("worker")}
               className={cn(
-                "rounded-[1.2rem] border px-4 py-4 text-left transition",
+                "rounded-[12px] border px-4 py-4 text-left transition",
                 persona === "worker" ? "border-[var(--color-primary)] bg-[rgba(47,111,237,0.08)]" : "border-[var(--color-border)] bg-white",
               )}
             >
@@ -473,7 +482,7 @@ export function LoginPage() {
             </button>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <button type="button" className="text-sm text-[var(--color-primary)]" onClick={switchToSignin}>
+            <button type="button" className="text-sm text-[var(--color-primary-strong)]" onClick={switchToSignin}>
               {t("login.have_account")}
             </button>
             <Button type="button" onClick={() => setStep(2)} disabled={fullName.trim().length < 2}>
@@ -489,12 +498,12 @@ export function LoginPage() {
         <div className="space-y-5">
           <div className="flex items-center justify-between gap-3">
             <StepPill current={2} total={4} label={t("login.step", { current: 2, total: 4 })} />
-            <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary)]" onClick={() => setStep(1)}>
+            <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary-strong)]" onClick={() => setStep(1)}>
               <ArrowLeft className="size-4" /> {t("common.back")}
             </button>
           </div>
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step2.title")}</h2>
+            <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.onboarding.step2.title")}</h2>
             <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step2.body")}</p>
           </div>
           <div className="space-y-2">
@@ -548,12 +557,12 @@ export function LoginPage() {
         <div className="space-y-5">
           <div className="flex items-center justify-between gap-3">
             <StepPill current={3} total={4} label={t("login.step", { current: 3, total: 4 })} />
-            <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary)]" onClick={() => setStep(2)}>
+            <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary-strong)]" onClick={() => setStep(2)}>
               <ArrowLeft className="size-4" /> {t("common.back")}
             </button>
           </div>
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step3.title")}</h2>
+            <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.onboarding.step3.title")}</h2>
             <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step3.body")}</p>
           </div>
           <div className="space-y-2">
@@ -575,17 +584,31 @@ export function LoginPage() {
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-3">
           <StepPill current={4} total={4} label={t("login.step", { current: 4, total: 4 })} />
-          <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary)]" onClick={() => setStep(3)}>
+          <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary-strong)]" onClick={() => setStep(3)}>
             <ArrowLeft className="size-4" /> {t("common.back")}
           </button>
         </div>
         <div>
-          <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step4.title")}</h2>
+          <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.onboarding.step4.title")}</h2>
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step4.body")}</p>
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.business_name")}</label>
           <Input value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} placeholder={t("login.business_name_placeholder")} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-[var(--color-heading)]">{t("settings.country")}</label>
+          <Segmented
+            className="w-full"
+            ariaLabel={t("settings.country")}
+            value={country}
+            onChange={setCountry}
+            options={[
+              { value: "US", label: t("settings.country_us") },
+              { value: "PL", label: t("settings.country_pl") },
+            ]}
+          />
+          <p className="text-[13px] text-[var(--color-text-muted)]">{country === "PL" ? t("login.country_hint_pl") : t("login.country_hint_us")}</p>
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.heard_about")}</label>
@@ -596,8 +619,8 @@ export function LoginPage() {
                 type="button"
                 onClick={() => setSource(item)}
                 className={cn(
-                  "rounded-[1rem] border px-3 py-3 text-left text-sm font-medium transition",
-                  source === item ? "border-[var(--color-primary)] bg-[rgba(47,111,237,0.08)] text-[var(--color-primary)]" : "border-[var(--color-border)] bg-white text-[var(--color-heading)]",
+                  "rounded-[12px] border px-3 py-3 text-left text-sm font-medium transition",
+                  source === item ? "border-[var(--color-primary)] bg-[rgba(47,111,237,0.08)] text-[var(--color-primary-strong)]" : "border-[var(--color-border)] bg-white text-[var(--color-heading)]",
                 )}
               >
                 {t(`source.${item}`)}
@@ -614,38 +637,33 @@ export function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-[linear-gradient(180deg,#f8fbff,#eef4fb)] px-4 py-6 md:px-8 md:py-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(47,111,237,0.10),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(104,240,93,0.10),transparent_26%)]" />
-      <div className="relative mx-auto max-w-[1180px]">
-        <div className="flex items-center justify-between gap-4">
-          <Link to="/" className="shrink-0">
-            <BrandLogo kind="wordmark" tone="light" className="h-12 w-auto sm:h-14" />
+    <div className="min-h-dvh bg-white">
+      <header className="ios-bar sticky top-0 z-20 border-b border-[var(--color-separator)]">
+        <div className="mx-auto flex h-14 max-w-[1180px] items-center justify-between gap-4 px-4 sm:px-6">
+          <Link to="/" className="shrink-0" aria-label="Gastrostuff">
+            <BrandLogo kind="wordmark" className="text-[1.8rem]" />
           </Link>
-          <div className="inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-white/92 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.06)] backdrop-blur">
-            {(["en", "pl", "ru"] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setLang(item)}
-                className={cn(
-                  "rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition",
-                  lang === item ? "bg-[var(--color-primary)] text-white" : "text-[var(--color-text-muted)] hover:text-[var(--color-heading)]",
-                )}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            ariaLabel={t("shell.language")}
+            value={lang}
+            onChange={setLang}
+            options={[
+              { value: "en", label: "EN" },
+              { value: "pl", label: "PL" },
+              { value: "ru", label: "RU" },
+            ]}
+          />
         </div>
-
-        <div className="flex min-h-[calc(100dvh-8.5rem)] items-center justify-center py-8 md:py-12">
-          <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="w-full max-w-[38rem]">
+      </header>
+      <div className="mx-auto max-w-[1180px] px-4">
+        <div className="flex min-h-[calc(100dvh-3.5rem)] justify-center py-8 md:items-center md:py-12">
+          <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="w-full max-w-[30rem]">
             <div className="mb-4 flex justify-center empty:hidden">
               <DevLoginButton />
             </div>
-            <Card className="w-full rounded-[1.9rem] border border-[rgba(148,163,184,0.16)] bg-white/98 p-2 shadow-[0_28px_65px_rgba(15,23,42,0.08)]">
-              <CardHeader className="p-5 pb-3 md:p-6 md:pb-3">
-                <CardTitle className="text-[2rem] tracking-tight">
+            <Card className="w-full border-0 p-0">
+              <CardHeader className="p-0 pb-4">
+                <CardTitle className="text-[34px] font-semibold tracking-tight">
                   {isInviteJoin ? t("login.mode.join_title") : mode === "signin" ? t("login.mode.signin_title") : t("login.mode.onboarding_title")}
                 </CardTitle>
                 <CardDescription>
@@ -656,7 +674,7 @@ export function LoginPage() {
                       : t("login.mode.onboarding_description")}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-5 pt-2 md:p-6 md:pt-2">
+              <CardContent className="p-0">
                 <motion.div key={`${mode}-${step}-${isInviteJoin ? "invite" : "default"}`} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.18 }}>
                   {isInviteJoin ? renderInviteJoin() : mode === "signin" ? renderSignin() : renderOnboarding()}
                 </motion.div>

@@ -11,8 +11,9 @@ from app.core.envelope import ok
 from app.core.permissions import can_manage_business_settings, can_manage_team, membership_permission_overrides
 from app.db import get_db
 from app.models import Location, LocationMembership, OrganizationMembership, RoleEnum, User
-from app.schemas import WorkerSetupOut, WorkerSetupPatch
+from app.schemas import MemberPositionOut, MemberPositionsPut, WorkerSetupOut, WorkerSetupPatch
 from app.services.billing import require_feature
+from app.services.positions import positions_by_user, replace_member_positions
 
 router = APIRouter(prefix="/workers", tags=["workers"])
 
@@ -78,6 +79,7 @@ def get_worker_setup(
             full_name=user.full_name,
             role=membership.role,
             staff_position=membership.staff_position,
+            positions=_positions_out(db, membership),
             locations=items,
             permission_overrides=membership_permission_overrides(membership),
         ).model_dump(mode="json")
@@ -142,3 +144,25 @@ def patch_worker_setup(
 
     db.commit()
     return ok({"updated": True, "user_id": str(user_id), "count": len(incoming_by_location)})
+
+
+def _positions_out(db: Session, membership: OrganizationMembership) -> list[MemberPositionOut]:
+    rows = positions_by_user(db, membership.organization_id).get(membership.user_id, [])
+    if not rows and membership.staff_position:
+        return [MemberPositionOut(position=membership.staff_position, hourly_rate=None, is_primary=True)]
+    return [MemberPositionOut(position=row.position, hourly_rate=row.hourly_rate, is_primary=row.is_primary) for row in rows]
+
+
+@router.put("/{user_id}/positions")
+def put_worker_positions(
+    user_id: UUID,
+    payload: MemberPositionsPut,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    """Replace the positions someone can work. The primary one shows first and is preferred by auto-plan."""
+    _require_team_access(context, db)
+    membership = _get_worker_membership_or_404(db, context, user_id)
+    replace_member_positions(db, membership, [(item.position, item.hourly_rate, item.is_primary) for item in payload.positions])
+    db.commit()
+    return ok([item.model_dump(mode="json") for item in _positions_out(db, membership)])

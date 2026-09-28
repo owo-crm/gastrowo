@@ -1,151 +1,90 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, CreditCard, Download, ReceiptText, Users2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { WorkerAvatar } from "@/components/worker-avatar";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ListRow, ListSection } from "@/components/ui/list";
+import { Segmented } from "@/components/ui/segmented";
+import { Sheet } from "@/components/ui/sheet";
+import { canViewPayroll } from "@/lib/access";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { canViewPayroll } from "@/lib/access";
+import { toLocalIso } from "@/lib/date";
 import { saveBlob } from "@/lib/file";
+import { currencyOf, formatDate, formatMoney } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import type { PayrollSummaryRow, TimesheetEntry } from "@/lib/types";
 
-type PeriodMode = "weekly" | "monthly";
-
-function toIsoDate(value: Date): string {
-  const year = value.getFullYear();
-  const month = `${value.getMonth() + 1}`.padStart(2, "0");
-  const day = `${value.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function startOfWeek(value: Date): Date {
-  const next = new Date(value);
-  const day = next.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  next.setDate(next.getDate() + diff);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function endOfWeek(value: Date): Date {
-  const next = startOfWeek(value);
-  next.setDate(next.getDate() + 6);
-  return next;
-}
-
-function startOfMonth(value: Date): Date {
-  return new Date(value.getFullYear(), value.getMonth(), 1);
-}
-
-function endOfMonth(value: Date): Date {
-  return new Date(value.getFullYear(), value.getMonth() + 1, 0);
-}
-
-function shiftAnchor(value: Date, direction: number, mode: PeriodMode): Date {
-  const next = new Date(value);
-  if (mode === "monthly") {
-    next.setMonth(next.getMonth() + direction);
-  } else {
-    next.setDate(next.getDate() + direction * 7);
-  }
-  return next;
-}
-
-function periodLabel(anchor: Date, mode: PeriodMode): string {
-  if (mode === "monthly") {
-    return anchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  }
-  const start = startOfWeek(anchor);
-  const end = endOfWeek(anchor);
-  return `${start.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })} - ${end.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}`;
-}
+type PeriodMode = "week" | "month";
 
 function rangeFor(anchor: Date, mode: PeriodMode) {
-  const start = mode === "monthly" ? startOfMonth(anchor) : startOfWeek(anchor);
-  const end = mode === "monthly" ? endOfMonth(anchor) : endOfWeek(anchor);
-  return { start: toIsoDate(start), end: toIsoDate(end) };
+  const start = new Date(anchor);
+  start.setHours(0, 0, 0, 0);
+  if (mode === "month") {
+    start.setDate(1);
+    return { start: toLocalIso(start), end: toLocalIso(new Date(start.getFullYear(), start.getMonth() + 1, 0)) };
+  }
+  const day = start.getDay();
+  start.setDate(start.getDate() + (day === 0 ? -6 : 1 - day));
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return { start: toLocalIso(start), end: toLocalIso(end) };
 }
 
-function timesheetHours(entry: TimesheetEntry): number {
+function entryHours(entry: TimesheetEntry): number {
   const [startHour, startMinute] = entry.arrived_at.split(":").map(Number);
   const [endHour, endMinute] = entry.left_at.split(":").map(Number);
-  const startTotal = startHour * 60 + startMinute;
-  let endTotal = endHour * 60 + endMinute;
-  if (endTotal <= startTotal) endTotal += 24 * 60;
-  return (endTotal - startTotal) / 60;
+  let minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
+  if (minutes <= 0) minutes += 24 * 60;
+  return minutes / 60;
 }
 
-function selectedRowFrom(rows: PayrollSummaryRow[], userId: string | null | undefined): PayrollSummaryRow | null {
-  if (!rows.length) return null;
-  if (!userId) return rows[0];
-  return rows.find((row) => row.user_id === userId) ?? rows[0];
-}
+const hoursText = (value: number | string) => {
+  const number = Number(value);
+  return `${number % 1 ? number.toFixed(2) : number} h`;
+};
 
 export function PayrollPage() {
   const { token, me } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const toast = useToast();
-  const [exporting, setExporting] = useState(false);
-  const [periodMode, setPeriodMode] = useState<PeriodMode>("weekly");
-  const [anchorDate, setAnchorDate] = useState(() => new Date());
+  const currency = currencyOf(me);
   const isStaff = me?.role === "STAFF";
-  const payrollAllowed = isStaff || canViewPayroll(me);
-  const range = useMemo(() => rangeFor(anchorDate, periodMode), [anchorDate, periodMode]);
+  const allowed = isStaff || canViewPayroll(me);
 
-  const teamPayrollQuery = useQuery({
-    queryKey: ["payroll-summary", periodMode, range.start, range.end],
+  const [mode, setMode] = useState<PeriodMode>("week");
+  const [anchor, setAnchor] = useState(() => new Date());
+  const range = useMemo(() => rangeFor(anchor, mode), [anchor, mode]);
+  const periodLabel =
+    mode === "month"
+      ? formatDate(range.start, lang, { month: "long", year: "numeric" })
+      : `${formatDate(range.start, lang, { month: "short", day: "numeric" })} – ${formatDate(range.end, lang, { month: "short", day: "numeric" })}`;
+
+  const summaryQuery = useQuery({
+    queryKey: ["payroll-summary", range.start, range.end],
     queryFn: () => api.getPayrollSummary(token!, { start_date: range.start, end_date: range.end }),
-    enabled: Boolean(token) && payrollAllowed,
+    enabled: Boolean(token) && allowed,
   });
-
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
-
-  useEffect(() => {
-    const nextDefault = isStaff ? me?.id ?? "" : teamPayrollQuery.data?.rows[0]?.user_id ?? "";
-    if (nextDefault && !selectedUserId) {
-      setSelectedUserId(nextDefault);
-    }
-  }, [isStaff, me?.id, selectedUserId, teamPayrollQuery.data?.rows]);
-
-  const detailUserId = isStaff ? undefined : selectedUserId || undefined;
-  const detailPayrollQuery = useQuery({
-    queryKey: ["payroll-summary-detail", periodMode, range.start, range.end, detailUserId ?? "self"],
-    queryFn: () => api.getPayrollSummary(token!, { start_date: range.start, end_date: range.end, user_id: detailUserId }),
-    enabled: Boolean(token) && payrollAllowed,
+  const rows = summaryQuery.data?.rows ?? [];
+  const [openRow, setOpenRow] = useState<PayrollSummaryRow | null>(null);
+  const detailUserId = isStaff ? me?.id : openRow?.user_id;
+  const entriesQuery = useQuery({
+    queryKey: ["payroll-entries", range.start, range.end, detailUserId],
+    queryFn: () => api.listTimesheets(token!, { scope: isStaff ? "my" : "team", start_date: range.start, end_date: range.end, user_id: isStaff ? undefined : detailUserId }),
+    enabled: Boolean(token) && allowed && Boolean(detailUserId),
   });
+  const confirmed = (entriesQuery.data ?? []).filter((entry) => entry.status === "approved" || entry.status === "corrected").sort((a, b) => a.work_date.localeCompare(b.work_date));
 
-  const timesheetsQuery = useQuery({
-    queryKey: ["payroll-timesheets", periodMode, range.start, range.end, detailUserId ?? "self"],
-    queryFn: () =>
-      api.listTimesheets(token!, {
-        scope: isStaff ? "my" : "team",
-        start_date: range.start,
-        end_date: range.end,
-        user_id: detailUserId,
-      }),
-    enabled: Boolean(token) && payrollAllowed,
-  });
-
-  const selectedRow = useMemo(
-    () => selectedRowFrom(detailPayrollQuery.data?.rows ?? teamPayrollQuery.data?.rows ?? [], isStaff ? me?.id : selectedUserId),
-    [detailPayrollQuery.data?.rows, teamPayrollQuery.data?.rows, isStaff, me?.id, selectedUserId],
-  );
-
-  const confirmedTimesheets = useMemo(
-    () => (timesheetsQuery.data ?? []).filter((entry) => entry.status === "approved" || entry.status === "corrected"),
-    [timesheetsQuery.data],
-  );
-
+  const [exporting, setExporting] = useState(false);
   const exportCsv = async () => {
     if (!token) return;
     setExporting(true);
     try {
-      const blob = await api.downloadPayrollCsv(token, { start_date: range.start, end_date: range.end });
-      saveBlob(blob, `payroll_${range.start}_${range.end}.csv`);
+      saveBlob(await api.downloadPayrollCsv(token, { start_date: range.start, end_date: range.end }), `payroll_${range.start}_${range.end}.csv`);
     } catch (error) {
       toast.error(t("dashboard.export_failed"), error instanceof Error ? error.message : undefined);
     } finally {
@@ -153,148 +92,134 @@ export function PayrollPage() {
     }
   };
 
-  const changePeriod = (direction: number) => setAnchorDate((current) => shiftAnchor(current, direction, periodMode));
+  const shift = (direction: -1 | 1) =>
+    setAnchor((current) => {
+      const next = new Date(current);
+      if (mode === "month") next.setMonth(next.getMonth() + direction);
+      else next.setDate(next.getDate() + 7 * direction);
+      return next;
+    });
 
-  if (!payrollAllowed) {
+  const totalHours = Number(summaryQuery.data?.total_hours ?? 0);
+  const totalPay = Number(summaryQuery.data?.total_payroll_pln ?? 0);
+  const overtime = rows.reduce((total, row) => total + Number(row.overtime_hours ?? 0), 0);
+  const money = (value: number | string) => formatMoney(value, currency, lang, { decimals: 2 });
+  const mine = isStaff ? rows.find((row) => row.user_id === me?.id) ?? rows[0] : null;
+
+  const entryList = (
+    <ListSection header={t("payroll.approved_hours")} footer={t("payroll.entries_footer")}>
+      {confirmed.map((entry) => (
+        <ListRow
+          key={entry.id}
+          title={`${formatDate(entry.work_date, lang)} · ${entry.arrived_at.slice(0, 5)}–${entry.left_at.slice(0, 5)}`}
+          subtitle={entry.is_restricted_entry ? t("schedule.extra_entry") : t("schedule.planned_entry")}
+          trailing={<span className="tabular-nums">{hoursText(entryHours(entry))}</span>}
+        />
+      ))}
+      {!confirmed.length ? <ListRow title={<span className="text-[var(--color-text-muted)]">{t("payroll.no_entries")}</span>} /> : null}
+    </ListSection>
+  );
+
+  if (!allowed) {
     return (
-      <AppShell title={t("dashboard.payroll")} subtitle="Payroll access is disabled for this account.">
-        <Card className="rounded-[1.3rem] border border-amber-200 bg-amber-50 px-5 py-5 text-sm text-amber-800">Payroll access is disabled for this account.</Card>
+      <AppShell title={t("sub.payroll")} flush>
+        <p className="px-4 py-10 text-center text-[15px] text-[var(--color-text-muted)] sm:px-6">{t("payroll.no_access")}</p>
       </AppShell>
     );
   }
 
   return (
     <AppShell
-      title={t("dashboard.payroll")}
-      subtitle={isStaff ? "Your confirmed hours and earnings in one place." : "Team payroll overview with drill-down into each employee."}
-      action={<Badge>{periodLabel(anchorDate, periodMode)}</Badge>}
+      title={t("sub.payroll")}
+      flush
+      action={
+        isStaff ? undefined : (
+          <Button size="sm" variant="tinted" onClick={exportCsv} disabled={exporting}>
+            <Download className="size-4" /> {t("payroll.export")}
+          </Button>
+        )
+      }
     >
-      <div className="space-y-4">
-        <Card className="rounded-[1.4rem] border border-slate-200/80 bg-white p-4 sm:p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="inline-flex items-center gap-1 rounded-[0.9rem] border border-slate-200 bg-white px-1 py-1 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
-              <button
-                type="button"
-                onClick={() => setPeriodMode("weekly")}
-                className={`rounded-[0.7rem] px-3 py-1.5 text-sm font-semibold transition ${periodMode === "weekly" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}
-              >
-                {t("dashboard.weekly")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPeriodMode("monthly")}
-                className={`rounded-[0.7rem] px-3 py-1.5 text-sm font-semibold transition ${periodMode === "monthly" ? "bg-slate-950 text-white" : "text-slate-500 hover:text-slate-950"}`}
-              >
-                {t("dashboard.monthly")}
-              </button>
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-[0.9rem] border border-slate-200 bg-white px-2 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
-              <button type="button" onClick={() => changePeriod(-1)} className="grid size-8 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950">
-                <ChevronLeft className="size-4" />
-              </button>
-              <div className="min-w-[110px] text-center text-sm font-semibold text-slate-900 sm:min-w-[150px]">{periodLabel(anchorDate, periodMode)}</div>
-              <button type="button" onClick={() => changePeriod(1)} className="grid size-8 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950">
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
-            {!isStaff ? (
-              <button
-                type="button"
-                onClick={exportCsv}
-                disabled={exporting}
-                className="inline-flex items-center justify-center gap-2 rounded-[0.9rem] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-[0_8px_18px_rgba(15,23,42,0.04)] transition hover:border-slate-300 disabled:opacity-60"
-              >
-                <Download className="size-4" />
-                {t("dashboard.export_csv")}
-              </button>
-            ) : null}
-          </div>
-        </Card>
-
-        <section className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-          {!isStaff ? (
-            <Card className="rounded-[1.4rem] border border-slate-200/80 bg-white p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Team payroll</p>
-                  <p className="mt-1 text-sm text-slate-600">Select an employee to inspect their payroll.</p>
-                </div>
-                <Users2 className="size-4 text-[var(--color-primary)]" />
-              </div>
-              <div className="mt-4 space-y-2">
-                {(teamPayrollQuery.data?.rows ?? []).map((row) => (
-                  <button
-                    key={row.user_id}
-                    type="button"
-                    onClick={() => setSelectedUserId(row.user_id)}
-                    className={`w-full rounded-[1rem] border px-3 py-3 text-left transition ${
-                      selectedUserId === row.user_id ? "border-[var(--color-primary)] bg-[var(--color-accent)]" : "border-slate-200 bg-white hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-900">{row.full_name}</p>
-                        <p className="mt-1 text-xs text-slate-500">{row.staff_position ?? row.role}</p>
-                      </div>
-                      <p className="shrink-0 text-sm font-semibold text-emerald-700">{Number(row.payroll_pln).toFixed(2)} PLN</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </Card>
-          ) : null}
-
-          <div className="space-y-4">
-            <section className="grid gap-3 sm:grid-cols-3">
-              <Card className="rounded-[1.25rem] border border-slate-200/80 bg-white px-4 py-4">
-                <ReceiptText className="size-4 text-[var(--color-primary)]" />
-                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{t("dashboard.approved_hours")}</p>
-                <p className="mt-2 text-2xl font-bold tracking-[-0.05em] text-slate-950">{selectedRow ? `${Number(selectedRow.approved_hours).toFixed(1)}h` : "0.0h"}</p>
-              </Card>
-              <Card className="rounded-[1.25rem] border border-slate-200/80 bg-white px-4 py-4">
-                <Users2 className="size-4 text-[var(--color-primary)]" />
-                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{t("dashboard.rate")}</p>
-                <p className="mt-2 text-2xl font-bold tracking-[-0.05em] text-slate-950">{selectedRow ? `${Number(selectedRow.hourly_rate_default_pln).toFixed(2)} PLN/h` : "0.00 PLN/h"}</p>
-              </Card>
-              <Card className="rounded-[1.25rem] border border-slate-200/80 bg-white px-4 py-4">
-                <CreditCard className="size-4 text-[var(--color-primary)]" />
-                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{t("dashboard.payroll")}</p>
-                <p className="mt-2 text-2xl font-bold tracking-[-0.05em] text-emerald-700">{selectedRow ? `${Number(selectedRow.payroll_pln).toFixed(2)} PLN` : "0.00 PLN"}</p>
-              </Card>
-            </section>
-
-            <Card className="rounded-[1.4rem] border border-slate-200/80 bg-white p-4 sm:p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{isStaff ? "My payroll detail" : "Individual payroll detail"}</p>
-                  <h2 className="mt-1 text-xl font-semibold text-slate-950">{selectedRow?.full_name ?? "—"}</h2>
-                  <p className="mt-1 text-sm text-slate-600">{selectedRow?.staff_position ?? selectedRow?.role ?? "No position"}</p>
-                </div>
-                <Badge>{confirmedTimesheets.length} entries</Badge>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {confirmedTimesheets.map((entry) => (
-                  <div key={entry.id} className="rounded-[1rem] border border-slate-200 bg-white px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900">{entry.work_date}</p>
-                        <p className="mt-1 text-xs text-slate-500">{entry.arrived_at.slice(0, 5)} - {entry.left_at.slice(0, 5)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-slate-900">{timesheetHours(entry).toFixed(1)}h</p>
-                        <p className="mt-1 text-xs text-slate-500">{entry.status}</p>
-                      </div>
-                    </div>
-                    {entry.note ? <p className="mt-2 text-sm text-slate-600">{entry.note}</p> : null}
-                  </div>
-                ))}
-                {!confirmedTimesheets.length ? <p className="py-6 text-sm text-slate-500">No confirmed timesheets in this period.</p> : null}
-              </div>
-            </Card>
-          </div>
-        </section>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4 sm:px-6">
+        <Segmented
+          ariaLabel={t("overview.period")}
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "week", label: t("overview.week") },
+            { value: "month", label: t("overview.month") },
+          ]}
+        />
+        <div className="flex items-center gap-1">
+          <Button size="icon" variant="ghost" aria-label={t("overview.previous")} onClick={() => shift(-1)}>
+            <ChevronLeft className="size-5" />
+          </Button>
+          <span className="min-w-[150px] text-center text-[15px] font-semibold text-black">{periodLabel}</span>
+          <Button size="icon" variant="ghost" aria-label={t("overview.next")} onClick={() => shift(1)}>
+            <ChevronRight className="size-5" />
+          </Button>
+        </div>
       </div>
+
+      <div className="mb-6 grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:px-6 [&>*]:ios-island">
+        <div className="px-4 py-4">
+          <p className="text-[13px] font-semibold text-[var(--color-text-muted)]">{isStaff ? t("payroll.my_pay") : t("payroll.total_pay")}</p>
+          <p className="mt-1 text-[28px] font-semibold tabular-nums text-black">{money(isStaff ? mine?.payroll_pln ?? 0 : totalPay)}</p>
+        </div>
+        <div className="px-4 py-4">
+          <p className="text-[13px] font-semibold text-[var(--color-text-muted)]">{t("payroll.hours")}</p>
+          <p className="mt-1 text-[28px] font-semibold tabular-nums text-black">{hoursText(isStaff ? mine?.approved_hours ?? 0 : totalHours)}</p>
+        </div>
+        <div className="col-span-2 px-4 py-4 sm:col-span-1">
+          <p className="text-[13px] font-semibold text-[var(--color-text-muted)]">{t("payroll.overtime")}</p>
+          <p className="mt-1 text-[28px] font-semibold tabular-nums text-black">{hoursText(isStaff ? mine?.overtime_hours ?? 0 : overtime)}</p>
+          <p className="text-[13px] text-[var(--color-text-muted)]">{me?.organization_settings?.labor_rules === "PL" ? t("payroll.overtime_pl") : t("payroll.overtime_us")}</p>
+        </div>
+      </div>
+
+      {isStaff ? (
+        entryList
+      ) : (
+        <ListSection footer={t("payroll.footer")}>
+          {rows.map((row) => (
+            <ListRow
+              key={row.user_id}
+              onClick={() => setOpenRow(row)}
+              chevron
+              leading={<WorkerAvatar name={row.full_name} size={36} />}
+              title={row.full_name}
+              subtitle={
+                <span>
+                  {[row.staff_position, hoursText(row.approved_hours)].filter(Boolean).join(" · ")}
+                  {Number(row.overtime_hours ?? 0) > 0 ? (
+                    <Badge tone="orange" className="ml-2">
+                      {t("payroll.ot", { hours: hoursText(row.overtime_hours ?? 0) })}
+                    </Badge>
+                  ) : null}
+                </span>
+              }
+              trailing={<span className="font-semibold tabular-nums text-black">{money(row.payroll_pln)}</span>}
+            />
+          ))}
+          {!rows.length ? <ListRow title={<span className="text-[var(--color-text-muted)]">{t("payroll.empty")}</span>} /> : null}
+        </ListSection>
+      )}
+
+      <Sheet open={Boolean(openRow)} onClose={() => setOpenRow(null)} title={openRow?.full_name ?? ""} subtitle={periodLabel}>
+        {openRow ? (
+          <div className="-mx-4 sm:-mx-5">
+            <ListSection>
+              <ListRow title={t("payroll.hours")} trailing={hoursText(openRow.approved_hours)} />
+              <ListRow title={t("payroll.base_rate")} trailing={`${money(openRow.hourly_rate_default_pln)}/h`} />
+              {Number(openRow.overtime_hours ?? 0) > 0 ? (
+                <ListRow title={t("payroll.overtime_premium", { hours: hoursText(openRow.overtime_hours ?? 0) })} trailing={money(openRow.overtime_premium ?? 0)} />
+              ) : null}
+              <ListRow title={<span className="font-semibold">{t("payroll.gross")}</span>} trailing={<span className="font-semibold text-black">{money(openRow.payroll_pln)}</span>} />
+            </ListSection>
+            {entryList}
+          </div>
+        ) : null}
+      </Sheet>
     </AppShell>
   );
 }

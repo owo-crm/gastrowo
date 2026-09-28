@@ -2,13 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
   FileClock,
+  Check,
   CheckCircle2,
   CircleAlert,
   Pencil,
@@ -27,6 +28,14 @@ import { WorkerAvatar } from "@/components/worker-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+import { ListRow, ListSection } from "@/components/ui/list";
+import { Sheet } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
+import { Segmented } from "@/components/ui/segmented";
+import { StaffWeek } from "@/components/schedule/staff-week";
+import { DayList, DayStrip, WeekGrid, type GridDay, type GridPerson, type GridShift } from "@/components/schedule/week-grid";
+import { currencyOf, formatDate, formatMoney } from "@/lib/format";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OverlayPortal } from "@/components/ui/overlay-portal";
 
@@ -40,14 +49,12 @@ import { api } from "@/lib/api";
 
 import { hasPlanFeature } from "@/lib/access";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
-import { ScheduleTabs } from "@/components/schedule-tabs";
-import { MyWeekShifts } from "@/components/my-week-shifts";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import type { Lang } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 
-import { formatTime, getMonday } from "@/lib/date";
+import { formatTime, getMonday, toLocalIso } from "@/lib/date";
 
 import type {
   AvailabilityPreferenceSlot,
@@ -145,7 +152,7 @@ function statusClass(status: ShiftRequest["status"]) {
 
   if (status === "cancelled") return "border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]";
 
-  return "border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary)]";
+  return "border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary-strong)]";
 
 }
 
@@ -163,7 +170,7 @@ function positionTone(position?: string | null, fallbackRole?: string | null) {
   if (key === "manager" || key === "kierownik") {
     return { accent: "#34d399", text: "text-emerald-700", chip: "bg-emerald-50 text-emerald-700" };
   }
-  return { accent: "#2f6fed", text: "text-[var(--color-primary)]", chip: "bg-[var(--color-accent)] text-[var(--color-primary)]" };
+  return { accent: "#2f6fed", text: "text-[var(--color-primary-strong)]", chip: "bg-[var(--color-accent)] text-[var(--color-primary-strong)]" };
 }
 
 function normalizePositionLegendLabel(value?: string | null): string {
@@ -341,7 +348,7 @@ function DayWarningPopover({
             }}
           >
             <div
-              className={popupClassName ?? "rounded-[1rem] border border-amber-200 bg-white p-3 shadow-[0_18px_40px_rgba(15,23,42,0.14)]"}
+              className={popupClassName ?? "rounded-[12px] border border-amber-200 bg-white p-3 "}
               style={{
                 position: "fixed",
                 top: popupStyle.top,
@@ -356,7 +363,7 @@ function DayWarningPopover({
                 {warningEntries.map((entry) => (
                   <div
                     key={`warning-${entry.key}`}
-                    className={`rounded-[0.9rem] px-3 py-2 ${entry.tone === "coverage" ? "bg-orange-50" : "bg-amber-50"}`}
+                    className={`rounded-[12px] px-3 py-2 ${entry.tone === "coverage" ? "bg-orange-50" : "bg-amber-50"}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-semibold text-[var(--color-heading)]">{entry.timeLabel}</p>
@@ -467,7 +474,7 @@ function MobileDaySelector({ weekDays, selectedDayIndex, onSelect, warningEntrie
                     onSelect(index);
                   }}
                   aria-pressed={isActive}
-                  className={`w-full min-w-0 rounded-lg px-0.5 py-2 text-center transition ${isActive ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-[inset_0_0_0_1px_rgba(47,111,237,0.12)]" : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"}`}
+                  className={`w-full min-w-0 rounded-lg px-0.5 py-2 text-center transition ${isActive ? "bg-[var(--color-accent)] text-[var(--color-primary-strong)] " : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"}`}
                 >
                   <p className="text-[11px] font-semibold uppercase">{day.title.slice(0, 3)}</p>
                   <p className="mt-0.5 text-sm font-semibold">{day.caption.split(".")[0]}</p>
@@ -502,23 +509,23 @@ type WeekRangeNavigatorProps = {
 function WeekRangeNavigator({ label, onPrevious, onNext, className }: WeekRangeNavigatorProps) {
   return (
     <div className={className}>
-      <div className="inline-flex w-full items-center gap-2 rounded-[0.9rem] border border-slate-200 bg-white px-2 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
+      <div className="inline-flex w-full items-center gap-2 rounded-[12px] border border-[var(--color-separator)] bg-white px-2 py-1.5 ">
         <button
           type="button"
           onClick={onPrevious}
           aria-label="Previous week"
-          className="grid size-8 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
+          className="grid size-8 place-items-center rounded-full text-[var(--color-text-muted)] transition hover:bg-[var(--color-grouped)] hover:text-black"
         >
           <ChevronLeft className="size-4" />
         </button>
-        <div className="min-w-[110px] flex-1 px-2 text-center text-sm font-semibold text-slate-900 sm:min-w-[150px]">
+        <div className="min-w-[110px] flex-1 px-2 text-center text-sm font-semibold text-black sm:min-w-[150px]">
           {label}
         </div>
         <button
           type="button"
           onClick={onNext}
           aria-label="Next week"
-          className="grid size-8 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
+          className="grid size-8 place-items-center rounded-full text-[var(--color-text-muted)] transition hover:bg-[var(--color-grouped)] hover:text-black"
         >
           <ChevronRight className="size-4" />
         </button>
@@ -561,7 +568,7 @@ function ShiftBlock({
       }
       className={`relative ${fitContent ? "inline-flex w-fit max-w-full" : "flex w-full"} min-h-[54px] flex-col justify-between border-l-[3px] px-2 py-1.5 ${
         highlighted
-          ? "rounded-[0.9rem] border border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-200"
+          ? "rounded-[12px] border border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-200"
           : ""
       } ${isEditing ? "bg-[var(--color-accent)] ring-1 ring-[rgba(47,111,237,0.20)]" : ""}`}
       draggable={false}
@@ -612,7 +619,7 @@ type ScheduleShiftPillProps = {
 function ScheduleShiftPill({ timeLabel, positionLabel, metaLabel, toneLabel, kind = "assigned" }: ScheduleShiftPillProps) {
   if (kind === "missing") {
     return (
-      <div className="rounded-[1rem] border border-dashed border-red-300 bg-red-50 px-3 py-2 text-red-600">
+      <div className="rounded-[12px] border border-dashed border-red-300 bg-red-50 px-3 py-2 text-red-600">
         <p className="text-base font-semibold">{timeLabel}</p>
         {metaLabel ? <p className="mt-1 text-xs font-medium">{metaLabel}</p> : null}
       </div>
@@ -621,7 +628,7 @@ function ScheduleShiftPill({ timeLabel, positionLabel, metaLabel, toneLabel, kin
 
   const tone = positionTone(toneLabel ?? positionLabel);
   return (
-    <div className={`rounded-[1rem] px-3 py-2 shadow-[0_8px_20px_rgba(15,23,42,0.04)] ${tone.chip}`} style={{ boxShadow: `inset 4px 0 0 ${tone.accent}` }}>
+    <div className={`rounded-[12px] px-3 py-2  ${tone.chip}`} style={{ boxShadow: `inset 4px 0 0 ${tone.accent}` }}>
       <p className="text-base font-semibold">{timeLabel}</p>
       {positionLabel ? <p className="mt-1 text-xs font-semibold">{positionLabel}</p> : null}
       {metaLabel ? <p className="mt-1 text-xs opacity-80">{metaLabel}</p> : null}
@@ -826,14 +833,14 @@ function AppliedShiftCard({
 
   return (
     <div
-      className={`rounded-[1rem] border px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] ${
+      className={`rounded-[12px] border px-4 py-4  ${
         entry.isConflict
           ? "border-red-200 bg-red-50/90"
           : entry.isOpen
             ? "border-red-200 bg-red-50/85"
             : entry.isMine
               ? "border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-200"
-              : "border-[var(--color-divider)] bg-white"
+              : "border-[var(--color-separator)] bg-white"
       }`}
       style={{
         boxShadow: `inset 4px 0 0 ${entry.isConflict ? "#ef4444" : entry.isOpen ? "#ef4444" : tone.accent}`,
@@ -874,7 +881,7 @@ function PreviewEditableShiftCard({
 
   return (
     <div
-      className="rounded-[1rem] border border-[var(--color-divider)] px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+      className="rounded-[12px] border border-[var(--color-separator)] px-4 py-4 "
       style={{
         boxShadow: `inset 4px 0 0 ${tone.accent}`,
         backgroundColor: hexToRgba(tone.accent, 0.11),
@@ -944,7 +951,7 @@ function PreviewCardsBoard({
         return (
           <div
             key={`preview-cards-${day.iso}`}
-            className={`rounded-[1.2rem] border border-[var(--color-divider)] p-3 ${
+            className={`rounded-[12px] border border-[var(--color-separator)] p-3 ${
               day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"
             }`}
           >
@@ -988,7 +995,7 @@ function PreviewCardsBoard({
                 ))}
               </div>
             ) : (
-              <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+              <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
                 {t("schedule.no_shifts_this_day")}
               </div>
             )}
@@ -1024,7 +1031,7 @@ function AppliedCardsBoard({
         return (
           <div
             key={`cards-${day.iso}`}
-            className={`rounded-[1.2rem] border border-[var(--color-divider)] p-3 ${
+            className={`rounded-[12px] border border-[var(--color-separator)] p-3 ${
               day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"
             }`}
           >
@@ -1054,7 +1061,7 @@ function AppliedCardsBoard({
                 ))}
               </div>
             ) : (
-              <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+              <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
                 {t("schedule.no_shifts_this_day")}
               </div>
             )}
@@ -1099,17 +1106,17 @@ function AppliedTimetableBoard({
           className="sticky top-0 z-30 grid bg-white"
           style={{ gridTemplateColumns }}
         >
-          <div className="sticky left-0 z-40 border-r border-b border-[var(--color-divider)] bg-white" />
+          <div className="sticky left-0 z-40 border-r border-b border-[var(--color-separator)] bg-white" />
           {weekDays.map((day) => {
             const warningEntries = warningEntriesByDate[day.iso] ?? [];
             const isWarningOpen = openWarningDay === day.iso;
             return (
             <div
               key={`header-${day.iso}`}
-              className={`relative border-b border-r border-[var(--color-divider)] ${dayHeaderClass} ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"}`}
+              className={`relative border-b border-r border-[var(--color-separator)] ${dayHeaderClass} ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"}`}
             >
               <div className="pr-8">
-                <p className={`font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)] ${compact ? "text-[11px]" : "text-[12px]"}`}>{day.title}</p>
+                <p className={`font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)] ${compact ? "text-[11px]" : "text-[12px]"}`}>{day.title}</p>
               </div>
               <div className="absolute right-3 top-3">
                 <DayWarningPopover
@@ -1120,7 +1127,7 @@ function AppliedTimetableBoard({
                   buttonClassName="inline-flex size-6 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100"
                 />
               </div>
-              <p className={`mt-1 font-black tracking-[-0.04em] text-[var(--color-heading)] ${compact ? "text-lg" : "text-2xl"}`}>
+              <p className={`mt-1 font-semibold tracking-[-0.01em] text-[var(--color-heading)] ${compact ? "text-lg" : "text-2xl"}`}>
                 {compact ? day.caption.replace(".", "/") : day.caption.split(".")[0]}
               </p>
             </div>
@@ -1131,14 +1138,14 @@ function AppliedTimetableBoard({
           className="grid"
           style={{ gridTemplateColumns }}
         >
-          <div className="sticky left-0 z-20 border-r border-[var(--color-divider)] bg-white">
+          <div className="sticky left-0 z-20 border-r border-[var(--color-separator)] bg-white">
             <div className="relative" style={{ height: boardHeight }}>
               {timeSlots.map((slot, index) => {
                 const top = index * rowHeight;
                 const hourLabel = `${`${Math.floor(slot / 60)}`.padStart(2, "0")}:${`${slot % 60}`.padStart(2, "0")}:00`;
                 return (
                   <div key={`time-${slot}`} className="absolute inset-x-0" style={{ top }}>
-                    <div className="border-t border-[var(--color-divider)]" />
+                    <div className="border-t border-[var(--color-separator)]" />
                     {index < timeSlots.length - 1 ? (
                       <span className={`absolute left-2 top-1 ${compact ? "text-[10px]" : "text-xs"} font-semibold text-[var(--color-text-muted)]`}>
                         {formatTime(hourLabel)}
@@ -1153,13 +1160,13 @@ function AppliedTimetableBoard({
           {weekDays.map((day, dayIndex) => (
             <div
               key={`column-${day.iso}`}
-              className={`relative min-w-0 border-r border-[var(--color-divider)] ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.04)]" : "bg-white"}`}
+              className={`relative min-w-0 border-r border-[var(--color-separator)] ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.04)]" : "bg-white"}`}
               style={{ height: boardHeight }}
             >
               {timeSlots.map((slot, index) => (
                 <div
                   key={`line-${day.iso}-${slot}`}
-                  className="absolute inset-x-0 border-t border-[var(--color-divider)]"
+                  className="absolute inset-x-0 border-t border-[var(--color-separator)]"
                   style={{ top: index * rowHeight }}
                 />
               ))}
@@ -1268,6 +1275,8 @@ type PreviewEditorModalState = {
   userId: string;
   startTime: string;
   endTime: string;
+  /** The slot's position; kept when someone else is assigned (people can work several positions). */
+  position?: string | null;
 };
 
 type TeamAvailabilityEditorState = {
@@ -1327,13 +1336,18 @@ function latestTimesheet(entries: TimesheetEntry[]): TimesheetEntry | undefined 
 
 
 
-export function SchedulePage() {
+export type ScheduleSection = "calendar" | "availability" | "requests" | "hours";
+
+export function SchedulePage({ section = "calendar" }: { section?: ScheduleSection }) {
   const { t, lang } = useLanguage();
   const location = useLocation();
   const { token, me } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const isTimesheetsRoute = location.pathname === "/timesheets";
+  const isTimesheetsRoute = section === "hours";
+  const navigate = useNavigate();
+  const [calendarView, setCalendarView] = useState<"grid" | "timeline">("grid");
+  const isPhone = useMediaQuery("(max-width: 767px)");
 
 
 
@@ -1420,6 +1434,11 @@ export function SchedulePage() {
 
 
 
+  const positionsCatalogQuery = useQuery({
+    queryKey: ["positions"],
+    queryFn: () => api.listPositions(token!),
+    enabled: Boolean(token) && me?.role !== "STAFF",
+  });
   const locationsQuery = useQuery({
 
     queryKey: ["locations"],
@@ -1551,7 +1570,7 @@ export function SchedulePage() {
     [dayShortNames, weekStart],
   );
   const weekRangeCompactLabel = useMemo(() => formatWeekRangeCompact(weekStart), [weekStart]);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = toLocalIso(new Date());
   const selectedDay = weekDays[selectedDayIndex] ?? weekDays[0];
   const mobileAppliedViewStorageKey = useMemo(
     () => (me?.id ? `schedule:applied-view:${me.id}:${locationFilter || "default"}` : null),
@@ -2379,6 +2398,7 @@ export function SchedulePage() {
       userId: entry.assigned_user_id,
       startTime: entry.startTime.slice(0, 5),
       endTime: entry.endTime.slice(0, 5),
+      position: entry.staff_position ?? null,
     });
   };
 
@@ -2587,11 +2607,11 @@ export function SchedulePage() {
         <CardDescription>{isManagerView && !isStaff ? t("schedule.manager_availability_description") : t("schedule.availability_description")}</CardDescription>
       </CardHeader>
       <CardContent className="min-h-0 max-w-full space-y-4 overflow-y-auto overflow-x-hidden pr-1">
-        <div className="grid items-end gap-2 border-b border-[var(--color-divider)] pb-3 md:grid-cols-[1fr_auto]">
+        <div className="grid items-end gap-2 border-b border-[var(--color-separator)] pb-3 md:grid-cols-[1fr_auto]">
           <div>
             <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("schedule.hours_per_week")}</p>
             <div className="mt-1 flex items-baseline gap-2">
-              <p className="text-2xl font-bold tracking-[-0.06em] text-[var(--color-heading)]">{availabilityDesiredHours.toFixed(1)}</p>
+              <p className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{availabilityDesiredHours.toFixed(1)}</p>
               <p className="text-sm text-[var(--color-text-muted)]">{t("schedule.derived_from_ranges")}</p>
             </div>
           </div>
@@ -2606,7 +2626,7 @@ export function SchedulePage() {
             const firstSlot = slots[0];
             const enabled = Boolean(firstSlot);
             return (
-              <div key={`availability-card-${day.iso}`} className="rounded-[1rem] border border-[var(--color-border)] bg-white px-4 py-4">
+              <div key={`availability-card-${day.iso}`} className="rounded-[12px] border border-[var(--color-border)] bg-white px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{day.title}</p>
@@ -2619,7 +2639,7 @@ export function SchedulePage() {
                     onClick={() => setAvailabilityDayEnabled(index, !enabled)}
                     className={`relative inline-flex h-11 w-16 items-center rounded-full p-1 transition ${enabled ? "bg-emerald-500/90" : "bg-slate-200"} disabled:opacity-40`}
                   >
-                    <span className={`size-7 rounded-full bg-white shadow-sm transition ${enabled ? "translate-x-8" : "translate-x-0"}`} />
+                    <span className={`size-7 rounded-full bg-white  transition ${enabled ? "translate-x-8" : "translate-x-0"}`} />
                   </button>
                 </div>
                 <p className="mt-2 text-xs font-medium text-[var(--color-text-muted)]">{enabled ? t("schedule.available") : t("schedule.off")}</p>
@@ -2653,7 +2673,7 @@ export function SchedulePage() {
     if (status === "approved") return "border-emerald-200 bg-emerald-50 text-emerald-700";
     if (status === "filled") return "border-sky-200 bg-sky-50 text-sky-700";
     if (status === "partial") return "border-amber-200 bg-amber-50 text-amber-700";
-    return "border-slate-200 bg-slate-50 text-slate-600";
+    return "border-[var(--color-separator)] bg-[var(--color-grouped)] text-[var(--color-text-muted)]";
   };
 
   const availabilityStatusLabel = (status: TeamAvailabilitySummaryRow["status"]) => {
@@ -2675,7 +2695,7 @@ export function SchedulePage() {
             {(teamAvailabilityQuery.data ?? [])
               .filter((item) => item.user_id !== me?.id)
               .map((item) => (
-                <div key={item.user_id} className="flex flex-wrap items-center justify-between gap-3 rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-3">
+                <div key={item.user_id} className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-[var(--color-separator)] bg-white px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-[var(--color-heading)]">{item.full_name}</p>
                     <p className="mt-1 text-xs text-[var(--color-text-muted)]">
@@ -2717,7 +2737,7 @@ export function SchedulePage() {
               ))}
           </div>
         ) : (
-          <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+          <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
             {t("schedule.no_team_availability")}
           </div>
         )}
@@ -2727,555 +2747,352 @@ export function SchedulePage() {
 
 
 
-  return (
+  const staffShiftById = Object.fromEntries((staffCalendarQuery.data ?? []).flatMap((day) => day.shifts).map((shift) => [shift.shift_id, shift]));
+  const requestStatusTone = (status: string) =>
+    status === "approved" ? "green" : status === "rejected" ? "red" : status === "cancelled" ? "neutral" : "orange";
+  const staffWeekNav = (
+    <div className="flex items-center justify-between gap-2 border-b border-[var(--color-separator)] py-2">
+      <Button size="icon" variant="ghost" aria-label={t("schedule.previous_week")} onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
+        <ChevronLeft className="size-5" />
+      </Button>
+      <span className="text-[15px] font-semibold text-black">
+        {weekDays[0]?.caption} – {weekDays[6]?.caption}
+      </span>
+      <Button size="icon" variant="ghost" aria-label={t("schedule.next_week")} onClick={() => setWeekStart((current) => shiftWeek(current, 7))}>
+        <ChevronRight className="size-5" />
+      </Button>
+    </div>
+  );
+  const staffOtherSection =
+    section === "availability" ? (
+      availabilityCard
+    ) : section === "requests" ? (
+      <ListSection header={t("schedule.my_requests")} footer={t("schedule.my_requests_footer")}>
+        {(myRequestsQuery.data ?? []).map((request) => {
+          const shift = staffShiftById[request.shift_id];
+          return (
+            <ListRow
+              key={request.id}
+              title={`${t(`schedule.request_type.${request.request_type}`)}${shift ? ` · ${shift.date} ${formatTime(shift.start_time)}–${formatTime(shift.end_time)}` : ""}`}
+              subtitle={request.note ?? new Date(request.created_at).toLocaleDateString(lang)}
+              trailing={<Badge tone={requestStatusTone(request.status)}>{t(`schedule.request_status.${request.status}`)}</Badge>}
+            />
+          );
+        })}
+        {!myRequestsQuery.data?.length ? <ListRow title={t("schedule.my_requests_empty")} /> : null}
+      </ListSection>
+    ) : (
+      <div>
+        {staffWeekNav}
+        <ListSection
+          header={t("schedule.my_hours")}
+          footer={timesheetsEnabled ? (
+            <Button variant="tinted" onClick={() => openExtraTimesheetModal(weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0]?.iso)}>
+              <FileClock className="size-4" /> {t("schedule.report_extra_hours")}
+            </Button>
+          ) : null}
+        >
+          {(myTimesheetsQuery.data ?? []).map((entry) => (
+            <ListRow
+              key={entry.id}
+              title={`${workDateLabel(entry.work_date)} · ${formatTime(entry.arrived_at)}–${formatTime(entry.left_at)}`}
+              subtitle={entry.is_restricted_entry ? t("schedule.extra_entry") : t("schedule.planned_entry")}
+              trailing={<Badge tone={entry.status === "approved" || entry.status === "corrected" ? "green" : entry.status === "rejected" ? "red" : "orange"}>{statusText(entry.status)}</Badge>}
+            />
+          ))}
+          {!myTimesheetsQuery.data?.length ? <ListRow title={t("schedule.my_hours_empty")} /> : null}
+        </ListSection>
+      </div>
+    );
 
-    <AppShell
-      title={isTimesheetsRoute ? t("nav.timesheets") : t("schedule.title")}
-      headerVariant={isManagerView ? "minimal" : "default"}
-      restaurantName="Old Town"
-      subtitle={isTimesheetsRoute ? t("schedule.timesheet_approvals_description") : isStaff ? t("schedule.subtitle.staff") : undefined}
-      action={isStaff ? <div className="hidden sm:block"><Badge>{t("schedule.week_of", { date: weekStart })}</Badge></div> : undefined}
-    >
-      {isStaff ? (
-        <div className="stagger-grid grid gap-4 2xl:h-[calc(100vh-11.5rem)] 2xl:grid-cols-[2.35fr_1fr]">
-          <Card className="min-h-0 max-w-full overflow-x-hidden">
-            <CardHeader className="pb-2">
-              <div className="grid gap-3">
-                <div className="flex items-start justify-between gap-3">
-                  <CardTitle className="text-lg">{t("schedule.my_weekly_calendar")}</CardTitle>
-                  {timesheetsEnabled ? (
-                    <Button size="sm" variant="secondary" className="h-8 px-2.5 sm:hidden" onClick={() => openExtraTimesheetModal(weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0]?.iso)}>
-                      <FileClock className="size-4" /> {t("schedule.report_extra_hours")}
-                    </Button>
-                  ) : null}
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <Button size="sm" variant="secondary" className="h-8 min-w-8 rounded-none border-0 bg-transparent px-1.5 shadow-none hover:bg-transparent" onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
-                    <ChevronLeft className="size-4" />
-                  </Button>
-                  <span className="min-w-0 flex-1 px-1 text-center text-xs font-semibold text-[var(--color-heading)] sm:text-sm">
-                    {weekDays[0]?.caption} - {weekDays[6]?.caption}
-                  </span>
-                  <Button size="sm" variant="secondary" className="h-8 min-w-8 rounded-none border-0 bg-transparent px-1.5 shadow-none hover:bg-transparent" onClick={() => setWeekStart((current) => shiftWeek(current, 7))}>
-                    <ChevronRight className="size-4" />
-                  </Button>
-                </div>
-                {timesheetsEnabled ? (
-                  <div className="hidden sm:flex sm:justify-end">
-                    <Button size="sm" variant="secondary" className="h-8 rounded-none border-0 bg-transparent px-1.5 shadow-none hover:bg-transparent" onClick={() => openExtraTimesheetModal(weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0]?.iso)}>
-                      <FileClock className="size-4" /> {t("schedule.report_extra_hours")}
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            </CardHeader>
-            <CardContent className="min-h-0 max-w-full overflow-x-hidden">
-              <div className="mb-4">
-                <MyWeekShifts days={staffCalendarQuery.data ?? []} onReportHours={timesheetsEnabled ? openShiftTimesheetModal : undefined} />
-              </div>
-              <MobileDaySelector className="mb-3 2xl:hidden" weekDays={weekDays} selectedDayIndex={selectedDayIndex} onSelect={setSelectedDayIndex} />
-              <div className="space-y-3 2xl:hidden">
-                {(() => {
-                  const dayData = staffDaysByWeek[selectedDayIndex];
-                  const shifts = dayData?.shifts ?? [];
-                  const teamAgenda = teamAgendaByDay[selectedDayIndex] ?? [];
-                  const coworkerAgenda = teamAgenda.filter((item) => !item.isMine);
-                  return (
-                    <>
-                      <div className={`rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-4 ${selectedDay?.iso === todayIso ? "bg-[rgba(47,111,237,0.04)]" : ""}`}>
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{selectedDay?.title}</p>
-                        <p className="mt-1 text-sm text-[var(--color-text-muted)]">{selectedDay?.caption}</p>
-                      </div>
-                      {shifts.map((shift) => {
-                        const latest = latestTimesheet(myTimesheetsByShiftId[shift.shift_id] ?? []);
-                        const canSubmitReport = timesheetsEnabled && shift.is_mine && (!latest || latest.status === "rejected");
-                        return (
-                          <div key={`mobile-${shift.shift_id}`} className="surface-card rounded-[1rem] px-4 py-4">
-                            <ShiftBlock
-                              timeRangeLabel={`${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`}
-                              positionLabel={shift.staff_position ?? shift.required_role}
-                              captionLabel={shift.location_name}
-                              peopleLabel={shift.assignments.map((assignment) => assignment.user_name.split(" ")[0]).join(", ")}
-                              highlighted={shift.is_mine}
-                              editable={false}
-                              isEditing={false}
-                              editText=""
-                              deleteLabel={t("schedule.delete_shift")}
-                            />
-                            <div className="mt-3 flex items-center justify-between gap-2">
-                              {latest ? (
-                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${timesheetStatusClass(latest.status)}`}>
-                                  {statusText(latest.status)}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-[var(--color-text-muted)]">{t("schedule.no_report")}</span>
-                              )}
-                              {canSubmitReport ? (
-                                <Button size="sm" variant="secondary" onClick={() => openShiftTimesheetModal(shift)}>
-                                  {t("schedule.report_hours")}
-                                </Button>
-                              ) : null}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {(myRestrictedTimesheetsByDate[selectedDay?.iso ?? ""] ?? []).length ? (
-                        <div className="rounded-[1rem] bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                          {t("schedule.extra_hours")}: {statusText(latestTimesheet(myRestrictedTimesheetsByDate[selectedDay?.iso ?? ""])?.status ?? "pending")}
-                        </div>
-                      ) : null}
-                      <div className="rounded-[1rem] border border-[var(--color-divider)] bg-[var(--color-surface-muted)] px-4 py-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{t("schedule.team_on_this_day")}</p>
-                            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                              {coworkerAgenda.length ? t("schedule.team_on_day_description") : t("schedule.no_other_assigned")}
-                            </p>
-                          </div>
-                          <Badge>{t("schedule.total_count", { count: teamAgenda.length })}</Badge>
-                        </div>
-                        {coworkerAgenda.length ? (
-                          <div className="mt-3 space-y-2">
-                            {coworkerAgenda.map((item) => (
-                              <div key={`team-mobile-${item.shiftId}-${item.userId}`} className="flex items-center justify-between gap-3 rounded-[0.9rem] border border-[var(--color-divider)] bg-white px-3 py-2">
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-[var(--color-heading)]">{item.userName}</p>
-                                  <p className="text-[11px] text-[var(--color-text-muted)]">{item.positionLabel}</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-sm font-semibold text-[var(--color-heading)]">{formatTime(item.startTime)}-{formatTime(item.endTime)}</p>
-                                  <p className="text-[11px] text-[var(--color-text-muted)]">{item.locationName}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                      {!shifts.length ? (
-                        <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-                          {t("schedule.no_shifts_this_day")}
-                        </div>
-                      ) : null}
-                    </>
-                  );
-                })()}
-              </div>
-              <div className="hidden h-full overflow-auto rounded-[1rem] border border-[var(--color-divider)] bg-white 2xl:block">
-                <div className="grid min-w-[820px] grid-cols-7">
-                  {weekDays.map((day, index) => {
-                    const dayData = staffDaysByWeek[index];
-                    const shifts = dayData?.shifts ?? [];
-                    const teamAgenda = (teamAgendaByDay[index] ?? []).filter((item) => !item.isMine);
-                    return (
-                      <div key={day.iso} className={`min-h-[96px] border-r border-[var(--color-divider)] p-2 ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : ""}`}>
-                        <p className="text-xs font-semibold text-[var(--color-heading)]">{day.title}</p>
-                        <p className="text-[10px] text-[var(--color-text-muted)]">{day.caption}</p>
-                        <div className="mt-1.5 space-y-1">
-                          {shifts.map((shift) => {
-                            const latest = latestTimesheet(myTimesheetsByShiftId[shift.shift_id] ?? []);
-                            const canSubmitReport = timesheetsEnabled && shift.is_mine && (!latest || latest.status === "rejected");
-                            return (
-                              <div key={shift.shift_id} className="space-y-1">
-                                <ShiftBlock
-                                  timeRangeLabel={`${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`}
-                                  positionLabel={shift.staff_position ?? shift.required_role}
-                                  captionLabel={shift.location_name}
-                                  peopleLabel={shift.assignments.map((assignment) => assignment.user_name.split(" ")[0]).join(", ")}
-                                  highlighted={shift.is_mine}
-                                  editable={false}
-                                  isEditing={false}
-                                  editText=""
-                                />
-                                {shift.is_mine ? (
-                                  <div className="flex items-center justify-between gap-1">
-                                    {latest ? (
-                                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${timesheetStatusClass(latest.status)}`}>
-                                        {statusText(latest.status)}
-                                      </span>
-                                    ) : (
-                                      <span className="text-[10px] text-[var(--color-text-muted)]">{t("schedule.no_report")}</span>
-                                    )}
-                                    {canSubmitReport ? (
-                                      <button
-                                        type="button"
-                                        className="text-[10px] font-semibold text-[var(--color-primary)] hover:underline"
-                                        onClick={() => openShiftTimesheetModal(shift)}
-                                      >
-                                        {t("schedule.report_hours")}
-                                      </button>
-                                    ) : null}
-                                  </div>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                          {(myRestrictedTimesheetsByDate[day.iso] ?? []).length ? (
-                            <div className="rounded-[0.75rem] bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700">
-                              {t("schedule.extra_hours")}: {statusText(latestTimesheet(myRestrictedTimesheetsByDate[day.iso])?.status ?? "pending")}
-                            </div>
-                          ) : null}
-                          {teamAgenda.length ? (
-                            <div className="rounded-[0.75rem] border border-[var(--color-divider)] bg-[var(--color-surface-muted)] px-2 py-1.5">
-                              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">{t("schedule.team")}</p>
-                              <div className="mt-1 space-y-1">
-                                {teamAgenda.map((item) => (
-                                  <div key={`team-desktop-${item.shiftId}-${item.userId}`} className="text-[10px] leading-4 text-[var(--color-heading)]">
-                                    <span className="font-medium">{item.userName.split(" ")[0]}</span>{" "}
-                                    <span className="text-[var(--color-text-muted)]">{formatTime(item.startTime)}-{formatTime(item.endTime)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
-                          {!shifts.length ? <p className="text-[10px] text-[var(--color-text-muted)]">{t("schedule.no_shift")}</p> : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+  // ---- Shift editor (draft) ----
+  const positionsByUser = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const user of usersQuery.data ?? []) map[user.id] = user.positions?.length ? user.positions : user.staff_position ? [user.staff_position] : [];
+    return map;
+  }, [usersQuery.data]);
+  const editorMember = sortedLocationMembers.find((member) => member.id === previewEditorModal?.userId) ?? null;
+  const editorPosition = previewEditorModal?.position ?? (editorMember ? positionsByUser[editorMember.id]?.[0] ?? editorMember.staff_position ?? "" : "");
+  const editorPositionOptions = Array.from(new Set([...(positionsCatalogQuery.data ?? []).map((item) => item.name), ...(editorPosition ? [editorPosition] : [])])).map((name) => ({ value: name, label: name }));
+  const editorPeople = previewEditorModal
+    ? sortedLocationMembers
+        .filter((member) => member.role !== "ADMIN")
+        .map((member) => {
+          const availability = availabilityStatusForMember(member, previewEditorModal.dayIso, `${previewEditorModal.startTime}:00`, `${previewEditorModal.endTime}:00`, previewEditorModal.overrideId);
+          const positions = positionsByUser[member.id] ?? (member.staff_position ? [member.staff_position] : []);
+          const canWork = member.role === "MANAGER" || !editorPosition || positions.some((item) => item.toLowerCase() === editorPosition.toLowerCase());
+          const hours = previewHoursByUser[member.id] ?? 0;
+          return { id: member.id, name: member.full_name, positions, canWork, tone: availability.tone, label: availability.label, rank: (canWork ? 0 : 10) + availability.rank, hours: hours % 1 ? hours.toFixed(1) : hours };
+        })
+        .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name))
+    : [];
+  const savePreviewEditor = () => {
+    if (!previewEditorModal) return;
+    const member = sortedLocationMembers.find((item) => item.id === previewEditorModal.userId);
+    if (!member) return;
+    const staffPosition = member.role === "STAFF" ? editorPosition || member.staff_position || null : null;
+    patchPreviewEditMutation.mutate(
+      previewEditorModal.mode === "create"
+        ? {
+            action: "create",
+            shift_key: `create:${member.id}:${previewEditorModal.dayIso}`,
+            location_id: locationFilter,
+            day_of_week: previewEditorModal.dayIndex,
+            start_time: `${previewEditorModal.startTime}:00`,
+            end_time: `${previewEditorModal.endTime}:00`,
+            required_role: member.role,
+            staff_position: staffPosition,
+            required_count: 1,
+            assigned_user_id: member.id,
+          }
+        : {
+            action: "upsert",
+            shift_key: `override:${previewEditorModal.overrideId}`,
+            start_time: `${previewEditorModal.startTime}:00`,
+            end_time: `${previewEditorModal.endTime}:00`,
+            assigned_user_id: member.id,
+            required_role: member.role,
+            staff_position: staffPosition,
+            required_count: 1,
+          },
+      { onSuccess: () => setPreviewEditorModal(null) },
+    );
+  };
 
-          {availabilityCard}
+  // ---- Full-screen week grid (manager calendar) ----
+  const positionOrder = (positionsCatalogQuery.data ?? []).map((item) => item.name);
+  const gridDays: GridDay[] = weekDays.map((day) => ({
+    iso: day.iso,
+    weekday: formatDate(day.iso, lang, { weekday: "short" }),
+    dayNumber: String(Number(day.iso.slice(8, 10))),
+    isToday: day.iso === todayIso,
+  }));
+  const gridPeople: GridPerson[] = (locationMembersQuery.data ?? [])
+    .filter((member) => member.role !== "ADMIN")
+    .map((member) => ({ id: member.id, name: member.full_name, position: member.staff_position ?? (member.role === "MANAGER" ? t("shell.role.MANAGER") : null), maxHours: member.max_hours_per_week }));
+  const gridShifts: GridShift[] =
+    scheduleStage === "preview"
+      ? previewOverridesForLocation.map((item) => {
+          const entry = previewEntriesByDate[weekDays[item.day_of_week]?.iso ?? ""]?.find((candidate) => candidate.overrideId === item.id);
+          return {
+            key: item.id,
+            dayIndex: item.day_of_week,
+            start: item.start_time,
+            end: item.end_time,
+            position: item.staff_position ?? (item.required_role === "MANAGER" ? t("shell.role.MANAGER") : null),
+            personId: item.assigned_user_id ?? null,
+            missing: item.assigned_user_id ? 0 : 1,
+            onClick: entry
+              ? () => openPreviewEditModal(entry)
+              : () =>
+                  setPreviewEditorModal({
+                    mode: "edit",
+                    dayIso: weekDays[item.day_of_week]?.iso ?? weekStart,
+                    dayIndex: item.day_of_week,
+                    overrideId: item.id,
+                    userId: "",
+                    startTime: item.start_time.slice(0, 5),
+                    endTime: item.end_time.slice(0, 5),
+                    position: item.staff_position ?? null,
+                  }),
+          };
+        })
+      : managerShifts.flatMap((shift) => {
+          const dayIndex = weekDays.findIndex((day) => day.iso === shift.date);
+          const position = shift.staff_position ?? (shift.required_role === "MANAGER" ? t("shell.role.MANAGER") : null);
+          const assigned = shift.assignments.map((assignment) => ({
+            key: `${shift.id}:${assignment.id}`,
+            dayIndex,
+            start: shift.start_time,
+            end: shift.end_time,
+            position,
+            personId: assignment.user_id,
+          }));
+          const missing = Math.max(0, shift.required_count - shift.assignments.length);
+          return missing ? [...assigned, { key: `${shift.id}:open`, dayIndex, start: shift.start_time, end: shift.end_time, position, personId: null, missing }] : assigned;
+        });
+  const visibleDays = isPhone ? [gridDays[selectedDayIndex] ?? gridDays[0]] : gridDays;
+  const visibleShifts = isPhone
+    ? gridShifts.filter((shift) => shift.dayIndex === selectedDayIndex).map((shift) => ({ ...shift, dayIndex: 0 }))
+    : gridShifts;
+  const summary = draftSummaryQuery.data;
+  const openCount = gridShifts.reduce((sum, shift) => sum + (shift.missing ?? 0), 0);
+  const locations = locationsQuery.data ?? [];
+
+  const managerCalendar = (
+    <div className="flex flex-col md:h-[calc(100dvh-var(--nav-height)-8px)]">
+      {me?.role === "ADMIN" ? <OnboardingChecklist /> : null}
+      <div className="flex flex-wrap items-center gap-2 px-3 pb-2 sm:px-4">
+        <div className="flex items-center">
+          <Button size="icon" variant="ghost" aria-label={t("schedule.previous_week")} onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
+            <ChevronLeft className="size-5" />
+          </Button>
+          <span className="min-w-[128px] text-center text-[15px] font-semibold tabular-nums text-black">{`${formatDate(weekDays[0]?.iso ?? weekStart, lang, { month: "short", day: "numeric" })} – ${formatDate(weekDays[6]?.iso ?? weekStart, lang, { month: "short", day: "numeric" })}`}</span>
+          <Button size="icon" variant="ghost" aria-label={t("schedule.next_week")} onClick={() => setWeekStart((current) => shiftWeek(current, 7))}>
+            <ChevronRight className="size-5" />
+          </Button>
         </div>
+        {locations.length > 1 ? (
+          <div className="w-44">
+            <Select options={locations.map((location) => ({ label: location.name, value: location.id }))} value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} />
+          </div>
+        ) : null}
+        {scheduleStage === "preview" ? (
+          <Badge tone="orange">{t("schedule.draft_badge")}</Badge>
+        ) : scheduleStage === "applied" ? (
+          <Badge tone="green">{t("schedule.published_badge")}</Badge>
+        ) : (
+          <Badge tone="neutral">{t("schedule.not_generated")}</Badge>
+        )}
+        {scheduleStage === "preview" && summary ? (
+          <span className="hidden text-[14px] text-[#3c3c43] xl:inline">
+            {t("schedule.summary_coverage", { filled: summary.coverage_summary.filled_slots, total: summary.coverage_summary.total_slots })}
+            {" · "}
+            {formatMoney(summary.labor_cost_summary.total_pln, currencyOf(me), lang, { decimals: 0 })}
+          </span>
+        ) : null}
+        {openCount > 0 ? <Badge tone="red" className="max-md:hidden">{t("schedule.grid_open_count", { count: openCount })}</Badge> : null}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {scheduleStage === "applied" && !isPhone ? (
+            <Segmented
+              ariaLabel={t("schedule.view")}
+              value={calendarView}
+              onChange={setCalendarView}
+              options={[
+                { value: "grid", label: t("schedule.view_grid") },
+                { value: "timeline", label: t("schedule.view_timeline") },
+              ]}
+            />
+          ) : null}
+          <Button size="sm" variant="ghost" className="max-md:hidden" onClick={() => navigate("/team/templates")}>
+            {t("sub.templates")}
+          </Button>
+          {scheduleStage === "preview" ? (
+            <>
+              <Button size="sm" variant="ghost" onClick={exitPreviewMode}>
+                {t("schedule.close_draft")}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
+                <Sparkles className="size-4" /> {t("schedule.regenerate")}
+              </Button>
+              <Button size="sm" onClick={() => applyMutation.mutate()} disabled={applyMutation.isPending}>
+                <ClipboardCheck className="size-4" /> {t("schedule.publish")}
+              </Button>
+            </>
+          ) : scheduleStage === "applied" ? (
+            <Button size="sm" onClick={() => previewMutation.mutate({ mode: "edit-from-applied" })} disabled={previewMutation.isPending || !locationFilter || shiftsQuery.isLoading}>
+              <Pencil className="size-4" /> {t("schedule.edit_week")}
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => previewMutation.mutate({ resetOverrides: false, mode: "generate" })} disabled={previewMutation.isPending || !locationFilter}>
+              <Sparkles className="size-4" /> {t("schedule.generate")}
+            </Button>
+          )}
+        </div>
+      </div>
+      {isPhone && (scheduleStage !== "idle" || gridShifts.length) ? (
+        <div className="ios-island mx-3 mb-2">
+          <DayStrip
+            days={gridDays}
+            selected={selectedDayIndex}
+            onSelect={setSelectedDayIndex}
+            openByDay={gridDays.map((_day, index) => gridShifts.filter((shift) => shift.dayIndex === index && shift.missing).length)}
+          />
+        </div>
+      ) : null}
+      <div className="min-h-0 flex-1 md:ios-island md:mx-3 md:mb-3">
+        {scheduleStage === "idle" && !gridShifts.length ? (
+          <div className="grid h-full place-items-center px-6 text-center">
+            <div className="max-w-md">
+              <p className="text-[20px] font-semibold text-black">{t("schedule.empty_title")}</p>
+              <p className="mt-2 text-[15px] text-[var(--color-text-muted)]">{t("schedule.empty_body")}</p>
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                <Button onClick={() => previewMutation.mutate({ resetOverrides: false, mode: "generate" })} disabled={previewMutation.isPending || !locationFilter}>
+                  <Sparkles className="size-4" /> {t("schedule.generate")}
+                </Button>
+                <Button variant="secondary" onClick={() => navigate("/team/templates")}>
+                  {t("sub.templates")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : scheduleStage === "applied" && calendarView === "timeline" && !isPhone ? (
+          <div className="h-full overflow-auto">
+            <AppliedTimetableBoard
+              compact={isPhone}
+              weekDays={weekDays}
+              entriesByDate={appliedTimetableByDate}
+              warningEntriesByDate={appliedWarningEntriesByDate}
+              timeSlots={appliedTimetableSlots}
+              startMinutes={appliedTimetableStartMinutes}
+              todayIso={todayIso}
+              t={t}
+            />
+          </div>
+        ) : isPhone ? (
+          <DayList
+            shifts={visibleShifts}
+            people={gridPeople}
+            positionOrder={positionOrder}
+            t={t}
+            onAdd={scheduleStage === "preview" ? () => openPreviewCreateModal(weekDays[selectedDayIndex]?.iso ?? weekStart) : undefined}
+          />
+        ) : (
+          <WeekGrid
+            days={visibleDays}
+            people={gridPeople}
+            shifts={visibleShifts}
+            positionOrder={positionOrder}
+            t={t}
+            onAdd={
+              scheduleStage === "preview"
+                ? (dayIndex, personId) => {
+                    const realDay = isPhone ? selectedDayIndex : dayIndex;
+                    openPreviewCreateModal(weekDays[realDay]?.iso ?? weekStart);
+                    if (personId) setPreviewEditorModal((current) => (current ? { ...current, userId: personId } : current));
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
+    </div>
+  );
 
+  const pageTitle = section === "calendar" ? (isStaff ? t("sub.my_week") : t("schedule.title")) : t(`sub.${section}`);
+
+  return (
+    <AppShell title={pageTitle} fullBleed={section === "calendar" && !isStaff} flush={isStaff}>
+      {isStaff && section !== "calendar" ? (
+        staffOtherSection
+      ) : isStaff ? (
+        <StaffWeek
+          token={token!}
+          meId={me?.id}
+          lang={lang}
+          t={t}
+          weekDays={weekDays.map((day) => day.iso)}
+          days={staffCalendarQuery.data ?? []}
+          timesheetsByShift={myTimesheetsByShiftId}
+          timesheetsEnabled={timesheetsEnabled}
+          onReportHours={openShiftTimesheetModal}
+          onReportExtra={(iso) => openExtraTimesheetModal(iso)}
+          onPrev={() => setWeekStart((current) => shiftWeek(current, -7))}
+          onNext={() => setWeekStart((current) => shiftWeek(current, 7))}
+        />
+      ) : section === "calendar" ? (
+        managerCalendar
       ) : (
+
 
         <div className="stagger-grid grid gap-5">
 
           <section className="min-w-0 space-y-5">
 
-            {me?.role === "ADMIN" && !isTimesheetsRoute ? <OnboardingChecklist /> : null}
-            <ScheduleTabs pendingCount={pendingTimesheetsQuery.data?.length ?? 0} />
-
-            {!isTimesheetsRoute ? (
+            {section === "requests" ? (
             <Card>
-
               <CardHeader>
-
-                <div className="flex flex-wrap items-start justify-between gap-4">
-
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <CardTitle>{t("schedule.calendar_title")}</CardTitle>
-                      {scheduleStage === "preview" ? (
-                        <Badge className="border-amber-200 bg-amber-50 text-amber-800">{t("schedule.draft_badge")}</Badge>
-                      ) : null}
-                      {scheduleStage === "applied" ? (
-                        <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">{t("schedule.published_badge")}</Badge>
-                      ) : null}
-                    </div>
-                    <CardDescription>{t("schedule.calendar_description")}</CardDescription>
-                    {scheduleStage === "preview" && draftSummaryQuery.data ? (
-                      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-[var(--color-heading)]">
-                        <span>
-                          {t("schedule.summary_coverage", {
-                            filled: draftSummaryQuery.data.coverage_summary.filled_slots,
-                            total: draftSummaryQuery.data.coverage_summary.total_slots,
-                          })}
-                        </span>
-                        {draftSummaryQuery.data.coverage_summary.total_slots > draftSummaryQuery.data.coverage_summary.filled_slots ? (
-                          <span className="text-amber-700">
-                            {t("schedule.summary_open", {
-                              count: draftSummaryQuery.data.coverage_summary.total_slots - draftSummaryQuery.data.coverage_summary.filled_slots,
-                            })}
-                          </span>
-                        ) : null}
-                        <span>{t("schedule.summary_cost", { cost: Math.round(Number(draftSummaryQuery.data.labor_cost_summary.total_pln)) })}</span>
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="hidden flex-wrap items-center gap-2 lg:flex">
-                    <WeekRangeNavigator
-                      label={weekRangeCompactLabel}
-                      onPrevious={() => setWeekStart((current) => shiftWeek(current, -7))}
-                      onNext={() => setWeekStart((current) => shiftWeek(current, 7))}
-                      className="min-w-[360px]"
-                    />
-                    <Button variant="secondary" onClick={() => window.location.assign("/team")}>
-                      {t("schedule.edit_template_for_location")}
-                    </Button>
-
-                    {scheduleStage === "idle" ? (
-                      <Button onClick={() => previewMutation.mutate({ resetOverrides: false, mode: "generate" })} disabled={previewMutation.isPending || !locationFilter}>
-                        <Sparkles className="size-4" /> {t("schedule.generate_from_template")}
-                      </Button>
-                    ) : null}
-
-                    {scheduleStage === "preview" ? (
-                      <>
-                        <Button className="bg-emerald-500 text-white hover:bg-emerald-600" onClick={() => applyMutation.mutate()} disabled={applyMutation.isPending}>
-                          <ClipboardCheck className="size-4" /> {t("schedule.publish")}
-                        </Button>
-                        <Button onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
-                          <Sparkles className="size-4" /> {t("schedule.regenerate")}
-                        </Button>
-                      </>
-                    ) : null}
-
-                    {scheduleStage === "applied" ? (
-                      <>
-                        <Button onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
-                          <Sparkles className="size-4" /> {t("schedule.regenerate")}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            previewMutation.mutate({ mode: "edit-from-applied" });
-                          }}
-                          disabled={previewMutation.isPending || !locationFilter || shiftsQuery.isLoading}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="space-y-4 lg:hidden">
-                  <WeekRangeNavigator
-                    label={weekRangeCompactLabel}
-                    onPrevious={() => setWeekStart((current) => shiftWeek(current, -7))}
-                    onNext={() => setWeekStart((current) => shiftWeek(current, 7))}
-                  />
-                  <Button variant="secondary" className="w-full justify-center" onClick={() => window.location.assign("/team")}>
-                    {t("schedule.edit_template_for_location")}
-                  </Button>
-
-                  <div className={`grid gap-3 ${scheduleStage === "idle" ? "grid-cols-1" : "grid-cols-2"}`}>
-                    {scheduleStage === "idle" ? (
-                      <Button className="w-full justify-center" onClick={() => previewMutation.mutate({ resetOverrides: false, mode: "generate" })} disabled={previewMutation.isPending || !locationFilter}>
-                        <Sparkles className="size-4" /> {t("schedule.generate_from_template")}
-                      </Button>
-                    ) : null}
-
-                    {scheduleStage === "preview" ? (
-                      <>
-                        <Button className="w-full justify-center bg-emerald-500 text-white hover:bg-emerald-600" onClick={() => applyMutation.mutate()} disabled={applyMutation.isPending}>
-                          <ClipboardCheck className="size-4" /> {t("schedule.publish")}
-                        </Button>
-                        <Button className="w-full justify-center" onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
-                          <Sparkles className="size-4" /> {t("schedule.regenerate")}
-                        </Button>
-                      </>
-                    ) : null}
-
-                    {scheduleStage === "applied" ? (
-                      <>
-                        <Button className="w-full justify-center" onClick={() => previewMutation.mutate({ resetOverrides: true, mode: "regenerate" })} disabled={previewMutation.isPending || !locationFilter}>
-                          <Sparkles className="size-4" /> {t("schedule.regenerate")}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          className="w-full justify-center"
-                          onClick={() => {
-                            previewMutation.mutate({ mode: "edit-from-applied" });
-                          }}
-                          disabled={previewMutation.isPending || !locationFilter || shiftsQuery.isLoading}
-                        >
-                          <Pencil className="size-4" /> {t("common.edit")}
-                        </Button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="mt-2 grid gap-3 lg:mt-0 lg:flex lg:flex-wrap lg:items-center">
-                  <Select
-                    className="w-full min-w-0 lg:min-w-[220px] border-[var(--color-primary)] bg-[var(--color-accent)] text-[var(--color-primary)]"
-                    options={((locationsQuery.data ?? []).map((location) => ({ label: location.name, value: location.id })))}
-                    value={locationFilter}
-                    onChange={(event) => setLocationFilter(event.target.value)}
-                  />
-
-                  {scheduleStage === "preview" ? (
-                    <>
-                      <div className="hidden lg:block lg:min-w-[140px]">
-                        <Select className="w-full min-w-0" options={dayOptions} value={bulkDay} onChange={(event) => setBulkDay(event.target.value)} />
-                      </div>
-                      <Button className="hidden lg:inline-flex lg:w-auto" variant="secondary" onClick={() => bulkClearDayMutation.mutate({})} disabled={bulkClearDayMutation.isPending || !locationFilter}>
-                        <Trash2 className="size-4" /> {t("schedule.clear_day")}
-                      </Button>
-                      <Button className="w-full lg:hidden" variant="secondary" onClick={() => bulkClearDayMutation.mutate({ dayIndex: selectedDayIndex })} disabled={bulkClearDayMutation.isPending || !locationFilter}>
-                        <Trash2 className="size-4" /> {t("schedule.clear_day")}
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
-
-                <div className="pt-1">
-                  {scheduleStage === "applied" ? (
-                    <div className="hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-4">
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button variant={mobileAppliedView === "cards" ? "default" : "secondary"} className="min-w-[132px]" onClick={() => setMobileAppliedView("cards")}>
-                          {t("schedule.cards_view")}
-                        </Button>
-                        <Button variant={mobileAppliedView === "timetable" ? "default" : "secondary"} className="min-w-[132px]" onClick={() => setMobileAppliedView("timetable")}>
-                          {t("schedule.timetable_view")}
-                        </Button>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                        {roleLegendItems.map((item) => (
-                          <div key={item.label} className="inline-flex items-center gap-2 text-sm text-[var(--color-heading)]">
-                            <span className="size-4 rounded-md" style={{ backgroundColor: item.accent }} />
-                            <span>{item.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                      {roleLegendItems.map((item) => (
-                        <div key={item.label} className="inline-flex items-center gap-2 text-sm text-[var(--color-heading)]">
-                          <span className="size-4 rounded-md" style={{ backgroundColor: item.accent }} />
-                          <span>{item.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-              </CardHeader>
-
-              <CardContent className="min-w-0 space-y-3">
-                {scheduleStage === "preview" ? (
-                  <div className="space-y-3 lg:hidden">
-                    <Button variant="secondary" className="h-9" onClick={exitPreviewMode}>
-                      <ChevronLeft className="size-4" /> {t("common.back")}
-                    </Button>
-                  </div>
-                ) : scheduleStage === "applied" && mobileAppliedView === "timetable" ? null : (
-                  <MobileDaySelector
-                    className="lg:hidden"
-                    weekDays={weekDays}
-                    selectedDayIndex={selectedDayIndex}
-                    onSelect={setSelectedDayIndex}
-                    warningEntriesByDate={activeMobileWarningEntriesByDate}
-                    t={t}
-                  />
-                )}
-
-                {scheduleStage === "idle" ? (
-                  <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-                    {t("schedule.generate_empty")}
-                  </div>
-                ) : null}
-
-                {scheduleStage === "preview" && previewVisibleIssueCount > 0 ? (
-                  <div className="flex flex-wrap items-start gap-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    <CircleAlert className="mt-0.5 size-4 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold">{t("schedule.missing_staff")}</p>
-                      <p className="mt-1 text-xs leading-5 text-amber-800">
-                        {previewVisibleIssueCount} • {t("schedule.fix_alerts")}
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-
-                {scheduleStage === "preview" ? (
-                  <PreviewCardsBoard
-                    weekDays={weekDays}
-                    entriesByDate={previewEntriesByDate}
-                    warningEntriesByDate={previewWarningEntriesByDate}
-                    todayIso={todayIso}
-                    t={t}
-                    onCreate={openPreviewCreateModal}
-                    onEdit={openPreviewEditModal}
-                    onDelete={(entry) =>
-                      patchPreviewEditMutation.mutate({
-                        action: "delete",
-                        shift_key: `override:${entry.overrideId}`,
-                      })
-                    }
-                  />
-                ) : null}
-
-                {scheduleStage === "applied" ? (
-                  <>
-                  <div className="space-y-3 lg:hidden">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant={mobileAppliedView === "cards" ? "default" : "secondary"} className="w-full" onClick={() => setMobileAppliedView("cards")}>
-                        {t("schedule.cards_view")}
-                      </Button>
-                      <Button variant={mobileAppliedView === "timetable" ? "default" : "secondary"} className="w-full" onClick={() => setMobileAppliedView("timetable")}>
-                        {t("schedule.timetable_view")}
-                      </Button>
-                    </div>
-                    <div className="overflow-x-auto pb-1">
-                      <div className="inline-flex min-w-max items-center gap-x-5 gap-y-2">
-                        {roleLegendItems.map((item) => (
-                          <div key={`mobile-${item.label}`} className="inline-flex items-center gap-2 text-sm text-[var(--color-heading)]">
-                            <span className="size-4 rounded-md" style={{ backgroundColor: item.accent }} />
-                            <span>{item.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {mobileAppliedView === "cards" ? (
-                      selectedAppliedEntries.length ? (
-                        selectedAppliedEntries.map((entry) => (
-                          <AppliedShiftCard key={`applied-mobile-${entry.key}`} entry={entry} t={t} />
-                        ))
-                      ) : (
-                        <div className="rounded-[1rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-                          {t("schedule.no_shifts_this_day")}
-                        </div>
-                      )
-                    ) : (
-                      <div className="rounded-[1.1rem] border border-[var(--color-divider)] bg-white">
-                        <AppliedTimetableBoard
-                          compact
-                          weekDays={weekDays}
-                          entriesByDate={appliedTimetableByDate}
-                          warningEntriesByDate={appliedWarningEntriesByDate}
-                          timeSlots={appliedTimetableSlots}
-                          startMinutes={appliedTimetableStartMinutes}
-                          todayIso={todayIso}
-                          t={t}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {mobileAppliedView === "cards" ? (
-                    <div className="hidden lg:block">
-                      <AppliedCardsBoard
-                        weekDays={weekDays}
-                        entriesByDate={appliedEntriesByDate}
-                        warningEntriesByDate={appliedWarningEntriesByDate}
-                        todayIso={todayIso}
-                        t={t}
-                      />
-                    </div>
-                  ) : (
-                    <div className="hidden rounded-[1.25rem] border border-[var(--color-divider)] bg-white lg:block">
-                      <AppliedTimetableBoard
-                        weekDays={weekDays}
-                        entriesByDate={appliedTimetableByDate}
-                        warningEntriesByDate={appliedWarningEntriesByDate}
-                        timeSlots={appliedTimetableSlots}
-                        startMinutes={appliedTimetableStartMinutes}
-                        todayIso={todayIso}
-                        t={t}
-                      />
-                    </div>
-                  )}
-                  </>
-                ) : null}
-              </CardContent>
-            </Card>
-            ) : null}
-
-            {!isTimesheetsRoute ? (
-            <Card>
-
-              <CardHeader>
-
                 <div>
-
                   <CardTitle>{t("schedule.incoming_requests")}</CardTitle>
 
                   <CardDescription>{t("schedule.incoming_requests_description")}</CardDescription>
@@ -3292,7 +3109,7 @@ export function SchedulePage() {
 
                   return (
 
-                    <div key={item.id} className="surface-muted rounded-[1.2rem] px-4 py-4">
+                    <div key={item.id} className="surface-muted rounded-[12px] px-4 py-4">
 
                       <p className="font-medium text-[var(--color-heading)]">{item.requester_name}  {item.request_type.toUpperCase()}</p>
 
@@ -3326,7 +3143,7 @@ export function SchedulePage() {
 
                 {!incomingRequestsQuery.data?.length ? (
 
-                  <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                  <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
 
                     {t("schedule.no_incoming_requests")}
 
@@ -3339,10 +3156,8 @@ export function SchedulePage() {
             </Card>
             ) : null}
 
-            {!isTimesheetsRoute && availabilityCard ? (
-              <div className="stagger-item">{availabilityCard}</div>
-            ) : null}
-            {!isTimesheetsRoute && teamAvailabilityCard ? <div className="stagger-item">{teamAvailabilityCard}</div> : null}
+            {section === "availability" && teamAvailabilityCard ? <div>{teamAvailabilityCard}</div> : null}
+            {section === "availability" && availabilityCard ? <div>{availabilityCard}</div> : null}
 
             {isTimesheetsRoute ? (
             <Card>
@@ -3362,7 +3177,7 @@ export function SchedulePage() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      className="h-9 rounded-[0.85rem] border-0 bg-transparent px-0 text-[var(--color-primary)] shadow-none hover:bg-transparent"
+                      className="h-9 rounded-[10px] border-0 bg-transparent px-0 text-[var(--color-primary-strong)] hover:bg-transparent"
                       onClick={() => approveVisibleTimesheetsMutation.mutate(visiblePendingTimesheets)}
                       disabled={approveVisibleTimesheetsMutation.isPending || reviewTimesheetMutation.isPending}
                     >
@@ -3376,7 +3191,7 @@ export function SchedulePage() {
 
               <CardContent className="space-y-3 overflow-hidden">
                 {visiblePendingTimesheets.length ? (
-                  <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-3">
+                  <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-[12px] border border-[var(--color-separator)] bg-white px-4 py-3">
                     <p className="text-sm font-medium text-[var(--color-heading)]">{t("schedule.pending_reports_in_week", { count: visiblePendingTimesheets.length })}</p>
                     <span className="text-xs text-[var(--color-text-muted)]">{t("schedule.scrollable_list")}</span>
                   </div>
@@ -3388,7 +3203,7 @@ export function SchedulePage() {
                   const employeeName = timesheetUserNameById[entry.user_id] ?? entry.user_id.slice(0, 8);
                   const deltaLabel = deltaText(shift, entry);
                   return (
-                    <div key={entry.id} className="surface-muted rounded-[1.2rem] px-4 py-4">
+                    <div key={entry.id} className="surface-muted rounded-[12px] px-4 py-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="font-medium text-[var(--color-heading)]">{employeeName}</p>
@@ -3448,7 +3263,7 @@ export function SchedulePage() {
 
                 {!visiblePendingTimesheets.length ? (
 
-                  <div className="rounded-[1.2rem] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
+                  <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
 
                     {t("schedule.no_pending_timesheets")}
 
@@ -3467,171 +3282,107 @@ export function SchedulePage() {
 
       )}
 
-      {previewEditorModal ? (
-        <OverlayPortal>
-          <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[520px] lg:rounded-[1.5rem] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 lg:shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
-              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
-                <div>
-                  <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">
-                    {previewEditorModal.mode === "create" ? t("schedule.add_shift") : t("common.edit")}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                    {weekDays[previewEditorModal.dayIndex]?.title} • {weekDays[previewEditorModal.dayIndex]?.caption}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
-                  onClick={() => setPreviewEditorModal(null)}
-                  aria-label="Close"
-                >
-                  <XCircle className="size-5" />
-                </button>
-              </div>
-
-              <div className="mobile-sheet-scroll px-4 py-4 lg:px-0">
-                <div className="grid gap-4">
-                  <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
-                    {t("common.worker")}
-                    <Select
-                      options={previewEditorWorkerOptions.map((item) => ({ value: item.value, label: item.label }))}
-                      value={previewEditorModal.userId}
-                      onChange={(event) =>
-                        setPreviewEditorModal((current) =>
-                          current ? { ...current, userId: event.target.value } : current,
-                        )
-                      }
-                    />
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
-                      {t("schedule.start_time_label")}
-                      <Input
-                        type="time"
-                        value={previewEditorModal.startTime}
-                        onChange={(event) =>
-                          setPreviewEditorModal((current) =>
-                            current ? { ...current, startTime: event.target.value } : current,
-                          )
-                        }
-                      />
-                    </label>
-                    <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
-                      {t("schedule.end_time_label")}
-                      <Input
-                        type="time"
-                        value={previewEditorModal.endTime}
-                        onChange={(event) =>
-                          setPreviewEditorModal((current) =>
-                            current ? { ...current, endTime: event.target.value } : current,
-                          )
-                        }
-                      />
-                    </label>
-                  </div>
-                  {selectedPreviewEditorMember && selectedPreviewEditorAvailability ? (
-                    <div className="rounded-[1rem] border border-[var(--color-divider)] bg-white px-4 py-3">
-                      <p className="text-sm font-semibold text-[var(--color-heading)]">
-                        {selectedPreviewEditorMember.full_name} • {selectedPreviewEditorMember.staff_position ?? selectedPreviewEditorMember.role}
-                      </p>
-                      <p
-                        className={`mt-1 text-sm ${
-                          selectedPreviewEditorAvailability.tone === "ok"
-                            ? "text-emerald-700"
-                            : selectedPreviewEditorAvailability.tone === "warning"
-                              ? "text-amber-700"
-                              : "text-[var(--color-text-muted)]"
-                        }`}
-                      >
-                        {selectedPreviewEditorAvailability.label}
-                      </p>
-                      {managerAvailabilityByUserDay[selectedPreviewEditorMember.id]?.[previewEditorModal.dayIso]?.windowLabel ? (
-                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                          {managerAvailabilityByUserDay[selectedPreviewEditorMember.id][previewEditorModal.dayIso].windowLabel}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="border-t border-[var(--color-divider)] px-4 py-4 lg:px-0">
-                <div className="grid gap-2">
-                  <Button variant="secondary" onClick={() => setPreviewEditorModal(null)}>
-                    {t("common.cancel")}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const selectedMember = sortedLocationMembers.find((member) => member.id === previewEditorModal.userId);
-                      if (!selectedMember) return;
-                      patchPreviewEditMutation.mutate(
-                        previewEditorModal.mode === "create"
-                          ? {
-                              action: "create",
-                              shift_key: `create:${selectedMember.id}:${previewEditorModal.dayIso}`,
-                              location_id: locationFilter,
-                              day_of_week: previewEditorModal.dayIndex,
-                              start_time: `${previewEditorModal.startTime}:00`,
-                              end_time: `${previewEditorModal.endTime}:00`,
-                              required_role: selectedMember.role,
-                              staff_position: selectedMember.role === "STAFF" ? selectedMember.staff_position ?? "Cook" : null,
-                              required_count: 1,
-                              assigned_user_id: selectedMember.id,
-                            }
-                          : {
-                              action: "upsert",
-                              shift_key: `override:${previewEditorModal.overrideId}`,
-                              start_time: `${previewEditorModal.startTime}:00`,
-                              end_time: `${previewEditorModal.endTime}:00`,
-                              assigned_user_id: selectedMember.id,
-                              required_role: selectedMember.role,
-                              staff_position: selectedMember.role === "STAFF" ? selectedMember.staff_position ?? "Cook" : null,
-                              required_count: 1,
-                            },
-                        {
-                          onSuccess: () => {
-                            setPreviewEditorModal(null);
-                          },
-                        },
-                      );
-                    }}
-                    disabled={patchPreviewEditMutation.isPending || !previewEditorModal.userId || !locationFilter}
-                  >
-                    {t("common.save")}
-                  </Button>
-                </div>
-              </div>
+      <Sheet
+        open={Boolean(previewEditorModal)}
+        onClose={() => setPreviewEditorModal(null)}
+        title={previewEditorModal?.mode === "create" ? t("schedule.add_shift") : t("schedule.edit_shift")}
+        subtitle={previewEditorModal ? formatDate(previewEditorModal.dayIso, lang, { weekday: "long", month: "long", day: "numeric" }) : undefined}
+        action={{
+          label: t("common.save"),
+          onClick: savePreviewEditor,
+          disabled: !previewEditorModal || patchPreviewEditMutation.isPending || !previewEditorModal.userId || !locationFilter || previewEditorModal.startTime === previewEditorModal.endTime,
+        }}
+      >
+        {previewEditorModal ? (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[var(--color-text-muted)]">{t("schedule.start_time_label")}</span>
+                <Input type="time" value={previewEditorModal.startTime} onChange={(event) => setPreviewEditorModal((current) => (current ? { ...current, startTime: event.target.value } : current))} />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[var(--color-text-muted)]">{t("schedule.end_time_label")}</span>
+                <Input type="time" value={previewEditorModal.endTime} onChange={(event) => setPreviewEditorModal((current) => (current ? { ...current, endTime: event.target.value } : current))} />
+              </label>
             </div>
+            {editorPositionOptions.length ? (
+              <label className="block">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[var(--color-text-muted)]">{t("team.position")}</span>
+                <Select value={editorPosition} onChange={(event) => setPreviewEditorModal((current) => (current ? { ...current, position: event.target.value } : current))} options={editorPositionOptions} />
+              </label>
+            ) : null}
+            <div>
+              <h3 className="ios-section-header pb-2">{t("schedule.who_works")}</h3>
+              <ul className="divide-y divide-[#e5e5ea] rounded-2xl border border-[#e5e5ea] px-3">
+                {editorPeople.map((person) => {
+                  const selected = person.id === previewEditorModal.userId;
+                  return (
+                    <li key={person.id}>
+                      <button
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setPreviewEditorModal((current) => (current ? { ...current, userId: person.id } : current))}
+                        className="flex min-h-[56px] w-full items-center gap-3 py-2 text-left active:bg-[var(--color-fill)]"
+                      >
+                        <span className={selected ? "grid size-6 place-items-center rounded-full bg-[var(--color-primary-strong)] text-white" : "size-6 rounded-full border-2 border-[#c7c7cc]"}>
+                          {selected ? <Check className="size-4" strokeWidth={3} /> : null}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[16px] text-black">
+                            {person.name}
+                            <span className="text-[#3c3c43]"> · {person.positions.join(", ") || t("team.position_none")}</span>
+                          </span>
+                          <span
+                            className={
+                              person.canWork && person.tone === "ok"
+                                ? "block text-[14px] font-semibold text-[var(--color-success)]"
+                                : !person.canWork || person.tone === "warning"
+                                  ? "block text-[14px] font-semibold text-[var(--color-warning)]"
+                                  : "block text-[14px] text-[#3c3c43]"
+                            }
+                          >
+                            {person.canWork ? person.label : t("schedule.not_this_position")}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-[13px] tabular-nums text-[#3c3c43]">{person.hours} h</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            {previewEditorModal.mode === "edit" && previewEditorModal.overrideId ? (
+              <Button
+                variant="danger-plain"
+                onClick={() =>
+                  patchPreviewEditMutation.mutate(
+                    { action: "delete", shift_key: `override:${previewEditorModal.overrideId}` },
+                    { onSuccess: () => setPreviewEditorModal(null) },
+                  )
+                }
+                disabled={patchPreviewEditMutation.isPending}
+              >
+                <Trash2 className="size-4" /> {t("schedule.delete_shift")}
+              </Button>
+            ) : null}
           </div>
-        </OverlayPortal>
-      ) : null}
+        ) : null}
+      </Sheet>
 
-      {teamAvailabilityEditor ? (
-        <OverlayPortal>
-          <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[520px] lg:rounded-[1.5rem] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 lg:shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
-              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
-                <div>
-                  <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{t("schedule.approve_availability")}</p>
-                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">{teamAvailabilityEditor.fullName}</p>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
-                  onClick={() => setTeamAvailabilityEditor(null)}
-                  aria-label="Close"
-                >
-                  <XCircle className="size-5" />
-                </button>
-              </div>
-
-              <div className="mobile-sheet-scroll px-4 py-4 lg:px-0">
-                <div className="grid gap-4 lg:mt-5">
+      <Sheet
+        open={Boolean(teamAvailabilityEditor)}
+        onClose={() => setTeamAvailabilityEditor(null)}
+        title={t("schedule.approve_availability")}
+        subtitle={teamAvailabilityEditor?.fullName}
+        action={{ label: t("common.save"), onClick: () => saveTeamAvailabilityEditorMutation.mutate(), disabled: saveTeamAvailabilityEditorMutation.isPending }}
+      >
+        {teamAvailabilityEditor ? (
+          <div>
+                <div className="grid gap-4">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("schedule.hours_per_week")}</p>
                     <div className="mt-1 flex items-baseline gap-2">
-                      <p className="text-2xl font-bold tracking-[-0.06em] text-[var(--color-heading)]">{teamAvailabilityEditorDesiredHours.toFixed(1)}</p>
+                      <p className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{teamAvailabilityEditorDesiredHours.toFixed(1)}</p>
                       <p className="text-sm text-[var(--color-text-muted)]">{t("schedule.derived_from_ranges")}</p>
                     </div>
                   </div>
@@ -3641,20 +3392,13 @@ export function SchedulePage() {
                       const firstSlot = slots[0];
                       const enabled = Boolean(firstSlot);
                       return (
-                        <div key={`team-availability-editor-${day.iso}`} className="rounded-[1rem] border border-[var(--color-border)] bg-white px-4 py-4">
+                        <div key={`team-availability-editor-${day.iso}`} className="rounded-[12px] border border-[var(--color-border)] bg-white px-4 py-4">
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{day.title}</p>
                               <p className="text-xs text-[var(--color-text-muted)]">{day.caption}</p>
                             </div>
-                            <button
-                              type="button"
-                              aria-pressed={enabled}
-                              onClick={() => setTeamAvailabilityDayEnabled(index, !enabled)}
-                              className={`relative inline-flex h-11 w-16 items-center rounded-full p-1 transition ${enabled ? "bg-emerald-500/90" : "bg-slate-200"}`}
-                            >
-                              <span className={`size-7 rounded-full bg-white shadow-sm transition ${enabled ? "translate-x-8" : "translate-x-0"}`} />
-                            </button>
+                            <Switch checked={enabled} label={day.title} onChange={(next) => setTeamAvailabilityDayEnabled(index, next)} />
                           </div>
                           <p className="mt-2 text-xs font-medium text-[var(--color-text-muted)]">{enabled ? t("schedule.available") : t("schedule.off")}</p>
                           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -3679,51 +3423,31 @@ export function SchedulePage() {
                   </div>
                 </div>
               </div>
+        ) : null}
+      </Sheet>
 
-              <div className="border-t border-[var(--color-divider)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
-                <div className="grid gap-2 lg:flex">
-                  <Button variant="secondary" onClick={() => setTeamAvailabilityEditor(null)}>
-                    {t("common.cancel")}
-                  </Button>
-                  <Button onClick={() => saveTeamAvailabilityEditorMutation.mutate()} disabled={saveTeamAvailabilityEditorMutation.isPending}>
-                    {t("common.save")}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </OverlayPortal>
-      ) : null}
-
-      {timesheetModal ? (
-        <OverlayPortal>
-          <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[440px] lg:rounded-[1.5rem] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 lg:shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
-              <div>
-                <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">
-                  {timesheetModal.mode === "shift" ? t("schedule.report_hours") : t("schedule.report_extra_hours")}
-                </p>
-                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                  {timesheetModal.mode === "shift"
-                    ? `${workDateLabel(timesheetModal.workDate)} • ${timesheetModal.shift.location_name}`
-                    : `${t("schedule.restricted_entry_for")} ${workDateLabel(timesheetModal.workDate)}`}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
-                onClick={() => setTimesheetModal(null)}
-                aria-label="Close"
-              >
-                <XCircle className="size-5" />
-              </button>
-            </div>
-
-            <div className="mobile-sheet-scroll px-4 py-4 lg:px-0">
-            <div className="grid gap-4 lg:mt-5">
+      <Sheet
+        open={Boolean(timesheetModal)}
+        onClose={() => setTimesheetModal(null)}
+        title={timesheetModal?.mode === "shift" ? t("schedule.report_hours") : t("schedule.report_extra_hours")}
+        subtitle={
+          timesheetModal
+            ? timesheetModal.mode === "shift"
+              ? `${workDateLabel(timesheetModal.workDate)} · ${timesheetModal.shift.location_name}`
+              : `${t("schedule.restricted_entry_for")} ${workDateLabel(timesheetModal.workDate)}`
+            : undefined
+        }
+        action={{
+          label: t("schedule.submit_report"),
+          onClick: () => timesheetModal && createTimesheetMutation.mutate({ modal: timesheetModal, form: timesheetForm }),
+          disabled: createTimesheetMutation.isPending || !timesheetForm.arrived_at || !timesheetForm.left_at,
+        }}
+      >
+        {timesheetModal ? (
+          <div>
+            <div className="grid gap-4">
               {timesheetModal.mode === "extra" ? (
-                <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+                <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                   {t("schedule.work_date")}
                   <Input
                     type="date"
@@ -3733,7 +3457,7 @@ export function SchedulePage() {
                 </label>
               ) : null}
               <div className="grid grid-cols-2 gap-3">
-                <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+                <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                   {t("schedule.arrived_at")}
                   <Input
                     type="time"
@@ -3741,7 +3465,7 @@ export function SchedulePage() {
                     onChange={(event) => setTimesheetForm((current) => ({ ...current, arrived_at: event.target.value }))}
                   />
                 </label>
-                <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+                <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                   {t("schedule.left_at")}
                   <Input
                     type="time"
@@ -3750,7 +3474,7 @@ export function SchedulePage() {
                   />
                 </label>
               </div>
-              <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+              <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                 {t("schedule.note")}
                 <Textarea
                   rows={3}
@@ -3760,57 +3484,41 @@ export function SchedulePage() {
                 />
               </label>
               {timesheetModal.mode === "shift" && timesheetModal.assignmentStatus === "in_shift" ? (
-                <p className="rounded-[1rem] bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                <p className="rounded-[12px] bg-amber-50 px-3 py-2 text-sm text-amber-700">
                   {t("schedule.shift_timer_notice")}
                 </p>
               ) : null}
             </div>
             </div>
+        ) : null}
+      </Sheet>
 
-            <div className="border-t border-[var(--color-divider)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
-              <div className="grid gap-2 lg:flex">
-              <Button variant="secondary" onClick={() => setTimesheetModal(null)}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                onClick={() => createTimesheetMutation.mutate({ modal: timesheetModal, form: timesheetForm })}
-                disabled={createTimesheetMutation.isPending || !timesheetForm.arrived_at || !timesheetForm.left_at}
-                className="w-full lg:w-auto"
-              >
-                {t("schedule.submit_report")}
-              </Button>
-              </div>
-            </div>
-            </div>
-          </div>
-        </OverlayPortal>
-      ) : null}
-
-      {reviewModal ? (
-        <OverlayPortal>
-          <div className="mobile-sheet-backdrop lg:grid lg:place-items-center lg:px-4 lg:py-6">
-            <div className="mobile-sheet-panel lg:w-full lg:max-w-[440px] lg:rounded-[1.5rem] lg:border lg:border-[var(--color-border)] lg:bg-white lg:p-5 lg:shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--color-divider)] px-4 py-4 lg:border-b-0 lg:px-0 lg:py-0">
-              <div>
-                <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{t("schedule.correct_timesheet")}</p>
-                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                  {timesheetUserNameById[reviewModal.entry.user_id] ?? reviewModal.entry.user_id.slice(0, 8)} • {workDateLabel(reviewModal.entry.work_date)}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="rounded-full p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"
-                onClick={() => setReviewModal(null)}
-                aria-label="Close"
-              >
-                <XCircle className="size-5" />
-              </button>
-            </div>
-
-            <div className="mobile-sheet-scroll px-4 py-4 lg:px-0">
-            <div className="grid gap-4 lg:mt-5">
+      <Sheet
+        open={Boolean(reviewModal)}
+        onClose={() => setReviewModal(null)}
+        title={t("schedule.correct_timesheet")}
+        subtitle={reviewModal ? `${timesheetUserNameById[reviewModal.entry.user_id] ?? reviewModal.entry.user_id.slice(0, 8)} · ${workDateLabel(reviewModal.entry.work_date)}` : undefined}
+        action={{
+          label: t("schedule.save_correction"),
+          onClick: () =>
+            reviewModal &&
+            reviewTimesheetMutation.mutate({
+              entry: reviewModal.entry,
+              payload: {
+                action: "correct",
+                arrived_at: toApiTime(reviewModal.arrived_at),
+                left_at: toApiTime(reviewModal.left_at),
+                review_note: reviewModal.review_note.trim() || undefined,
+              },
+            }),
+          disabled: !reviewModal || reviewTimesheetMutation.isPending || !reviewModal.arrived_at || !reviewModal.left_at,
+        }}
+      >
+        {reviewModal ? (
+          <div>
+            <div className="grid gap-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+                <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                   {t("schedule.arrived_at")}
                   <Input
                     type="time"
@@ -3818,7 +3526,7 @@ export function SchedulePage() {
                     onChange={(event) => setReviewModal((current) => (current ? { ...current, arrived_at: event.target.value } : current))}
                   />
                 </label>
-                <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+                <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                   {t("schedule.left_at")}
                   <Input
                     type="time"
@@ -3827,7 +3535,7 @@ export function SchedulePage() {
                   />
                 </label>
               </div>
-              <label className="grid gap-1.5 text-sm font-medium text-[var(--color-heading)]">
+              <label className="grid gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)]">
                 {t("schedule.review_note")}
                 <Textarea
                   rows={3}
@@ -3838,35 +3546,8 @@ export function SchedulePage() {
               </label>
             </div>
             </div>
-
-            <div className="border-t border-[var(--color-divider)] px-4 py-4 lg:mt-5 lg:flex lg:justify-end lg:gap-2 lg:border-t-0 lg:px-0 lg:py-0">
-              <div className="grid gap-2 lg:flex">
-              <Button variant="secondary" onClick={() => setReviewModal(null)}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                onClick={() =>
-                  reviewTimesheetMutation.mutate({
-                    entry: reviewModal.entry,
-                    payload: {
-                      action: "correct",
-                      arrived_at: toApiTime(reviewModal.arrived_at),
-                      left_at: toApiTime(reviewModal.left_at),
-                      review_note: reviewModal.review_note.trim() || undefined,
-                    },
-                  })
-                }
-                disabled={reviewTimesheetMutation.isPending || !reviewModal.arrived_at || !reviewModal.left_at}
-                className="w-full lg:w-auto"
-              >
-                {t("schedule.save_correction")}
-              </Button>
-              </div>
-            </div>
-            </div>
-          </div>
-        </OverlayPortal>
-      ) : null}
+        ) : null}
+      </Sheet>
 
     </AppShell>
 

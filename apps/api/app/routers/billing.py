@@ -16,7 +16,8 @@ from app.core.permissions import can_manage_business_settings
 from app.db import get_db
 from app.models import Organization, OrganizationSubscription, RoleEnum, SubscriptionPlanEnum, SubscriptionStatusEnum
 from app.schemas import BillingCheckoutSessionOut, BillingCheckoutSessionRequest, BillingPortalSessionOut
-from app.services.billing import count_members
+from app.services.billing import count_locations
+from app.services.labor_rules import currency_for
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -52,17 +53,24 @@ def _get_stripe():
     return stripe
 
 
-def _price_id_for(plan: SubscriptionPlanEnum, billing_cycle: str) -> str:
-    # Business prices remain in _plan_from_price_id only for existing subscriptions.
-    mapping = {
-        (SubscriptionPlanEnum.STANDARD, "monthly"): settings.stripe_price_standard_monthly,
-        (SubscriptionPlanEnum.STANDARD, "annual"): settings.stripe_price_standard_annual,
-        (SubscriptionPlanEnum.PRO, "monthly"): settings.stripe_price_pro_monthly,
-        (SubscriptionPlanEnum.PRO, "annual"): settings.stripe_price_pro_annual,
+def _price_table() -> dict[tuple[SubscriptionPlanEnum, str, str], str]:
+    """(plan, billing cycle, currency) -> Stripe price id. Each price is per location per period."""
+    return {
+        (SubscriptionPlanEnum.STANDARD, "monthly", "USD"): settings.stripe_price_starter_usd_monthly,
+        (SubscriptionPlanEnum.STANDARD, "annual", "USD"): settings.stripe_price_starter_usd_annual,
+        (SubscriptionPlanEnum.PRO, "monthly", "USD"): settings.stripe_price_pro_usd_monthly,
+        (SubscriptionPlanEnum.PRO, "annual", "USD"): settings.stripe_price_pro_usd_annual,
+        (SubscriptionPlanEnum.STANDARD, "monthly", "PLN"): settings.stripe_price_starter_pln_monthly,
+        (SubscriptionPlanEnum.STANDARD, "annual", "PLN"): settings.stripe_price_starter_pln_annual,
+        (SubscriptionPlanEnum.PRO, "monthly", "PLN"): settings.stripe_price_pro_pln_monthly,
+        (SubscriptionPlanEnum.PRO, "annual", "PLN"): settings.stripe_price_pro_pln_annual,
     }
-    price_id = mapping.get((plan, billing_cycle), "")
+
+
+def _price_id_for(plan: SubscriptionPlanEnum, billing_cycle: str, currency: str) -> str:
+    price_id = _price_table().get((plan, billing_cycle, currency), "")
     if not price_id:
-        raise HTTPException(status_code=503, detail=f"Stripe price is not configured for {plan.value}/{billing_cycle}")
+        raise HTTPException(status_code=503, detail=f"Stripe price is not configured for {plan.value}/{billing_cycle}/{currency}")
     return price_id
 
 
@@ -89,13 +97,16 @@ def _status_from_stripe(raw_status: str | None) -> SubscriptionStatusEnum:
 
 def _plan_from_price_id(price_id: str | None) -> tuple[SubscriptionPlanEnum, str] | None:
     reverse_mapping = {
+        # Older per-person prices stay readable for subscriptions created before per-location billing.
         settings.stripe_price_standard_monthly: (SubscriptionPlanEnum.STANDARD, "monthly"),
         settings.stripe_price_standard_annual: (SubscriptionPlanEnum.STANDARD, "annual"),
         settings.stripe_price_pro_monthly: (SubscriptionPlanEnum.PRO, "monthly"),
         settings.stripe_price_pro_annual: (SubscriptionPlanEnum.PRO, "annual"),
         settings.stripe_price_business_monthly: (SubscriptionPlanEnum.BUSINESS, "monthly"),
         settings.stripe_price_business_annual: (SubscriptionPlanEnum.BUSINESS, "annual"),
+        **{price: (plan, cycle) for (plan, cycle, _currency), price in _price_table().items()},
     }
+    reverse_mapping.pop("", None)
     if not price_id:
         return None
     return reverse_mapping.get(price_id)
@@ -156,16 +167,16 @@ def create_checkout_session(
     stripe = _get_stripe()
     subscription = _get_subscription(db, context.membership.organization_id)
     if payload.plan not in (SubscriptionPlanEnum.STANDARD, SubscriptionPlanEnum.PRO):
-        raise HTTPException(status_code=422, detail="Only the Standard and Pro plans can be purchased")
+        raise HTTPException(status_code=422, detail="Only the Starter and Pro plans can be purchased")
     if subscription.stripe_subscription_id:
         raise HTTPException(status_code=409, detail="This workspace already has a subscription; manage it in the billing portal")
-    price_id = _price_id_for(payload.plan, payload.billing_cycle)
-    # Paid plans are priced per team member; the quantity follows the team afterwards (sync_stripe_seats).
-    seats = max(count_members(db, context.membership.organization_id), 1)
+    price_id = _price_id_for(payload.plan, payload.billing_cycle, currency_for(organization.country or "US"))
+    # Paid plans are priced per location; the quantity follows new or deleted locations (sync_stripe_locations).
+    quantity = max(count_locations(db, context.membership.organization_id), 1)
 
     session = stripe.checkout.Session.create(
         mode="subscription",
-        line_items=[{"price": price_id, "quantity": seats}],
+        line_items=[{"price": price_id, "quantity": quantity}],
         success_url=settings.billing_success_url,
         cancel_url=settings.billing_cancel_url,
         allow_promotion_codes=True,

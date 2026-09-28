@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import type { AuthLoginResponse, MeResponse, OtpSendPurpose, OtpSendResponse, OtpVerifyResponse } from "@/lib/types";
 
 const TOKEN_STORAGE_KEY = "gastrowo.token";
@@ -23,6 +23,7 @@ type AuthContextValue = {
     organization_name: string;
     password: string;
     source: string;
+    country?: "US" | "PL";
   }) => Promise<void>;
   verifyInviteJoin: (payload: { email: string; code: string; invite_token: string; full_name?: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -61,6 +62,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(nextToken);
   };
 
+  /**
+   * Access tokens expire after 12 hours. When one is rejected, get a fresh one from the remembered
+   * session cookie (30 days) instead of leaving the user "signed in" without a profile.
+   */
+  const refreshFromRememberedSession = async (): Promise<boolean> => {
+    try {
+      const session = await api.bootstrapSession();
+      if (!session) return false;
+      applyLocalSession(session.access_token);
+      await hydrateMe(session.access_token);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const isAuthError = (error: unknown) => error instanceof ApiError && (error.status === 401 || error.status === 403);
+
   const applySession = async (nextToken: string) => {
     applyLocalSession(nextToken);
     await hydrateMe(nextToken);
@@ -76,10 +95,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (token) {
         try {
           await hydrateMe(token);
-        } catch {
-          // Keep an already-restored session stable instead of bouncing
-          // between /login and /pending-link when /auth/me is flaky.
-          if (!isStale()) {
+        } catch (error) {
+          if (isAuthError(error)) {
+            // Expired or revoked token: renew it silently, or sign out if that is not possible.
+            const renewed = await refreshFromRememberedSession();
+            if (!renewed && !isStale()) clearLocalSession();
+          } else if (!isStale()) {
+            // Network hiccup: keep the session; the app offers "Try again".
             setMe(null);
           }
         } finally {
@@ -137,7 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Refresh permissions/plan when the tab is in use; hidden tabs don't poll.
     const sync = () => {
       if (document.visibilityState !== "visible") return;
-      void hydrateMe(token).catch(() => undefined);
+      void hydrateMe(token).catch(async (error) => {
+        if (!isAuthError(error)) return;
+        if (!(await refreshFromRememberedSession())) clearLocalSession();
+      });
     };
     const interval = window.setInterval(sync, 120000);
     document.addEventListener("visibilitychange", sync);
@@ -173,6 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     organization_name: string;
     password: string;
     source: string;
+    country?: "US" | "PL";
   }) => {
     const response = await api.completeOwnerOnboarding(payload);
     await applySession(response.access_token);

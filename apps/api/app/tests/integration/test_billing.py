@@ -33,18 +33,18 @@ def _workspace(db_session, *, members: int, plan: SubscriptionPlanEnum, status: 
 def test_expired_trial_falls_back_to_free_with_member_limit(client, db_session):
     headers = _workspace(
         db_session,
-        members=5,
+        members=15,
         plan=SubscriptionPlanEnum.PRO,
         status=SubscriptionStatusEnum.TRIALING,
         trial_ends_at=datetime.now(UTC) - timedelta(days=1),
     )
     summary = client.get("/organizations/current/subscription", headers=headers).json()["data"]
     assert summary["plan"] == "free"
-    assert summary["member_cap"] == 5
-    assert summary["location_cap"] is None
+    assert summary["member_cap"] == 15
+    assert summary["location_cap"] == 1
 
-    sixth = client.post("/organizations/members/link-by-email", headers=headers, json={"email": "sixth@billing-example.com"})
-    assert sixth.status_code == 402
+    sixteenth = client.post("/organizations/members/link-by-email", headers=headers, json={"email": "sixteenth@billing-example.com"})
+    assert sixteenth.status_code == 402
 
 
 def test_pro_has_no_member_or_location_limits(client, db_session):
@@ -58,17 +58,36 @@ def test_pro_has_no_member_or_location_limits(client, db_session):
     summary = client.get("/organizations/current/subscription", headers=headers).json()["data"]
     assert summary["plan"] == "pro"
     assert summary["member_cap"] is None
-    assert summary["billable_seats"] == 30
+    assert summary["location_cap"] is None
 
     invite = client.post("/organizations/members/link-by-email", headers=headers, json={"email": "thirty-one@billing-example.com"})
     assert invite.status_code == 200
+    for name in ("Brooklyn", "Queens", "Harlem"):
+        assert client.post("/locations", headers=headers, json={"name": name, "timezone": "America/New_York"}).status_code == 200
+    assert client.get("/organizations/current/subscription", headers=headers).json()["data"]["billable_locations"] == 3
 
 
-def test_free_plan_can_add_many_locations(client, db_session):
+def test_free_plan_has_one_location(client, db_session):
     headers = _workspace(db_session, members=1, plan=SubscriptionPlanEnum.FREE, status=SubscriptionStatusEnum.ACTIVE)
-    for name in ("Gdynia", "Sopot", "Gdańsk"):
-        created = client.post("/locations", headers=headers, json={"name": name, "timezone": "Europe/Warsaw"})
-        assert created.status_code == 200, created.text
+    first = client.post("/locations", headers=headers, json={"name": "Brooklyn", "timezone": "America/New_York"})
+    assert first.status_code == 200, first.text
+    second = client.post("/locations", headers=headers, json={"name": "Queens", "timezone": "America/New_York"})
+    assert second.status_code == 402
+    assert "Starter" in second.json()["error"]["message"]
+
+
+def test_starter_allows_thirty_people_per_location(client, db_session):
+    headers = _workspace(db_session, members=30, plan=SubscriptionPlanEnum.STANDARD, status=SubscriptionStatusEnum.ACTIVE)
+    assert client.post("/locations", headers=headers, json={"name": "Brooklyn", "timezone": "America/New_York"}).status_code == 200
+    summary = client.get("/organizations/current/subscription", headers=headers).json()["data"]
+    assert summary["member_cap"] == 30
+    blocked = client.post("/organizations/members/link-by-email", headers=headers, json={"email": "thirty-one@billing-example.com"})
+    assert blocked.status_code == 402
+
+    assert client.post("/locations", headers=headers, json={"name": "Queens", "timezone": "America/New_York"}).status_code == 200
+    assert client.get("/organizations/current/subscription", headers=headers).json()["data"]["member_cap"] == 60
+    allowed = client.post("/organizations/members/link-by-email", headers=headers, json={"email": "thirty-one@billing-example.com"})
+    assert allowed.status_code == 200
 
 
 def test_features_follow_the_plan(client, db_session):

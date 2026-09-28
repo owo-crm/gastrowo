@@ -11,6 +11,10 @@ export type OrganizationSettings = {
   manager_can_manage_business_settings: boolean;
   manager_can_access_notes: boolean;
   manager_can_access_inventory: boolean;
+  /** "US" or "PL": drives currency, labour rules and the payroll CSV format. */
+  country?: "US" | "PL";
+  currency?: "USD" | "PLN";
+  labor_rules?: "US" | "PL";
 };
 
 export type MembershipPermissionOverrides = {
@@ -105,6 +109,7 @@ export type SubscriptionSummary = {
   location_cap: number | null;
   soft_limit_reached: boolean;
   billable_seats?: number;
+  billable_locations?: number;
   has_payment_method?: boolean;
   features?: string[];
 };
@@ -180,6 +185,8 @@ export type User = {
   role: Role;
   max_hours_per_week: number;
   staff_position?: string | null;
+  /** Every position the person can work, primary first. */
+  positions?: string[];
   hourly_rate_pln?: string;
 };
 
@@ -204,11 +211,19 @@ export type WorkerSetupLocation = {
   hourly_rate_pln: string;
 };
 
+export type MemberPosition = {
+  position: string;
+  /** null = use the person's rate at the location */
+  hourly_rate: string | null;
+  is_primary: boolean;
+};
+
 export type WorkerSetup = {
   user_id: string;
   full_name: string;
   role: Role;
   staff_position?: string | null;
+  positions?: MemberPosition[];
   locations: WorkerSetupLocation[];
   permission_overrides: MembershipPermissionOverrides;
 };
@@ -533,6 +548,9 @@ export type PayrollSummaryRow = {
   hourly_rate_default_pln: string;
   payroll_pln: string;
   restricted_hours?: string;
+  /** US: hours over 40 in a workweek and the extra half-time paid for them. */
+  overtime_hours?: string;
+  overtime_premium?: string;
 };
 
 export type PayrollSummary = {
@@ -541,6 +559,7 @@ export type PayrollSummary = {
   viewer_scope: "self" | "team";
   total_hours: string;
   total_payroll_pln: string;
+  currency?: "USD" | "PLN";
   rows: PayrollSummaryRow[];
 };
 
