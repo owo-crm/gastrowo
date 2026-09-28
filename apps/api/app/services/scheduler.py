@@ -574,7 +574,11 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
 
     for demand in demand_specs:
         shift_hours = shift_duration_hours(demand.start_time, demand.end_time)
-        candidates = role_buckets.get(demand.required_role, [])
+        candidates = list(role_buckets.get(demand.required_role, []))
+        # The manager's pick is placed whatever their role: a manager can cover a cook shift as a cook.
+        preferred_membership = membership_by_user_id.get(demand.preferred_user_id) if demand.preferred_user_id else None
+        if preferred_membership is not None and preferred_membership not in candidates:
+            candidates.append(preferred_membership)
         if not auto_assign:
             candidates = [item for item in candidates if item.user_id == demand.preferred_user_id]
         eligible: list[tuple[OrganizationMembership, LocationMembership, float, User, bool]] = []
@@ -640,6 +644,14 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
                     )
                 )
             reasons.extend(weekly_overtime_issue(country, current_hours + shift_hours))
+
+            is_manager_pick = demand.preferred_user_id is not None and membership.user_id == demand.preferred_user_id
+            if is_manager_pick and reasons and "overlap" not in reasons:
+                # A day off, another position or a full week is the manager's call, not a reason to leave the shift empty.
+                warnings.append(f"{user.full_name} {demand.date.isoformat()} {demand.start_time}-{demand.end_time}: placed by manager ({', '.join(reasons)})")
+                if location_member is None:
+                    location_member = LocationMembership(location_id=demand.location_id, user_id=membership.user_id, hourly_rate_pln=Decimal("0"), priority=0)
+                reasons = []
 
             if reasons:
                 rejected_for_demand[membership.user_id] = RejectedCandidate(

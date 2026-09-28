@@ -2830,7 +2830,9 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
     if (!previewEditorModal) return;
     const member = sortedLocationMembers.find((item) => item.id === previewEditorModal.userId);
     if (!member) return;
-    const staffPosition = member.role === "STAFF" ? editorPosition || member.staff_position || null : null;
+    // Whoever works it, the shift is for the chosen position: a manager put on a cook shift works as a cook.
+    const staffPosition = editorPosition || (member.role === "STAFF" ? member.staff_position : null) || null;
+    const requiredRole = staffPosition ? "STAFF" : member.role;
     patchPreviewEditMutation.mutate(
       previewEditorModal.mode === "create"
         ? {
@@ -2840,7 +2842,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
             day_of_week: previewEditorModal.dayIndex,
             start_time: `${previewEditorModal.startTime}:00`,
             end_time: `${previewEditorModal.endTime}:00`,
-            required_role: member.role,
+            required_role: requiredRole,
             staff_position: staffPosition,
             required_count: 1,
             assigned_user_id: member.id,
@@ -2851,7 +2853,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
             start_time: `${previewEditorModal.startTime}:00`,
             end_time: `${previewEditorModal.endTime}:00`,
             assigned_user_id: member.id,
-            required_role: member.role,
+            required_role: requiredRole,
             staff_position: staffPosition,
             required_count: 1,
           },
