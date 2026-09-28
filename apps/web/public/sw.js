@@ -1,4 +1,4 @@
-/* Plato service worker: makes the app installable and shows push notifications. */
+/* Platofy service worker: makes the app installable and shows push notifications. */
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
@@ -10,13 +10,13 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: "Plato", body: event.data ? event.data.text() : "" };
+    data = { title: "Platofy", body: event.data ? event.data.text() : "" };
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || "Plato", {
+    self.registration.showNotification(data.title || "Platofy", {
       body: data.body || "",
-      icon: "/brand/plato/plato-icon-192.png",
-      badge: "/brand/plato/favicon-32.png",
+      icon: "/brand/platofy/platofy-icon-192.png",
+      badge: "/brand/platofy/favicon-32.png",
       data: { url: data.url || "/" },
     }),
   );

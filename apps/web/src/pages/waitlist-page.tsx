@@ -10,7 +10,7 @@ import { formatDate } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 
-/** Plato-internal: emails left on the landing page, newest first. */
+/** Platofy-internal: emails left on the landing page, newest first. */
 export function WaitlistPage() {
   const { token } = useAuth();
   const { t, lang } = useLanguage();

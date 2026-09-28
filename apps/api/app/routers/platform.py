@@ -1,4 +1,4 @@
-"""Platform admin panel: every business on Plato, their subscriptions, and a log of what was changed.
+"""Platform admin panel: every business on Platofy, their subscriptions, and a log of what was changed.
 
 Only emails in PLATFORM_ADMIN_EMAILS get in. Changes to a business with a live Stripe subscription are
 mirrored to Stripe where Stripe has an equivalent (free days, coupon, cancel); the local record is the
@@ -240,7 +240,7 @@ def _apply_discount(subscription: OrganizationSubscription, percent: int, months
             percent_off=percent,
             duration="forever" if percent == 100 and months >= 36 else "repeating",
             duration_in_months=None if percent == 100 and months >= 36 else months,
-            name=f"Plato {percent}% · {organization.name}"[:40],
+            name=f"Platofy {percent}% · {organization.name}"[:40],
             metadata={"organization_id": str(organization.id)},
         )
         subscription.stripe_coupon_id = coupon["id"]

@@ -166,7 +166,7 @@ def test_marketing_waitlist_admin_only_listing(client, db_session, monkeypatch):
     forbidden = client.get("/marketing/waitlist", headers=auth_header(staff_token))
     assert forbidden.status_code == 403
 
-    # A restaurant admin is not a platform admin: leads belong to Plato, not to tenants.
+    # A restaurant admin is not a platform admin: leads belong to Platofy, not to tenants.
     tenant_admin = client.get("/marketing/waitlist", headers=auth_header(ADMIN_token))
     assert tenant_admin.status_code == 403
 

@@ -6,7 +6,7 @@ from app.tests.integration.test_api_flow import auth_header, signup_ADMIN
 def _setup(client, monkeypatch):
     from app.core.config import settings
 
-    boss, _ = signup_ADMIN(client, organization_name="Plato HQ", email="me@plato-hq.com")
+    boss, _ = signup_ADMIN(client, organization_name="Platofy HQ", email="me@plato-hq.com")
     monkeypatch.setattr(settings, "platform_admin_emails", "me@plato-hq.com")
     customer, _ = signup_ADMIN(client, organization_name="Taco Stand", email="owner@taco-stand.com")
     orgs = client.get("/platform/organizations", headers=auth_header(boss)).json()["data"]
@@ -58,11 +58,11 @@ def test_delete_needs_the_exact_name_and_never_your_own_business(client, monkeyp
     assert client.request("DELETE", f"/platform/organizations/{taco}", headers=auth_header(boss), json={"confirm_name": "taco stand"}).status_code == 422
     deleted = client.request("DELETE", f"/platform/organizations/{taco}", headers=auth_header(boss), json={"confirm_name": "Taco Stand"})
     assert deleted.status_code == 200, deleted.text
-    assert [item["name"] for item in client.get("/platform/organizations", headers=auth_header(boss)).json()["data"]] == ["Plato HQ"]
+    assert [item["name"] for item in client.get("/platform/organizations", headers=auth_header(boss)).json()["data"]] == ["Platofy HQ"]
     # Its only owner is gone with it.
     assert client.post("/auth/login", json={"email": "owner@taco-stand.com", "password": "ADMIN123!"}).status_code == 404
 
     own = client.get("/platform/organizations", headers=auth_header(boss)).json()["data"][0]["id"]
-    assert client.request("DELETE", f"/platform/organizations/{own}", headers=auth_header(boss), json={"confirm_name": "Plato HQ"}).status_code == 422
+    assert client.request("DELETE", f"/platform/organizations/{own}", headers=auth_header(boss), json={"confirm_name": "Platofy HQ"}).status_code == 422
     # The log survives the deletion.
     assert any(item["action"] == "delete_business" and item["organization_name"] == "Taco Stand" for item in client.get("/platform/audit", headers=auth_header(boss)).json()["data"])
