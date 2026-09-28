@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Lock, Mail } from "lucide-react";
+import { legalLinks } from "@/lib/legal-links";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand-logo";
@@ -39,20 +40,20 @@ function DevHint({ code, label }: { code?: string | null; label: string }) {
 }
 
 function LegalAuthNotice() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const link = "font-semibold text-[var(--color-primary-strong)] hover:underline";
   return (
     <p className="text-[13px] leading-5 text-[var(--color-text-muted)]">
       {t("login.legal_prefix")}{" "}
-      <Link to="/regulamin" className={link}>
+      <Link to={legalLinks(lang).terms} className={link}>
         {t("login.legal_terms")}
       </Link>
       ,{" "}
-      <Link to="/polityka-prywatnosci" className={link}>
+      <Link to={legalLinks(lang).privacy} className={link}>
         {t("login.legal_privacy")}
       </Link>{" "}
       {t("login.legal_and")}{" "}
-      <Link to="/polityka-cookies" className={link}>
+      <Link to={legalLinks(lang).cookies} className={link}>
         {t("login.legal_cookies")}
       </Link>
       .

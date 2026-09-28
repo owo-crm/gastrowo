@@ -154,3 +154,13 @@ def test_invite_link_joins_without_a_code_but_never_takes_over_an_account(client
     # One use only, and the password works for the next sign-in.
     assert client.post("/auth/invites/join/accept", json={"email": "new@invite-diner.com", "invite_token": token, "full_name": "New Cook", "password": "Passw0rd!"}).status_code == 404
     assert client.post("/auth/login", json={"email": "new@invite-diner.com", "password": "Passw0rd!"}).status_code == 200
+
+
+def test_password_guessing_is_locked_out(client):
+    from app.tests.integration.test_api_flow import signup_ADMIN
+
+    signup_ADMIN(client, organization_name="Lockout Diner", email="owner@lockout-diner.com")
+    codes = [client.post("/auth/login", json={"email": "owner@lockout-diner.com", "password": f"wrong-{index}"}).status_code for index in range(9)]
+    assert codes[:8] == [401] * 8 and codes[8] == 429
+    # Even the right password waits out the lock.
+    assert client.post("/auth/login", json={"email": "owner@lockout-diner.com", "password": "ADMIN123!"}).status_code == 429
