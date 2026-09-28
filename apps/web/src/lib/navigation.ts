@@ -79,7 +79,10 @@ export function getNavSections(me?: MeResponse | null): NavSection[] {
   settingsSubs.push(sub("/settings/calendar", "calendar_sync"));
   if (isAdmin) settingsSubs.push(sub("/settings/billing", "billing"));
   // Plato-internal: waitlist leads from the landing page.
-  if (me?.is_platform_admin) settingsSubs.push(sub("/waitlist", "waitlist"));
+  if (me?.is_platform_admin) {
+    settingsSubs.push(sub("/platform", "platform"));
+    settingsSubs.push(sub("/waitlist", "waitlist"));
+  }
   sections.push({ key: "settings", icon: Settings, subs: settingsSubs });
 
   return sections;

@@ -259,6 +259,17 @@ def _ensure_runtime_schema_compat() -> None:
             if "clock_mode" not in organization_columns:
                 connection.execute(text("ALTER TABLE organizations ADD COLUMN clock_mode VARCHAR(16) NOT NULL DEFAULT 'both'"))
 
+        if "organization_subscriptions" in tables:
+            subscription_columns = {column["name"] for column in inspector.get_columns("organization_subscriptions")}
+            for name, ddl in (
+                ("discount_percent", "INTEGER"),
+                ("discount_months", "INTEGER"),
+                ("stripe_coupon_id", "VARCHAR(255)"),
+                ("admin_note", "TEXT"),
+            ):
+                if name not in subscription_columns:
+                    connection.execute(text(f"ALTER TABLE organization_subscriptions ADD COLUMN {name} {ddl}"))
+
         if "organization_memberships" in tables:
             membership_columns = {column["name"] for column in inspector.get_columns("organization_memberships")}
             if "staff_position" not in membership_columns:

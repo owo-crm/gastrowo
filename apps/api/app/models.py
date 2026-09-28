@@ -180,6 +180,11 @@ class OrganizationSubscription(Base):
     current_period_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Set from the platform admin panel: a percent off for a number of months, applied through a Stripe coupon.
+    discount_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    discount_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stripe_coupon_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -537,3 +542,17 @@ class ClockSession(Base):
     clock_in_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     clock_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     timesheet_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("timesheets.id", ondelete="SET NULL"), nullable=True)
+
+
+class PlatformAuditLog(Base):
+    """What a platform admin changed, and in which business. Kept after the business is deleted."""
+
+    __tablename__ = "platform_audit_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    actor_email: Mapped[str] = mapped_column(String(255))
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+    organization_name: Mapped[str] = mapped_column(String(160))
+    action: Mapped[str] = mapped_column(String(40))
+    detail: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
