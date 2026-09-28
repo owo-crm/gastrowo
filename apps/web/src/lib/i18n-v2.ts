@@ -344,6 +344,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "schedule.legend_ok": "All good",
     "schedule.legend_pending": "Hours waiting for approval",
     "schedule.legend_action": "Report your hours",
+    "app.load_error_title": "Couldn't load your account",
+    "app.load_error_body": "Check your connection and try again. If it keeps happening, sign out and sign in again.",
+    "app.try_again": "Try again",
     // @end-en
   },
   pl: {
@@ -685,6 +688,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "schedule.legend_ok": "Wszystko OK",
     "schedule.legend_pending": "Godziny czekają na akceptację",
     "schedule.legend_action": "Zgłoś godziny",
+    "app.load_error_title": "Nie udało się wczytać konta",
+    "app.load_error_body": "Sprawdź połączenie i spróbuj ponownie. Jeśli to się powtarza, wyloguj się i zaloguj ponownie.",
+    "app.try_again": "Spróbuj ponownie",
     // @end-pl
   },
   ru: {
@@ -1026,6 +1032,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "schedule.legend_ok": "Всё в порядке",
     "schedule.legend_pending": "Часы ждут подтверждения",
     "schedule.legend_action": "Отметьте часы",
+    "app.load_error_title": "Не удалось загрузить аккаунт",
+    "app.load_error_body": "Проверьте интернет и попробуйте снова. Если повторяется — выйдите и войдите заново.",
+    "app.try_again": "Попробовать снова",
     // @end-ru
   },
 };

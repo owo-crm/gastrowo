@@ -50,6 +50,17 @@ export function apiAbsoluteUrl(path: string): string {
   return new URL(`${API_URL}${path}`, window.location.origin).toString();
 }
 
+/** An error answered by the API, with its HTTP status (401 = the sign-in token is no longer valid). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   let response: Response;
   try {
@@ -84,7 +95,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
               })
               .join("; ")
           : undefined;
-    throw new Error(payload?.error?.message ?? detailMessage ?? `Request failed: ${response.status}`);
+    throw new ApiError(payload?.error?.message ?? detailMessage ?? `Request failed: ${response.status}`, response.status);
   }
 
   return payload!.data;

@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { canAccessNotes, canAccessReport, canManageTeam, canViewOverview, canViewPayroll, hasPlanFeature } from "@/lib/access";
@@ -42,8 +42,48 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
   if (effectiveMe && !effectiveMe.is_linked) {
     return <Navigate to="/pending-link" replace />;
   }
+  if (!effectiveMe) {
+    // Signed in but the profile did not load: never show a half-empty app.
+    return <AccountLoadError />;
+  }
 
   return children;
+}
+
+function AccountLoadError() {
+  const { refreshMe, logout } = useAuth();
+  const { t } = useLanguage();
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="grid min-h-dvh place-items-center bg-[var(--color-bg)] px-6 text-center">
+      <div className="ios-island max-w-sm px-6 py-8">
+        <p className="text-[20px] font-semibold text-black">{t("app.load_error_title")}</p>
+        <p className="mt-2 text-[15px] text-[#3c3c43]">{t("app.load_error_body")}</p>
+        <div className="mt-6 grid gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await refreshMe();
+              } catch {
+                // stays on this screen
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="min-h-11 rounded-full bg-[var(--color-primary-strong)] px-5 text-[15px] font-semibold text-white disabled:opacity-50"
+          >
+            {t("app.try_again")}
+          </button>
+          <button type="button" onClick={() => void logout()} className="min-h-11 rounded-full px-5 text-[15px] font-semibold text-[var(--color-primary-strong)]">
+            {t("shell.log_out")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function PageLoading() {
