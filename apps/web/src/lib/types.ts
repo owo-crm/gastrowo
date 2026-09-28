@@ -620,3 +620,42 @@ export type KioskPunchResult = {
   timesheet_status?: string;
   session: ClockSessionInfo;
 };
+
+export type PlatformBusiness = {
+  id: string;
+  name: string;
+  country: string;
+  created_at: string | null;
+  owners: string[];
+  members: number;
+  locations: number;
+  plan: "free" | "standard" | "pro" | "business" | "enterprise";
+  stored_plan: string;
+  status: "trialing" | "active" | "past_due" | "canceled" | "expired";
+  trial_ends_at: string | null;
+  current_period_ends_at: string | null;
+  has_stripe: boolean;
+  discount_percent: number | null;
+  discount_months: number | null;
+  admin_note: string | null;
+};
+
+export type PlatformLogItem = {
+  id: string;
+  actor_email: string;
+  organization_id: string | null;
+  organization_name: string;
+  action: string;
+  detail: Record<string, unknown>;
+  created_at: string;
+};
+
+export type PlatformStats = { businesses: number; people: number; paying: number; trialing: number; by_plan: Record<string, number> };
+
+export type PlatformAction =
+  | { action: "extend"; days: number }
+  | { action: "set_plan"; plan: "free" | "standard" | "pro"; days?: number | null }
+  | { action: "cancel" }
+  | { action: "discount"; percent: number; months: number }
+  | { action: "remove_discount" }
+  | { action: "note"; note: string };

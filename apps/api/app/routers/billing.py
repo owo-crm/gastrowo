@@ -179,7 +179,8 @@ def create_checkout_session(
         line_items=[{"price": price_id, "quantity": quantity}],
         success_url=settings.billing_success_url,
         cancel_url=settings.billing_cancel_url,
-        allow_promotion_codes=True,
+        # A discount set in the platform admin panel rides along; otherwise customers may enter promo codes.
+        **({"discounts": [{"coupon": subscription.stripe_coupon_id}]} if subscription.stripe_coupon_id else {"allow_promotion_codes": True}),
         client_reference_id=str(context.membership.organization_id),
         customer=subscription.stripe_customer_id or None,
         customer_email=None if subscription.stripe_customer_id else context.user.email,

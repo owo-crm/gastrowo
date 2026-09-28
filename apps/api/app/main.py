@@ -23,6 +23,7 @@ from app.routers import (
     notifications,
     organizations,
     payroll,
+    platform,
     positions,
     reports,
     schedule,
@@ -101,3 +102,4 @@ app.include_router(notifications.router)
 app.include_router(dashboard.router)
 app.include_router(payroll.router)
 app.include_router(clock.router)
+app.include_router(platform.router)

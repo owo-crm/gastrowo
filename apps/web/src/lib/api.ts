@@ -1,4 +1,8 @@
 import type {
+  PlatformAction,
+  PlatformBusiness,
+  PlatformLogItem,
+  PlatformStats,
   ClockMe,
   ClockMode,
   ClockSessionInfo,
@@ -653,5 +657,23 @@ export const api = {
   },
   kioskPunch(kioskToken: string, pin: string) {
     return request<KioskPunchResult>("/kiosk/punch", { method: "POST", body: JSON.stringify({ pin }), headers: { "X-Kiosk-Token": kioskToken } });
+  },
+  platformStats(token: string) {
+    return request<PlatformStats>("/platform/stats", {}, token);
+  },
+  platformBusinesses(token: string, q = "") {
+    return request<PlatformBusiness[]>(`/platform/organizations?q=${encodeURIComponent(q)}`, {}, token);
+  },
+  platformBusiness(token: string, id: string) {
+    return request<PlatformBusiness & { log: PlatformLogItem[] }>(`/platform/organizations/${id}`, {}, token);
+  },
+  platformChange(token: string, id: string, body: PlatformAction) {
+    return request<PlatformBusiness & { detail: Record<string, unknown> }>(`/platform/organizations/${id}/subscription`, { method: "POST", body: JSON.stringify(body) }, token);
+  },
+  platformDelete(token: string, id: string, confirmName: string) {
+    return request<{ deleted: boolean }>(`/platform/organizations/${id}`, { method: "DELETE", body: JSON.stringify({ confirm_name: confirmName }) }, token);
+  },
+  platformAudit(token: string) {
+    return request<PlatformLogItem[]>("/platform/audit?limit=30", {}, token);
   },
 };
