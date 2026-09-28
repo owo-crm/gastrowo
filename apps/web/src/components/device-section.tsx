@@ -8,7 +8,7 @@ import { useLanguage } from "@/lib/i18n";
 import { canPromptInstall, currentPushSubscription, disablePush, enablePush, isIos, isStandalone, onInstallAvailabilityChange, promptInstall, pushSupported } from "@/lib/pwa";
 import { useToast } from "@/lib/toast";
 
-/** "This device": push notifications and installing Plato on the Home Screen. */
+/** "This device": push notifications and installing Platofy on the Home Screen. */
 export function DeviceSection() {
   const { token } = useAuth();
   const { t } = useLanguage();

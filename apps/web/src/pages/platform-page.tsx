@@ -56,7 +56,7 @@ function describe(log: PlatformLogItem, t: Translate) {
   }
 }
 
-/** Plato-internal: every business, its subscription, and the buttons to change it. */
+/** Platofy-internal: every business, its subscription, and the buttons to change it. */
 export function PlatformPage() {
   const { token } = useAuth();
   const { t, lang } = useLanguage();
