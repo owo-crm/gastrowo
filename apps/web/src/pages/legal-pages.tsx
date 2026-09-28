@@ -73,14 +73,14 @@ const termsSections: LegalSection[] = [
   {
     title: "§1. Postanowienia ogólne",
     paragraphs: [
-      `Niniejszy Regulamin określa zasady korzystania z platformy Gastrostuff dostępnej pod adresem ${siteUrl}.`,
+      `Niniejszy Regulamin określa zasady korzystania z platformy Plato dostępnej pod adresem ${siteUrl}.`,
       `Operatorem Serwisu jest Nikan Kozlov. W sprawach związanych z Serwisem można skontaktować się pod adresem ${supportEmail}.`,
     ],
   },
   {
     title: "§2. Definicje",
     bullets: [
-      "Serwis – platforma Gastrostuff służąca do organizacji pracy restauracji i zespołu.",
+      "Serwis – platforma Plato służąca do organizacji pracy restauracji i zespołu.",
       "Użytkownik – osoba korzystająca z Serwisu.",
       "Administrator – właściciel organizacji lub restauracji korzystającej z Serwisu.",
       "Organizacja – restauracja, lokal gastronomiczny lub inny podmiot korzystający z Serwisu.",
@@ -90,7 +90,7 @@ const termsSections: LegalSection[] = [
   {
     title: "§3. Zakres usług",
     paragraphs: [
-      "Gastrostuff umożliwia w szczególności planowanie grafików, zarządzanie zespołem, zadaniami, notatkami oraz wybranymi danymi operacyjnymi restauracji.",
+      "Plato umożliwia w szczególności planowanie grafików, zarządzanie zespołem, zadaniami, notatkami oraz wybranymi danymi operacyjnymi restauracji.",
     ],
     bullets: [
       "tworzenie i publikowanie grafików pracy,",
@@ -154,7 +154,7 @@ const privacySections: LegalSection[] = [
   {
     title: "1. Informacje ogólne",
     paragraphs: [
-      `Niniejsza Polityka Prywatności opisuje zasady przetwarzania danych osobowych użytkowników platformy Gastrostuff dostępnej pod adresem ${siteUrl}.`,
+      `Niniejsza Polityka Prywatności opisuje zasady przetwarzania danych osobowych użytkowników platformy Plato dostępnej pod adresem ${siteUrl}.`,
       `Administratorem danych jest Nikan Kozlov. Kontakt w sprawach ochrony danych: ${supportEmail}.`,
     ],
   },
@@ -171,7 +171,7 @@ const privacySections: LegalSection[] = [
     title: "3. Cele przetwarzania danych",
     bullets: [
       "utworzenie i obsługa konta użytkownika,",
-      "świadczenie usług dostępnych w Gastrostuff,",
+      "świadczenie usług dostępnych w Plato,",
       "zarządzanie organizacją, zespołem i komunikacją wewnętrzną,",
       "zapewnienie bezpieczeństwa, wykrywanie nadużyć i utrzymanie działania Serwisu,",
       "kontakt z użytkownikami w sprawach organizacyjnych, technicznych i handlowych,",
@@ -247,7 +247,7 @@ const cookiesSections: LegalSection[] = [
   {
     title: "1. Informacje ogólne",
     paragraphs: [
-      `Niniejsza Polityka Cookies określa zasady wykorzystywania plików cookies przez platformę Gastrostuff dostępną pod adresem ${siteUrl}.`,
+      `Niniejsza Polityka Cookies określa zasady wykorzystywania plików cookies przez platformę Plato dostępną pod adresem ${siteUrl}.`,
       `Administratorem Serwisu jest Nikan Kozlov. Kontakt: ${supportEmail}.`,
     ],
   },
@@ -292,13 +292,13 @@ const cookiesSections: LegalSection[] = [
 ];
 
 export function TermsPage() {
-  return <LegalLayout title="Regulamin Serwisu Gastrostuff" subtitle="Zasady korzystania z platformy Gastrostuff dla restauracji i zespołów." sections={termsSections} />;
+  return <LegalLayout title="Regulamin Serwisu Plato" subtitle="Zasady korzystania z platformy Plato dla restauracji i zespołów." sections={termsSections} />;
 }
 
 export function PrivacyPolicyPage() {
-  return <LegalLayout title="Polityka Prywatności Gastrostuff" subtitle="Zasady przetwarzania danych osobowych użytkowników i organizacji korzystających z Gastrostuff." sections={privacySections} />;
+  return <LegalLayout title="Polityka Prywatności Plato" subtitle="Zasady przetwarzania danych osobowych użytkowników i organizacji korzystających z Plato." sections={privacySections} />;
 }
 
 export function CookiesPolicyPage() {
-  return <LegalLayout title="Polityka Cookies Gastrostuff" subtitle="Informacje o wykorzystywaniu plików cookies i ustawieniach związanych z bezpieczeństwem oraz działaniem serwisu." sections={cookiesSections} />;
+  return <LegalLayout title="Polityka Cookies Plato" subtitle="Informacje o wykorzystywaniu plików cookies i ustawieniach związanych z bezpieczeństwem oraz działaniem serwisu." sections={cookiesSections} />;
 }

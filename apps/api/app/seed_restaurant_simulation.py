@@ -30,7 +30,7 @@ from app.models import (
     User,
 )
 
-ORG_NAME = "GastrOWO Pilot Restaurant"
+ORG_NAME = "Plato Pilot Restaurant"
 OWNER_EMAIL = "pilot.owner@workdish.app"
 OWNER_PASSWORD = "Pilot123!"
 STAFF_PASSWORD = "Staff123!"

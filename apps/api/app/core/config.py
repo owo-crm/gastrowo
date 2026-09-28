@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     stripe_checkout_success_url: str | None = None
     stripe_checkout_cancel_url: str | None = None
     stripe_portal_return_url: str | None = None
-    # Comma-separated emails of GastrOWO staff allowed to read platform-wide data (e.g. waitlist leads).
+    # Comma-separated emails of Plato staff allowed to read platform-wide data (e.g. waitlist leads).
     platform_admin_emails: str = ""
     # Test-only one-click login (POST /auth/dev-login). Refused in production.
     dev_login_enabled: bool = False
