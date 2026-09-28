@@ -12,7 +12,7 @@ from app.core.permissions import can_manage_team, membership_permission_override
 from app.db import get_db
 from app.models import Location, LocationMembership, OrganizationMembership, RoleEnum, User
 from app.services.billing import require_location_slot, sync_stripe_locations
-from app.schemas import LocationCreate, LocationMemberOut, LocationMemberPatch, LocationOut, LocationPatch
+from app.schemas import LocationClockAreaPut, LocationCreate, LocationMemberOut, LocationMemberPatch, LocationOut, LocationPatch
 
 router = APIRouter(prefix="/locations", tags=["locations"])
 
@@ -89,6 +89,9 @@ def list_locations(
             timezone=location.timezone,
             manager_user_ids=manager_ids_by_location.get(location.id, []),
             manager_names=manager_names_by_location.get(location.id, []),
+            latitude=location.latitude,
+            longitude=location.longitude,
+            clock_radius_m=location.clock_radius_m or 150,
         ).model_dump(mode="json")
         for location in locations
     ]
@@ -205,6 +208,25 @@ def patch_location(
             manager_names=list(manager_names),
         ).model_dump(mode="json")
     )
+
+
+@router.put("/{location_id}/clock-area")
+def put_clock_area(
+    location_id: UUID,
+    payload: LocationClockAreaPut,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    """Where phone clock-ins are allowed for this location; null coordinates turn the check off."""
+    _require_team_access(context, db)
+    location = _get_location_or_404(db, context.membership.organization_id, location_id)
+    if (payload.latitude is None) != (payload.longitude is None):
+        raise HTTPException(status_code=422, detail="Send both latitude and longitude, or neither")
+    location.latitude = payload.latitude
+    location.longitude = payload.longitude
+    location.clock_radius_m = payload.radius_m
+    db.commit()
+    return ok({"id": str(location.id), "latitude": location.latitude, "longitude": location.longitude, "clock_radius_m": location.clock_radius_m})
 
 
 @router.delete("/{location_id}")

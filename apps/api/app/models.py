@@ -11,6 +11,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     Enum as SqlEnum,
+    Float,
     ForeignKey,
     Integer,
     Numeric,
@@ -230,6 +231,10 @@ class Location(Base):
     organization_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(160))
     timezone: Mapped[str] = mapped_column(String(64), default="Europe/Warsaw")
+    # When set, phone clock-ins must happen within clock_radius_m of this point.
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    clock_radius_m: Mapped[int] = mapped_column(Integer, default=150)
 
 
 class LocationMembership(Base):
@@ -405,6 +410,8 @@ class Timesheet(Base):
     left_at: Mapped[datetime.time] = mapped_column(Time)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_restricted_entry: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    # Unpaid break inside arrived_at..left_at, subtracted from worked hours.
+    break_minutes: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[TimesheetStatusEnum] = mapped_column(SqlEnum(TimesheetStatusEnum), default=TimesheetStatusEnum.PENDING, index=True)
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -494,6 +501,10 @@ class InviteToken(Base):
     role: Mapped[RoleEnum] = mapped_column(SqlEnum(RoleEnum), index=True)
     token: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     location_ids_csv: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Filled by team import: applied when the person joins.
+    full_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    staff_position: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    hourly_rate: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     invited_by: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -542,6 +553,8 @@ class ClockSession(Base):
     clock_in_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     clock_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     timesheet_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("timesheets.id", ondelete="SET NULL"), nullable=True)
+    break_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    break_seconds: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class PlatformAuditLog(Base):

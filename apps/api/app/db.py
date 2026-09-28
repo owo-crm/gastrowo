@@ -259,6 +259,20 @@ def _ensure_runtime_schema_compat() -> None:
             if "clock_mode" not in organization_columns:
                 connection.execute(text("ALTER TABLE organizations ADD COLUMN clock_mode VARCHAR(16) NOT NULL DEFAULT 'both'"))
 
+        for table, column, ddl in (
+            ("timesheets", "break_minutes", "INTEGER NOT NULL DEFAULT 0"),
+            ("clock_sessions", "break_started_at", "TIMESTAMP WITH TIME ZONE" if engine.dialect.name == "postgresql" else "DATETIME"),
+            ("clock_sessions", "break_seconds", "INTEGER NOT NULL DEFAULT 0"),
+            ("locations", "latitude", "DOUBLE PRECISION" if engine.dialect.name == "postgresql" else "REAL"),
+            ("locations", "longitude", "DOUBLE PRECISION" if engine.dialect.name == "postgresql" else "REAL"),
+            ("locations", "clock_radius_m", "INTEGER NOT NULL DEFAULT 150"),
+            ("invite_tokens", "full_name", "VARCHAR(120)"),
+            ("invite_tokens", "staff_position", "VARCHAR(80)"),
+            ("invite_tokens", "hourly_rate", "NUMERIC(10, 2)"),
+        ):
+            if table in tables and column not in {item["name"] for item in inspector.get_columns(table)}:
+                connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+
         if "organization_subscriptions" in tables:
             subscription_columns = {column["name"] for column in inspector.get_columns("organization_subscriptions")}
             for name, ddl in (

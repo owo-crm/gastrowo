@@ -19,14 +19,24 @@ from app.core.deps import OrgContext, get_current_organization, require_org_cont
 from app.core.envelope import ok
 from app.core.permissions import can_manage_business_settings, can_manage_team
 from app.db import get_db
-from app.models import ClockSession, KioskDevice, Location, Organization, OrganizationMembership, RoleEnum, Shift, User
-from app.services.timeclock import _utc, CLOCK_MODES, clock_in, clock_out, generate_pin, membership_for_pin, mode_allows, open_session, set_pin
+from app.models import ClockSession, KioskDevice, Location, LocationMembership, Organization, OrganizationMembership, RoleEnum, Shift, User
+from app.services.timeclock import _utc, CLOCK_MODES, clock_in, clock_out, end_break, generate_pin, membership_for_pin, mode_allows, open_session, set_pin, start_break
 
 router = APIRouter(tags=["clock"])
 
 
 class PinIn(BaseModel):
     pin: str = Field(min_length=4, max_length=6)
+
+
+class PunchIn(PinIn):
+    action: Literal["toggle", "break"] = "toggle"
+
+
+class ClockInIn(BaseModel):
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    accuracy: float | None = Field(default=None, ge=0)
 
 
 class ClockModeIn(BaseModel):
@@ -48,6 +58,9 @@ def _session_out(db: Session, session: ClockSession | None) -> dict | None:
         "clock_in_at": session.clock_in_at.isoformat(),
         "clock_out_at": session.clock_out_at.isoformat() if session.clock_out_at else None,
         "source": session.source,
+        "on_break": session.break_started_at is not None,
+        "break_started_at": session.break_started_at.isoformat() if session.break_started_at else None,
+        "break_seconds": session.break_seconds or 0,
         "location_name": location.name if location else None,
         "shift": {
             "id": str(shift.id),
@@ -72,17 +85,40 @@ def my_clock(context: OrgContext = Depends(require_org_context()), db: Session =
             "mode": organization.clock_mode or "both",
             "phone_allowed": mode_allows(organization, "phone"),
             "has_pin": bool(context.membership.clock_pin_digest),
+            # Any of this person's locations requires being there to clock in from the phone.
+            "needs_location": bool(
+                db.scalar(
+                    select(Location.id)
+                    .join(LocationMembership, LocationMembership.location_id == Location.id)
+                    .where(LocationMembership.user_id == context.user.id, Location.organization_id == organization.id, Location.latitude.is_not(None))
+                )
+            ),
             "open_session": _session_out(db, open_session(db, organization.id, context.user.id)),
         }
     )
 
 
 @router.post("/clock/in")
-def phone_clock_in(context: OrgContext = Depends(require_org_context()), db: Session = Depends(get_db)):
+def phone_clock_in(payload: ClockInIn | None = None, context: OrgContext = Depends(require_org_context()), db: Session = Depends(get_db)):
     organization = get_current_organization(context, db)
     if not mode_allows(organization, "phone"):
         raise HTTPException(status_code=403, detail="Your business clocks in on the tablet at work")
-    session = clock_in(db, organization.id, context.user, source="phone")
+    coords = (payload.latitude, payload.longitude, payload.accuracy or 0) if payload and payload.latitude is not None and payload.longitude is not None else None
+    session = clock_in(db, organization.id, context.user, source="phone", coords=coords)
+    db.commit()
+    return ok(_session_out(db, session))
+
+
+@router.post("/clock/break/start")
+def phone_break_start(context: OrgContext = Depends(require_org_context()), db: Session = Depends(get_db)):
+    session = start_break(db, context.membership.organization_id, context.user)
+    db.commit()
+    return ok(_session_out(db, session))
+
+
+@router.post("/clock/break/end")
+def phone_break_end(context: OrgContext = Depends(require_org_context()), db: Session = Depends(get_db)):
+    session = end_break(db, context.membership.organization_id, context.user)
     db.commit()
     return ok(_session_out(db, session))
 
@@ -271,7 +307,7 @@ def kiosk_device(x_kiosk_token: str | None = Header(default=None), db: Session =
 
 
 @router.post("/kiosk/punch")
-def kiosk_punch(payload: PinIn, x_kiosk_token: str | None = Header(default=None), db: Session = Depends(get_db)):
+def kiosk_punch(payload: PunchIn, x_kiosk_token: str | None = Header(default=None), db: Session = Depends(get_db)):
     """Clock the owner of this PIN in, or out if they are already in."""
     device, organization, location = _kiosk(db, x_kiosk_token)
     if not mode_allows(organization, "kiosk"):
@@ -292,7 +328,18 @@ def kiosk_punch(payload: PinIn, x_kiosk_token: str | None = Header(default=None)
     user = db.get(User, membership.user_id)
     assert user is not None
 
-    if open_session(db, organization.id, user.id) is None:
+    current = open_session(db, organization.id, user.id)
+    if payload.action == "break":
+        if current is None:
+            raise HTTPException(status_code=409, detail="Clock in first")
+        if current.break_started_at is None:
+            session = start_break(db, organization.id, user)
+            db.commit()
+            return ok({"action": "break_start", "full_name": user.full_name, "session": _session_out(db, session)})
+        session = end_break(db, organization.id, user)
+        db.commit()
+        return ok({"action": "break_end", "full_name": user.full_name, "session": _session_out(db, session)})
+    if current is None:
         session = clock_in(db, organization.id, user, source="kiosk", location_id=location.id)
         db.commit()
         return ok({"action": "in", "full_name": user.full_name, "session": _session_out(db, session)})

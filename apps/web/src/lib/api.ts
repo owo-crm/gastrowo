@@ -623,8 +623,14 @@ export const api = {
   clockMe(token: string) {
     return request<ClockMe>("/clock/me", {}, token);
   },
-  clockIn(token: string) {
-    return request<ClockSessionInfo>("/clock/in", { method: "POST" }, token);
+  clockIn(token: string, coords?: { latitude: number; longitude: number; accuracy: number }) {
+    return request<ClockSessionInfo>("/clock/in", { method: "POST", body: JSON.stringify(coords ?? {}) }, token);
+  },
+  clockBreak(token: string, phase: "start" | "end") {
+    return request<ClockSessionInfo>(`/clock/break/${phase}`, { method: "POST" }, token);
+  },
+  setLocationClockArea(token: string, locationId: string, body: { latitude: number | null; longitude: number | null; radius_m: number }) {
+    return request<{ id: string }>(`/locations/${locationId}/clock-area`, { method: "PUT", body: JSON.stringify(body) }, token);
   },
   clockOut(token: string) {
     return request<{ session: ClockSessionInfo; timesheet_status: string }>("/clock/out", { method: "POST" }, token);
@@ -655,8 +661,8 @@ export const api = {
       headers: { "X-Kiosk-Token": kioskToken },
     });
   },
-  kioskPunch(kioskToken: string, pin: string) {
-    return request<KioskPunchResult>("/kiosk/punch", { method: "POST", body: JSON.stringify({ pin }), headers: { "X-Kiosk-Token": kioskToken } });
+  kioskPunch(kioskToken: string, pin: string, action: "toggle" | "break" = "toggle") {
+    return request<KioskPunchResult>("/kiosk/punch", { method: "POST", body: JSON.stringify({ pin, action }), headers: { "X-Kiosk-Token": kioskToken } });
   },
   platformStats(token: string) {
     return request<PlatformStats>("/platform/stats", {}, token);
@@ -684,5 +690,11 @@ export const api = {
   },
   pushUnsubscribe(token: string, endpoint: string) {
     return request<{ subscribed: boolean }>("/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }, token);
+  },
+  importTeam(token: string, rows: Array<{ email: string; name?: string; position?: string; rate?: number }>) {
+    return request<{ invited: string[]; skipped: Array<{ email: string; reason: string }> }>("/organizations/members/import", { method: "POST", body: JSON.stringify({ rows }) }, token);
+  },
+  lookupInvite(token: string, email: string) {
+    return request<{ business_name: string; full_name: string | null; expired: boolean }>(`/auth/invites/lookup?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`);
   },
 };

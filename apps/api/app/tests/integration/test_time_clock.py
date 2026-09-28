@@ -97,3 +97,54 @@ def test_wrong_pins_are_rate_limited(client):
     device = {"X-Kiosk-Token": client.post("/clock/kiosks", headers=auth_header(admin), json={"location_id": location_id}).json()["data"]["token"]}
     codes = [client.post("/kiosk/punch", headers=device, json={"pin": f"99{index:02d}"}).status_code for index in range(10)]
     assert codes[:8] == [404] * 8 and codes[8:] == [429, 429]
+
+
+def test_breaks_are_subtracted_from_hours_and_pay(client, db_session):
+    admin, staff, location_id, staff_id = _team(client)
+    client.patch(f"/locations/{location_id}/members/{staff_id}", headers=auth_header(admin), json={"hourly_rate_pln": "20.00", "priority": 3})
+    assert client.post("/clock/in", headers=auth_header(staff)).status_code == 200
+    assert client.post("/clock/break/start", headers=auth_header(staff)).json()["data"]["on_break"] is True
+    assert client.post("/clock/break/start", headers=auth_header(staff)).status_code == 409
+
+    # Fast-forward: clocked in 8 h ago, the break has lasted 30 min when the shift ends.
+    session = db_session.scalar(select(ClockSession).where(ClockSession.user_id == UUID(staff_id)))
+    session.clock_in_at = datetime.now(UTC) - timedelta(hours=8)
+    session.break_started_at = datetime.now(UTC) - timedelta(minutes=30)
+    db_session.commit()
+    out = client.post("/clock/out", headers=auth_header(staff))
+    assert out.status_code == 200, out.text
+
+    entry = db_session.scalar(select(Timesheet).where(Timesheet.user_id == UUID(staff_id)))
+    assert entry.break_minutes == 30
+    client.patch(f"/timesheets/{entry.id}", headers=auth_header(admin), json={"action": "approve"})
+    today = datetime.now(UTC).date()
+    summary = client.get(f"/payroll/summary?start_date={(today - timedelta(days=2)).isoformat()}&end_date={(today + timedelta(days=1)).isoformat()}", headers=auth_header(admin)).json()["data"]
+    row = next(item for item in summary["rows"] if item["user_id"] == staff_id)
+    assert abs(float(row["approved_hours"]) - 7.5) < 0.05
+
+
+def test_phone_clock_in_only_near_the_location(client, db_session):
+    admin, staff, location_id, _ = _team(client)
+    # The restaurant is in Brooklyn; the worker tries from Manhattan, then from the door.
+    assert client.put(f"/locations/{location_id}/clock-area", headers=auth_header(admin), json={"latitude": 40.6782, "longitude": -73.9442, "radius_m": 150}).status_code == 200
+    assert client.get("/clock/me", headers=auth_header(staff)).json()["data"]["needs_location"] is True
+    assert client.post("/clock/in", headers=auth_header(staff)).status_code == 428
+    far = client.post("/clock/in", headers=auth_header(staff), json={"latitude": 40.7580, "longitude": -73.9855, "accuracy": 20})
+    assert far.status_code == 403 and " m from " in far.json()["error"]["message"]
+    near = client.post("/clock/in", headers=auth_header(staff), json={"latitude": 40.6786, "longitude": -73.9440, "accuracy": 15})
+    assert near.status_code == 200, near.text
+    # Turning the check off removes the requirement.
+    client.post("/clock/out", headers=auth_header(staff))
+    assert client.put(f"/locations/{location_id}/clock-area", headers=auth_header(admin), json={"latitude": None, "longitude": None}).status_code == 200
+    assert client.post("/clock/in", headers=auth_header(staff)).status_code == 200
+
+
+def test_tablet_break_button(client):
+    admin, _staff, location_id, staff_id = _team(client)
+    device = {"X-Kiosk-Token": client.post("/clock/kiosks", headers=auth_header(admin), json={"location_id": location_id}).json()["data"]["token"]}
+    pin = client.post(f"/clock/pins/{staff_id}", headers=auth_header(admin)).json()["data"]["pin"]
+    assert client.post("/kiosk/punch", headers=device, json={"pin": pin, "action": "break"}).status_code == 409
+    assert client.post("/kiosk/punch", headers=device, json={"pin": pin}).json()["data"]["action"] == "in"
+    assert client.post("/kiosk/punch", headers=device, json={"pin": pin, "action": "break"}).json()["data"]["action"] == "break_start"
+    assert client.post("/kiosk/punch", headers=device, json={"pin": pin, "action": "break"}).json()["data"]["action"] == "break_end"
+    assert client.post("/kiosk/punch", headers=device, json={"pin": pin}).json()["data"]["action"] == "out"

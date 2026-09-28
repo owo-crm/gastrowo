@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
+import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
@@ -91,6 +92,24 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<AuthFieldError>({});
   const sendInFlightRef = useRef(false);
+  const [invitedBusiness, setInvitedBusiness] = useState<string | null>(null);
+
+  // Invite links: show which business it is and pre-fill the name the manager typed.
+  useEffect(() => {
+    if (!isInviteJoin) return;
+    let cancelled = false;
+    api
+      .lookupInvite(inviteToken, invitedEmail)
+      .then((info) => {
+        if (cancelled) return;
+        setInvitedBusiness(info.business_name);
+        if (info.full_name) setFullName((current) => current || info.full_name || "");
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [isInviteJoin, inviteToken, invitedEmail]);
 
   useEffect(() => {
     if (!isInviteJoin) {
@@ -300,7 +319,9 @@ export function LoginPage() {
   const renderInviteJoin = () => (
     <div className="space-y-5">
       <div>
-        <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.invite.title")}</h2>
+        <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">
+          {invitedBusiness ? t("login.invite.title_business", { business: invitedBusiness }) : t("login.invite.title")}
+        </h2>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.invite.body_simple")}</p>
       </div>
       <div className="space-y-2">

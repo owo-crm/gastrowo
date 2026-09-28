@@ -153,7 +153,7 @@ def owner_dashboard(
     for item in timesheets:
         if item.status not in (TimesheetStatusEnum.APPROVED, TimesheetStatusEnum.CORRECTED):
             continue
-        worked_hours = timesheet_hours(item.arrived_at, item.left_at)
+        worked_hours = timesheet_hours(item.arrived_at, item.left_at, item.break_minutes)
         if worked_hours > 0:
             approved_worked_hours += worked_hours
             confirmed_timesheets.append(item)
@@ -204,7 +204,7 @@ def owner_dashboard(
     payroll_acc: dict[str, dict[str, Decimal | str]] = {}
     for item in confirmed_timesheets:
         user_key = str(item.user_id)
-        worked_hours = timesheet_hours(item.arrived_at, item.left_at)
+        worked_hours = timesheet_hours(item.arrived_at, item.left_at, item.break_minutes)
         if worked_hours <= 0:
             continue
         default_rate = fallback_rate_for_user(user_key)

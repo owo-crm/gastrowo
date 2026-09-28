@@ -144,6 +144,17 @@ class MembershipPermissionOverridesPatch(BaseModel):
     manager_can_access_inventory_override: bool | None = None
 
 
+class TeamImportRow(BaseModel):
+    email: str = Field(max_length=255)
+    name: str | None = Field(default=None, max_length=120)
+    position: str | None = Field(default=None, max_length=80)
+    rate: Decimal | None = Field(default=None, ge=0, le=10000)
+
+
+class TeamImportRequest(BaseModel):
+    rows: list[TeamImportRow] = Field(min_length=1, max_length=200)
+
+
 class LinkByEmailRequest(BaseModel):
     email: EmailStr
     name: str | None = Field(default=None, min_length=2, max_length=120)
@@ -318,6 +329,15 @@ class LocationOut(APIModel):
     timezone: str
     manager_user_ids: list[UUID] = []
     manager_names: list[str] = []
+    latitude: float | None = None
+    longitude: float | None = None
+    clock_radius_m: int = 150
+
+
+class LocationClockAreaPut(BaseModel):
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    radius_m: int = Field(default=150, ge=50, le=2000)
 
 
 class UserOut(APIModel):
@@ -911,6 +931,7 @@ class TimesheetEntry(APIModel):
     left_at: time
     note: str | None
     is_restricted_entry: bool
+    break_minutes: int = 0
     status: TimesheetStatusEnum
     review_note: str | None
     reviewed_by: UUID | None
