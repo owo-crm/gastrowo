@@ -76,7 +76,7 @@ export function OnboardingChecklist() {
     <section className="ios-island mx-3 mb-4 px-4 py-4 sm:mx-6 sm:px-5" aria-labelledby="onboarding-title">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="onboarding-title" className="text-[17px] font-bold text-black">
+          <h2 id="onboarding-title" className="text-[17px] font-semibold text-black">
             {t("onboarding.title")}
           </h2>
           <p className="text-[14px] text-[var(--color-text-muted)]">
@@ -102,7 +102,7 @@ export function OnboardingChecklist() {
               >
                 <span
                   className={cn(
-                    "grid size-6 shrink-0 place-items-center rounded-full text-[13px] font-bold",
+                    "grid size-6 shrink-0 place-items-center rounded-full text-[13px] font-semibold",
                     step.done ? "bg-[var(--color-success)] text-white" : isNext ? "bg-[var(--color-primary-strong)] text-white" : "bg-[var(--color-fill)] text-black",
                   )}
                 >

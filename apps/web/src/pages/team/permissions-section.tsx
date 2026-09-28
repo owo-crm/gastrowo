@@ -68,7 +68,7 @@ export function PermissionsSection() {
         <span className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--color-fill)]">
           <Lock className="size-6 text-black" />
         </span>
-        <p className="mt-4 text-[20px] font-bold text-black">{t("team.permissions_locked_title")}</p>
+        <p className="mt-4 text-[20px] font-semibold text-black">{t("team.permissions_locked_title")}</p>
         <p className="mx-auto mt-2 max-w-md text-[15px] text-[var(--color-text-muted)]">{t("team.permissions_locked_body")}</p>
         <Button className="mt-5" onClick={() => navigate(UPGRADE_ROUTE)}>
           {t("team.see_plans")}

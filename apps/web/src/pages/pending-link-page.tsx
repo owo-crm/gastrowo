@@ -39,7 +39,7 @@ export function PendingLinkPage() {
               {t("common.worker")}
             </div>
             <div>
-              <CardTitle className="text-[1.9rem] tracking-[-0.05em] text-[var(--color-heading)]">{t("pending.card_title")}</CardTitle>
+              <CardTitle className="text-[1.9rem] tracking-[-0.01em] text-[var(--color-heading)]">{t("pending.card_title")}</CardTitle>
               <CardDescription className="mx-auto mt-2 max-w-[34rem] text-sm leading-6 text-[var(--color-text-muted)]">
                 {t("pending.card_description")}
               </CardDescription>

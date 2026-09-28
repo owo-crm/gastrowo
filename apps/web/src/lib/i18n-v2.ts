@@ -337,6 +337,13 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "schedule.timesheet_reviewed": "Saved",
     "schedule.timesheets_approved": "Approved",
     "schedule.timesheets_approved_count": "Approved {{count}}",
+    "schedule.week_total": "Total hours: {{hours}}",
+    "schedule.no_shift_assigned": "No shift",
+    "schedule.reported_hours": "Reported {{from}}–{{to}}",
+    "schedule.open_shift": "Open shift",
+    "schedule.legend_ok": "All good",
+    "schedule.legend_pending": "Hours waiting for approval",
+    "schedule.legend_action": "Report your hours",
     // @end-en
   },
   pl: {
@@ -671,6 +678,13 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "schedule.timesheet_reviewed": "Zapisano",
     "schedule.timesheets_approved": "Zatwierdzono",
     "schedule.timesheets_approved_count": "Zatwierdzono {{count}}",
+    "schedule.week_total": "Suma godzin: {{hours}}",
+    "schedule.no_shift_assigned": "Brak przypisanej zmiany",
+    "schedule.reported_hours": "Zgłoszono {{from}}–{{to}}",
+    "schedule.open_shift": "Wolna zmiana",
+    "schedule.legend_ok": "Wszystko OK",
+    "schedule.legend_pending": "Godziny czekają na akceptację",
+    "schedule.legend_action": "Zgłoś godziny",
     // @end-pl
   },
   ru: {
@@ -1005,6 +1019,13 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "schedule.timesheet_reviewed": "Сохранено",
     "schedule.timesheets_approved": "Подтверждено",
     "schedule.timesheets_approved_count": "Подтверждено: {{count}}",
+    "schedule.week_total": "Всего часов: {{hours}}",
+    "schedule.no_shift_assigned": "Нет смены",
+    "schedule.reported_hours": "Отмечено {{from}}–{{to}}",
+    "schedule.open_shift": "Открытая смена",
+    "schedule.legend_ok": "Всё в порядке",
+    "schedule.legend_pending": "Часы ждут подтверждения",
+    "schedule.legend_action": "Отметьте часы",
     // @end-ru
   },
 };

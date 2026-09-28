@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Story+Script&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Story+Script&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -48,7 +48,7 @@
   --destructive-foreground: #ffffff;
   --min-tap-target: 44px;
   --nav-height: 64px;
-  --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-system: "Nunito Variable", "Nunito", -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
 }
 
 * {
@@ -67,9 +67,9 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-system);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.4;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -84,8 +84,8 @@ body {
 h1, h2, h3, h4, h5, h6 {
   color: var(--color-heading);
   font-family: var(--font-system);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 :focus-visible {

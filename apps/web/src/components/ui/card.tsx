@@ -11,7 +11,7 @@ export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElemen
 }
 
 export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn("min-w-0 break-words text-[20px] font-bold leading-tight tracking-[-0.02em] text-black", className)} {...props} />;
+  return <h2 className={cn("min-w-0 break-words text-[20px] font-semibold leading-tight tracking-[-0.02em] text-black", className)} {...props} />;
 }
 
 export function CardDescription({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {

@@ -33,7 +33,7 @@ export function Segmented<T extends string>({
             )}
           >
             {option.label}
-            {option.badge ? <span className="rounded-full bg-[var(--color-danger)] px-1.5 text-[11px] font-bold leading-4 text-white">{option.badge}</span> : null}
+            {option.badge ? <span className="rounded-full bg-[var(--color-danger)] px-1.5 text-[11px] font-semibold leading-4 text-white">{option.badge}</span> : null}
           </button>
         );
       })}

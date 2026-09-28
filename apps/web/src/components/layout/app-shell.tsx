@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, CheckCircle2, ChevronRight, Clock3, Coins, CreditCard, FilePlus2, Lock, LogOut, Trash2, XCircle } from "lucide-react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 
-import { BrandLogo } from "@/components/brand-logo";
 import { CloseButton } from "@/components/ui/sheet";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -111,7 +110,7 @@ function NotificationsButton() {
       >
         <Bell className="size-[22px]" strokeWidth={2.2} />
         {unreadCount > 0 ? (
-          <span className="absolute right-1 top-1 grid min-w-[18px] place-items-center rounded-full bg-[var(--color-danger)] px-1 text-[11px] font-bold leading-[18px] text-white">
+          <span className="absolute right-1 top-1 grid min-w-[18px] place-items-center rounded-full bg-[var(--color-danger)] px-1 text-[11px] font-semibold leading-[18px] text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         ) : null}
@@ -216,7 +215,7 @@ function UserRow() {
         onClick={() => setOpen((current) => !current)}
         className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left hover:bg-white/60"
       >
-        <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-primary-strong)] text-[13px] font-bold text-white">
+        <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-primary-strong)] text-[13px] font-semibold text-white">
           {me?.avatar_url ? <img src={me.avatar_url} alt="" className="size-full object-cover" /> : initialsOf(me?.full_name, "U")}
         </span>
         <span className="min-w-0 flex-1">
@@ -246,13 +245,10 @@ function WorkspaceHeader() {
 
   return (
     <Link to={getHomeRoute(me)} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-white/60">
-      <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[9px] bg-[var(--color-primary-strong)] text-[13px] font-bold text-white">
+      <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[9px] bg-[var(--color-primary-strong)] text-[13px] font-semibold text-white">
         {logo ? <img src={logo} alt="" className="size-full object-cover" /> : initialsOf(name, "GS")}
       </span>
-      <span className="min-w-0">
-        <span className="block truncate text-[16px] font-bold text-black">{name}</span>
-        <BrandLogo kind="wordmark" className="text-[0.95rem]" />
-      </span>
+      <span className="min-w-0 truncate text-[17px] font-semibold text-black">{name}</span>
     </Link>
   );
 }
@@ -424,7 +420,7 @@ export function AppShell({
         <header className="ios-bar sticky top-0 z-30">
           <div className={cn("flex min-h-[var(--nav-height)] items-center gap-2 pl-4 pr-2 pt-1 sm:pl-6", !fullBleed && "mx-auto max-w-[1180px]")}>
             <div className="min-w-0 flex-1 py-2">
-              <h1 className="truncate text-[30px] font-bold leading-[1.1] tracking-[-0.03em] text-black lg:text-[32px]">{title}</h1>
+              <h1 className="truncate text-[28px] font-semibold leading-[1.15] tracking-[-0.01em] text-black lg:text-[30px]">{title}</h1>
               {subtitle ? <p className="hidden truncate text-[15px] text-[#3c3c43] md:block">{subtitle}</p> : null}
             </div>
             {action ? <div className="hidden shrink-0 md:block">{action}</div> : null}

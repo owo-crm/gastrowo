@@ -164,15 +164,15 @@ export function PayrollPage() {
       <div className="mb-6 grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:px-6 [&>*]:ios-island">
         <div className="px-4 py-4">
           <p className="text-[13px] font-semibold text-[var(--color-text-muted)]">{isStaff ? t("payroll.my_pay") : t("payroll.total_pay")}</p>
-          <p className="mt-1 text-[28px] font-bold tabular-nums text-black">{money(isStaff ? mine?.payroll_pln ?? 0 : totalPay)}</p>
+          <p className="mt-1 text-[28px] font-semibold tabular-nums text-black">{money(isStaff ? mine?.payroll_pln ?? 0 : totalPay)}</p>
         </div>
         <div className="px-4 py-4">
           <p className="text-[13px] font-semibold text-[var(--color-text-muted)]">{t("payroll.hours")}</p>
-          <p className="mt-1 text-[28px] font-bold tabular-nums text-black">{hoursText(isStaff ? mine?.approved_hours ?? 0 : totalHours)}</p>
+          <p className="mt-1 text-[28px] font-semibold tabular-nums text-black">{hoursText(isStaff ? mine?.approved_hours ?? 0 : totalHours)}</p>
         </div>
         <div className="col-span-2 px-4 py-4 sm:col-span-1">
           <p className="text-[13px] font-semibold text-[var(--color-text-muted)]">{t("payroll.overtime")}</p>
-          <p className="mt-1 text-[28px] font-bold tabular-nums text-black">{hoursText(isStaff ? mine?.overtime_hours ?? 0 : overtime)}</p>
+          <p className="mt-1 text-[28px] font-semibold tabular-nums text-black">{hoursText(isStaff ? mine?.overtime_hours ?? 0 : overtime)}</p>
           <p className="text-[13px] text-[var(--color-text-muted)]">{me?.organization_settings?.labor_rules === "PL" ? t("payroll.overtime_pl") : t("payroll.overtime_us")}</p>
         </div>
       </div>
@@ -214,7 +214,7 @@ export function PayrollPage() {
               {Number(openRow.overtime_hours ?? 0) > 0 ? (
                 <ListRow title={t("payroll.overtime_premium", { hours: hoursText(openRow.overtime_hours ?? 0) })} trailing={money(openRow.overtime_premium ?? 0)} />
               ) : null}
-              <ListRow title={<span className="font-semibold">{t("payroll.gross")}</span>} trailing={<span className="font-bold text-black">{money(openRow.payroll_pln)}</span>} />
+              <ListRow title={<span className="font-semibold">{t("payroll.gross")}</span>} trailing={<span className="font-semibold text-black">{money(openRow.payroll_pln)}</span>} />
             </ListSection>
             {entryList}
           </div>

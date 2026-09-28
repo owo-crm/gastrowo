@@ -36,7 +36,7 @@ function PhotoPicker({ image, fallback, label, rounded, onPick }: { image: strin
   return (
     <div className="flex items-center gap-4 px-4 py-4 sm:px-6">
       <span
-        className={`grid size-16 shrink-0 place-items-center overflow-hidden bg-[var(--color-primary-strong)] text-[20px] font-bold text-white ${rounded === "full" ? "rounded-full" : "rounded-[14px]"}`}
+        className={`grid size-16 shrink-0 place-items-center overflow-hidden bg-[var(--color-primary-strong)] text-[20px] font-semibold text-white ${rounded === "full" ? "rounded-full" : "rounded-[14px]"}`}
       >
         {image ? <img src={image} alt="" className="size-full object-cover" /> : fallback}
       </span>

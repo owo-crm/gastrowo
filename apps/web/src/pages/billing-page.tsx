@@ -74,7 +74,7 @@ export function BillingPage() {
 
         <ListSection header={t("billing.your_plan")}>
           <ListRow
-            title={<span className="text-[20px] font-bold">{subscription ? t(planTitleKey(subscription.plan)) : "…"}</span>}
+            title={<span className="text-[20px] font-semibold">{subscription ? t(planTitleKey(subscription.plan)) : "…"}</span>}
             trailing={badge ? <Badge tone={badge.tone}>{badge.label}</Badge> : null}
           />
           <ListRow
@@ -98,7 +98,7 @@ export function BillingPage() {
         </ListSection>
 
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3 pt-6 sm:px-6">
-          <h2 className="text-[20px] font-bold text-black">{t("billing.choose_plan")}</h2>
+          <h2 className="text-[20px] font-semibold text-black">{t("billing.choose_plan")}</h2>
           <Segmented
             ariaLabel={t("billing.cycle")}
             value={cycle}
@@ -119,12 +119,12 @@ export function BillingPage() {
             return (
               <section key={plan.key} className={cn("ios-island flex flex-col px-5 py-6", isCurrent && "ring-2 ring-[var(--color-primary-strong)]")}>
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-[20px] font-bold text-black">{t(`plan.${plan.key}.title`)}</h3>
+                  <h3 className="text-[20px] font-semibold text-black">{t(`plan.${plan.key}.title`)}</h3>
                   {isCurrent ? <Badge tone="blue">{isTrial ? t("billing.trial") : t("billing.current")}</Badge> : null}
                 </div>
                 <p className="mt-0.5 text-[15px] text-[var(--color-text-muted)]">{t(`plan.${plan.key}.tagline`)}</p>
                 <p className="mt-4 flex flex-wrap items-baseline gap-x-1.5">
-                  <span className="text-[34px] font-bold leading-none tracking-tight text-black">{formatMoney(price, currency, lang)}</span>
+                  <span className="text-[34px] font-semibold leading-none tracking-tight text-black">{formatMoney(price, currency, lang)}</span>
                   <span className="text-[14px] text-[var(--color-text-muted)]">
                     {paid ? (cycle === "monthly" ? t("plan.per_location_month") : t("billing.per_location_year")) : t("plan.forever")}
                   </span>

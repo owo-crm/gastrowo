@@ -39,7 +39,7 @@ export function WorkerAvatar({ name, size = 32, className }: WorkerAvatarProps) 
 
   return (
     <div
-      className={cn("grid shrink-0 place-items-center rounded-full border-2 font-bold tracking-[-0.02em]", className)}
+      className={cn("grid shrink-0 place-items-center rounded-full border-2 font-semibold tracking-[-0.02em]", className)}
       style={{
         width: size,
         height: size,

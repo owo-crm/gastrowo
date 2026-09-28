@@ -303,7 +303,7 @@ export function LoginPage() {
     <div className="space-y-5">
       <StepPill current={1} total={1} label={t("login.step", { current: 1, total: 1 })} />
       <div>
-        <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.invite.title")}</h2>
+        <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.invite.title")}</h2>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.invite.body")}</p>
       </div>
       <div className="space-y-2">
@@ -350,7 +350,7 @@ export function LoginPage() {
   const renderSignin = () => (
     <div className="space-y-5">
       <div>
-        <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.signin.title")}</h2>
+        <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.signin.title")}</h2>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.signin.body")}</p>
       </div>
       <div className="space-y-2">
@@ -450,7 +450,7 @@ export function LoginPage() {
         <div className="space-y-5">
           <StepPill current={1} total={4} label={t("login.step", { current: 1, total: 4 })} />
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step1.title")}</h2>
+            <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.onboarding.step1.title")}</h2>
             <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step1.body")}</p>
           </div>
           <div className="space-y-2">
@@ -503,7 +503,7 @@ export function LoginPage() {
             </button>
           </div>
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step2.title")}</h2>
+            <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.onboarding.step2.title")}</h2>
             <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step2.body")}</p>
           </div>
           <div className="space-y-2">
@@ -562,7 +562,7 @@ export function LoginPage() {
             </button>
           </div>
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step3.title")}</h2>
+            <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.onboarding.step3.title")}</h2>
             <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step3.body")}</p>
           </div>
           <div className="space-y-2">
@@ -589,7 +589,7 @@ export function LoginPage() {
           </button>
         </div>
         <div>
-          <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[var(--color-heading)]">{t("login.onboarding.step4.title")}</h2>
+          <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.onboarding.step4.title")}</h2>
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step4.body")}</p>
         </div>
         <div className="space-y-2">
@@ -663,7 +663,7 @@ export function LoginPage() {
             </div>
             <Card className="w-full border-0 p-0">
               <CardHeader className="p-0 pb-4">
-                <CardTitle className="text-[34px] font-bold tracking-tight">
+                <CardTitle className="text-[34px] font-semibold tracking-tight">
                   {isInviteJoin ? t("login.mode.join_title") : mode === "signin" ? t("login.mode.signin_title") : t("login.mode.onboarding_title")}
                 </CardTitle>
                 <CardDescription>

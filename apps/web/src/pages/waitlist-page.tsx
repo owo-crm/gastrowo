@@ -23,7 +23,7 @@ export function WaitlistPage() {
           <div className="grid gap-5 bg-white px-4 py-5 sm:px-6 sm:py-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Marketing</p>
-              <h2 className="mt-3 text-2xl font-bold tracking-[-0.05em] text-[var(--color-heading)] sm:text-3xl">
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)] sm:text-3xl">
                 Early-access waitlist dla Gastrostuff
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">
@@ -34,7 +34,7 @@ export function WaitlistPage() {
               <div className="rounded-[12px] border border-[var(--color-border)] bg-white/90 px-4 py-4">
                 <Mailbox className="size-4 text-[var(--color-primary-strong)]" />
                 <p className="mt-3 text-xs uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Leady</p>
-                <p className="mt-1 text-2xl font-bold tracking-[-0.04em] text-[var(--color-heading)]">{leads.length}</p>
+                <p className="mt-1 text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{leads.length}</p>
               </div>
               <div className="rounded-[12px] border border-[var(--color-border)] bg-white/90 px-4 py-4">
                 <Tag className="size-4 text-emerald-600" />
@@ -52,7 +52,7 @@ export function WaitlistPage() {
 
         <Card className="rounded-[12px] border border-[var(--color-border)] bg-white p-0">
           <div className="border-b border-[var(--color-separator)] px-5 py-4">
-            <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">Zebrane adresy</p>
+            <p className="text-lg font-semibold tracking-[-0.01em] text-[var(--color-heading)]">Zebrane adresy</p>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">Najnowsze zgłoszenia są pokazane na górze.</p>
           </div>
           <div className="overflow-x-auto">

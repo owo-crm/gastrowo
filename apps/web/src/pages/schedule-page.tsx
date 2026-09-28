@@ -32,6 +32,7 @@ import { ListRow, ListSection } from "@/components/ui/list";
 import { Sheet } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Segmented } from "@/components/ui/segmented";
+import { StaffWeek } from "@/components/schedule/staff-week";
 import { DayList, DayStrip, WeekGrid, type GridDay, type GridPerson, type GridShift } from "@/components/schedule/week-grid";
 import { currencyOf, formatDate, formatMoney } from "@/lib/format";
 import { useMediaQuery } from "@/lib/use-media-query";
@@ -48,7 +49,6 @@ import { api } from "@/lib/api";
 
 import { hasPlanFeature } from "@/lib/access";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
-import { MyWeekShifts } from "@/components/my-week-shifts";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import type { Lang } from "@/lib/i18n";
@@ -1116,7 +1116,7 @@ function AppliedTimetableBoard({
               className={`relative border-b border-r border-[var(--color-separator)] ${dayHeaderClass} ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"}`}
             >
               <div className="pr-8">
-                <p className={`font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)] ${compact ? "text-[11px]" : "text-[12px]"}`}>{day.title}</p>
+                <p className={`font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)] ${compact ? "text-[11px]" : "text-[12px]"}`}>{day.title}</p>
               </div>
               <div className="absolute right-3 top-3">
                 <DayWarningPopover
@@ -1127,7 +1127,7 @@ function AppliedTimetableBoard({
                   buttonClassName="inline-flex size-6 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100"
                 />
               </div>
-              <p className={`mt-1 font-black tracking-[-0.04em] text-[var(--color-heading)] ${compact ? "text-lg" : "text-2xl"}`}>
+              <p className={`mt-1 font-semibold tracking-[-0.01em] text-[var(--color-heading)] ${compact ? "text-lg" : "text-2xl"}`}>
                 {compact ? day.caption.replace(".", "/") : day.caption.split(".")[0]}
               </p>
             </div>
@@ -2611,7 +2611,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
           <div>
             <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("schedule.hours_per_week")}</p>
             <div className="mt-1 flex items-baseline gap-2">
-              <p className="text-2xl font-bold tracking-[-0.06em] text-[var(--color-heading)]">{availabilityDesiredHours.toFixed(1)}</p>
+              <p className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{availabilityDesiredHours.toFixed(1)}</p>
               <p className="text-sm text-[var(--color-text-muted)]">{t("schedule.derived_from_ranges")}</p>
             </div>
           </div>
@@ -3004,7 +3004,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
         {scheduleStage === "idle" && !gridShifts.length ? (
           <div className="grid h-full place-items-center px-6 text-center">
             <div className="max-w-md">
-              <p className="text-[20px] font-bold text-black">{t("schedule.empty_title")}</p>
+              <p className="text-[20px] font-semibold text-black">{t("schedule.empty_title")}</p>
               <p className="mt-2 text-[15px] text-[var(--color-text-muted)]">{t("schedule.empty_body")}</p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
                 <Button onClick={() => previewMutation.mutate({ resetOverrides: false, mode: "generate" })} disabled={previewMutation.isPending || !locationFilter}>
@@ -3062,211 +3062,24 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
   const pageTitle = section === "calendar" ? (isStaff ? t("sub.my_week") : t("schedule.title")) : t(`sub.${section}`);
 
   return (
-    <AppShell title={pageTitle} fullBleed={section === "calendar" && !isStaff} flush={isStaff && section !== "calendar"}>
+    <AppShell title={pageTitle} fullBleed={section === "calendar" && !isStaff} flush={isStaff}>
       {isStaff && section !== "calendar" ? (
         staffOtherSection
       ) : isStaff ? (
-        <div>
-          <Card className="min-h-0 max-w-full overflow-x-hidden border-b-0">
-            <CardHeader className="pb-2">
-              <div className="grid gap-3">
-                <div className="flex items-start justify-between gap-3">
-                  <CardTitle className="text-lg">{t("schedule.my_weekly_calendar")}</CardTitle>
-                  {timesheetsEnabled ? (
-                    <Button size="sm" variant="secondary" className="h-8 px-2.5 sm:hidden" onClick={() => openExtraTimesheetModal(weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0]?.iso)}>
-                      <FileClock className="size-4" /> {t("schedule.report_extra_hours")}
-                    </Button>
-                  ) : null}
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <Button size="sm" variant="secondary" className="h-8 min-w-8 rounded-none border-0 bg-transparent px-1.5 hover:bg-transparent" onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
-                    <ChevronLeft className="size-4" />
-                  </Button>
-                  <span className="min-w-0 flex-1 px-1 text-center text-xs font-semibold text-[var(--color-heading)] sm:text-sm">
-                    {weekDays[0]?.caption} - {weekDays[6]?.caption}
-                  </span>
-                  <Button size="sm" variant="secondary" className="h-8 min-w-8 rounded-none border-0 bg-transparent px-1.5 hover:bg-transparent" onClick={() => setWeekStart((current) => shiftWeek(current, 7))}>
-                    <ChevronRight className="size-4" />
-                  </Button>
-                </div>
-                {timesheetsEnabled ? (
-                  <div className="hidden sm:flex sm:justify-end">
-                    <Button size="sm" variant="secondary" className="h-8 rounded-none border-0 bg-transparent px-1.5 hover:bg-transparent" onClick={() => openExtraTimesheetModal(weekDays.some((day) => day.iso === todayIso) ? todayIso : weekDays[0]?.iso)}>
-                      <FileClock className="size-4" /> {t("schedule.report_extra_hours")}
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            </CardHeader>
-            <CardContent className="min-h-0 max-w-full overflow-x-hidden">
-              <div className="mb-4">
-                <MyWeekShifts days={staffCalendarQuery.data ?? []} onReportHours={timesheetsEnabled ? openShiftTimesheetModal : undefined} />
-              </div>
-              <MobileDaySelector className="mb-3 2xl:hidden" weekDays={weekDays} selectedDayIndex={selectedDayIndex} onSelect={setSelectedDayIndex} />
-              <div className="space-y-3 2xl:hidden">
-                {(() => {
-                  const dayData = staffDaysByWeek[selectedDayIndex];
-                  const shifts = dayData?.shifts ?? [];
-                  const teamAgenda = teamAgendaByDay[selectedDayIndex] ?? [];
-                  const coworkerAgenda = teamAgenda.filter((item) => !item.isMine);
-                  return (
-                    <>
-                      <div className={`rounded-[12px] border border-[var(--color-separator)] bg-white px-4 py-4 ${selectedDay?.iso === todayIso ? "bg-[rgba(47,111,237,0.04)]" : ""}`}>
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{selectedDay?.title}</p>
-                        <p className="mt-1 text-sm text-[var(--color-text-muted)]">{selectedDay?.caption}</p>
-                      </div>
-                      {shifts.map((shift) => {
-                        const latest = latestTimesheet(myTimesheetsByShiftId[shift.shift_id] ?? []);
-                        const canSubmitReport = timesheetsEnabled && shift.is_mine && (!latest || latest.status === "rejected");
-                        return (
-                          <div key={`mobile-${shift.shift_id}`} className="surface-card rounded-[12px] px-4 py-4">
-                            <ShiftBlock
-                              timeRangeLabel={`${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`}
-                              positionLabel={shift.staff_position ?? shift.required_role}
-                              captionLabel={shift.location_name}
-                              peopleLabel={shift.assignments.map((assignment) => assignment.user_name.split(" ")[0]).join(", ")}
-                              highlighted={shift.is_mine}
-                              editable={false}
-                              isEditing={false}
-                              editText=""
-                              deleteLabel={t("schedule.delete_shift")}
-                            />
-                            <div className="mt-3 flex items-center justify-between gap-2">
-                              {latest ? (
-                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${timesheetStatusClass(latest.status)}`}>
-                                  {statusText(latest.status)}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-[var(--color-text-muted)]">{t("schedule.no_report")}</span>
-                              )}
-                              {canSubmitReport ? (
-                                <Button size="sm" variant="secondary" onClick={() => openShiftTimesheetModal(shift)}>
-                                  {t("schedule.report_hours")}
-                                </Button>
-                              ) : null}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {(myRestrictedTimesheetsByDate[selectedDay?.iso ?? ""] ?? []).length ? (
-                        <div className="rounded-[12px] bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                          {t("schedule.extra_hours")}: {statusText(latestTimesheet(myRestrictedTimesheetsByDate[selectedDay?.iso ?? ""])?.status ?? "pending")}
-                        </div>
-                      ) : null}
-                      <div className="rounded-[12px] border border-[var(--color-separator)] bg-[var(--color-surface-muted)] px-4 py-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{t("schedule.team_on_this_day")}</p>
-                            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                              {coworkerAgenda.length ? t("schedule.team_on_day_description") : t("schedule.no_other_assigned")}
-                            </p>
-                          </div>
-                          <Badge>{t("schedule.total_count", { count: teamAgenda.length })}</Badge>
-                        </div>
-                        {coworkerAgenda.length ? (
-                          <div className="mt-3 space-y-2">
-                            {coworkerAgenda.map((item) => (
-                              <div key={`team-mobile-${item.shiftId}-${item.userId}`} className="flex items-center justify-between gap-3 rounded-[12px] border border-[var(--color-separator)] bg-white px-3 py-2">
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-[var(--color-heading)]">{item.userName}</p>
-                                  <p className="text-[11px] text-[var(--color-text-muted)]">{item.positionLabel}</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-sm font-semibold text-[var(--color-heading)]">{formatTime(item.startTime)}-{formatTime(item.endTime)}</p>
-                                  <p className="text-[11px] text-[var(--color-text-muted)]">{item.locationName}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                      {!shifts.length ? (
-                        <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-                          {t("schedule.no_shifts_this_day")}
-                        </div>
-                      ) : null}
-                    </>
-                  );
-                })()}
-              </div>
-              <div className="hidden h-full overflow-auto rounded-[12px] border border-[var(--color-separator)] bg-white 2xl:block">
-                <div className="grid min-w-[820px] grid-cols-7">
-                  {weekDays.map((day, index) => {
-                    const dayData = staffDaysByWeek[index];
-                    const shifts = dayData?.shifts ?? [];
-                    const teamAgenda = (teamAgendaByDay[index] ?? []).filter((item) => !item.isMine);
-                    return (
-                      <div key={day.iso} className={`min-h-[96px] border-r border-[var(--color-separator)] p-2 ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : ""}`}>
-                        <p className="text-xs font-semibold text-[var(--color-heading)]">{day.title}</p>
-                        <p className="text-[10px] text-[var(--color-text-muted)]">{day.caption}</p>
-                        <div className="mt-1.5 space-y-1">
-                          {shifts.map((shift) => {
-                            const latest = latestTimesheet(myTimesheetsByShiftId[shift.shift_id] ?? []);
-                            const canSubmitReport = timesheetsEnabled && shift.is_mine && (!latest || latest.status === "rejected");
-                            return (
-                              <div key={shift.shift_id} className="space-y-1">
-                                <ShiftBlock
-                                  timeRangeLabel={`${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`}
-                                  positionLabel={shift.staff_position ?? shift.required_role}
-                                  captionLabel={shift.location_name}
-                                  peopleLabel={shift.assignments.map((assignment) => assignment.user_name.split(" ")[0]).join(", ")}
-                                  highlighted={shift.is_mine}
-                                  editable={false}
-                                  isEditing={false}
-                                  editText=""
-                                />
-                                {shift.is_mine ? (
-                                  <div className="flex items-center justify-between gap-1">
-                                    {latest ? (
-                                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${timesheetStatusClass(latest.status)}`}>
-                                        {statusText(latest.status)}
-                                      </span>
-                                    ) : (
-                                      <span className="text-[10px] text-[var(--color-text-muted)]">{t("schedule.no_report")}</span>
-                                    )}
-                                    {canSubmitReport ? (
-                                      <button
-                                        type="button"
-                                        className="text-[10px] font-semibold text-[var(--color-primary-strong)] hover:underline"
-                                        onClick={() => openShiftTimesheetModal(shift)}
-                                      >
-                                        {t("schedule.report_hours")}
-                                      </button>
-                                    ) : null}
-                                  </div>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                          {(myRestrictedTimesheetsByDate[day.iso] ?? []).length ? (
-                            <div className="rounded-[10px] bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700">
-                              {t("schedule.extra_hours")}: {statusText(latestTimesheet(myRestrictedTimesheetsByDate[day.iso])?.status ?? "pending")}
-                            </div>
-                          ) : null}
-                          {teamAgenda.length ? (
-                            <div className="rounded-[10px] border border-[var(--color-separator)] bg-[var(--color-surface-muted)] px-2 py-1.5">
-                              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">{t("schedule.team")}</p>
-                              <div className="mt-1 space-y-1">
-                                {teamAgenda.map((item) => (
-                                  <div key={`team-desktop-${item.shiftId}-${item.userId}`} className="text-[10px] leading-4 text-[var(--color-heading)]">
-                                    <span className="font-medium">{item.userName.split(" ")[0]}</span>{" "}
-                                    <span className="text-[var(--color-text-muted)]">{formatTime(item.startTime)}-{formatTime(item.endTime)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
-                          {!shifts.length ? <p className="text-[10px] text-[var(--color-text-muted)]">{t("schedule.no_shift")}</p> : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
+        <StaffWeek
+          token={token!}
+          meId={me?.id}
+          lang={lang}
+          t={t}
+          weekDays={weekDays.map((day) => day.iso)}
+          days={staffCalendarQuery.data ?? []}
+          timesheetsByShift={myTimesheetsByShiftId}
+          timesheetsEnabled={timesheetsEnabled}
+          onReportHours={openShiftTimesheetModal}
+          onReportExtra={(iso) => openExtraTimesheetModal(iso)}
+          onPrev={() => setWeekStart((current) => shiftWeek(current, -7))}
+          onNext={() => setWeekStart((current) => shiftWeek(current, 7))}
+        />
       ) : section === "calendar" ? (
         managerCalendar
       ) : (
@@ -3569,7 +3382,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("schedule.hours_per_week")}</p>
                     <div className="mt-1 flex items-baseline gap-2">
-                      <p className="text-2xl font-bold tracking-[-0.06em] text-[var(--color-heading)]">{teamAvailabilityEditorDesiredHours.toFixed(1)}</p>
+                      <p className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{teamAvailabilityEditorDesiredHours.toFixed(1)}</p>
                       <p className="text-sm text-[var(--color-text-muted)]">{t("schedule.derived_from_ranges")}</p>
                     </div>
                   </div>

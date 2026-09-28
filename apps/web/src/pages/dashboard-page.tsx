@@ -50,7 +50,7 @@ function Stat({ label, value, note, valueClass }: { label: string; value: string
   return (
     <div className="min-w-0 px-4 py-4">
       <p className="text-[13px] font-semibold text-[var(--color-text-muted)]">{label}</p>
-      <p className={cn("mt-1 truncate text-[30px] font-bold leading-tight tracking-[-0.03em] tabular-nums text-black", valueClass)}>{value}</p>
+      <p className={cn("mt-1 truncate text-[30px] font-semibold leading-tight tracking-[-0.01em] tabular-nums text-black", valueClass)}>{value}</p>
       {note ? <p className="mt-0.5 truncate text-[13px] text-[var(--color-text-muted)]">{note}</p> : null}
     </div>
   );

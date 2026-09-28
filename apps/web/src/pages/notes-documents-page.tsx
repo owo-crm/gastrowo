@@ -695,7 +695,7 @@ export function NotesDocumentsPage() {
                           </div>
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{item.title}</h3>
+                              <h3 className="text-lg font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{item.title}</h3>
                               <Badge className={cn("border-transparent", item.type === "document" ? "bg-rose-50 text-rose-700" : "bg-blue-50 text-blue-700")}>
                                 {item.type === "document" ? "Document" : "Note"}
                               </Badge>
@@ -789,7 +789,7 @@ export function NotesDocumentsPage() {
                     <CardContent className="space-y-4 p-5">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">{contactDisplayName(contact)}</p>
+                          <p className="text-lg font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{contactDisplayName(contact)}</p>
                           <p className="mt-1 text-sm font-medium text-[var(--color-text-muted)]">{contactRoleLabel(contact)}</p>
                           {contact.company && contact.company !== contactDisplayName(contact) ? <p className="mt-1 text-sm text-[var(--color-text-muted)]">{contact.company}</p> : null}
                         </div>
@@ -907,7 +907,7 @@ export function NotesDocumentsPage() {
                 >
                   <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-4 sm:px-6 sm:py-5">
                     <div className="min-w-0">
-                      <p className="text-lg font-bold tracking-[-0.03em] text-[var(--color-heading)]">
+                      <p className="text-lg font-semibold tracking-[-0.01em] text-[var(--color-heading)]">
                         {editorModal.kind === "record"
                           ? editorModal.mode === "edit"
                             ? "Edit note or document"

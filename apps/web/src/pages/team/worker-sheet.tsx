@@ -164,7 +164,7 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
           <div className="mb-6 flex items-center gap-3 px-1">
             <WorkerAvatar name={setup.full_name} size={52} />
             <div className="min-w-0">
-              <p className="truncate text-[20px] font-bold text-black">{setup.full_name}</p>
+              <p className="truncate text-[20px] font-semibold text-black">{setup.full_name}</p>
               <p className="text-[15px] text-[var(--color-text-muted)]">{positions.map((item) => item.position).join(" · ") || t("team.position_none")}</p>
             </div>
           </div>
