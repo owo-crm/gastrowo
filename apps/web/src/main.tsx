@@ -8,6 +8,8 @@ import { App } from "@/App";
 import { captureTestLoginKey } from "@/components/dev-login-button";
 import { AuthProvider } from "@/lib/auth";
 import { LanguageProvider } from "@/lib/i18n";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { installErrorReporting } from "@/lib/error-reporting";
 import { registerServiceWorker } from "@/lib/pwa";
 import { ToastProvider } from "@/lib/toast";
 import "@/styles.css";
@@ -21,9 +23,11 @@ const queryClient = new QueryClient({
 
 captureTestLoginKey();
 registerServiceWorker();
+installErrorReporting();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <AuthProvider>
@@ -35,5 +39,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </AuthProvider>
       </LanguageProvider>
     </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>,
 );

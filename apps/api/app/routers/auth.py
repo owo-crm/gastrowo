@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 import hmac
+import time as time_module
 import secrets
 from uuid import UUID
 
@@ -377,14 +378,37 @@ def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, response:
     return ok(_issue_auth_payload(user, [membership]))
 
 
+# Password guessing: 8 wrong passwords for one email within 15 minutes locks password sign-in for it.
+# In-memory per process, which is enough for one API instance; the email-code sign-in stays available.
+_PASSWORD_WINDOW_SECONDS = 15 * 60
+_PASSWORD_MAX_FAILURES = 8
+_failed_passwords: dict[str, list[float]] = {}
+
+
+def _check_password_attempts(email: str) -> None:
+    now = time_module.monotonic()
+    recent = [moment for moment in _failed_passwords.get(email, []) if now - moment < _PASSWORD_WINDOW_SECONDS]
+    _failed_passwords[email] = recent
+    if len(recent) >= _PASSWORD_MAX_FAILURES:
+        raise HTTPException(status_code=429, detail="Too many wrong passwords. Try again in 15 minutes or sign in with an email code.")
+
+
+def _record_failed_password(email: str) -> None:
+    _failed_passwords.setdefault(email, []).append(time_module.monotonic())
+
+
 @router.post("/login")
 @router.post("/login/password")
 def login_with_password(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.email == payload.email.lower()))
+    email = payload.email.lower()
+    _check_password_attempts(email)
+    user = db.scalar(select(User).where(User.email == email))
     if user is None:
         raise HTTPException(status_code=404, detail="Account with this email was not found")
     if not user.password_hash or not verify_password(payload.password, user.password_hash):
+        _record_failed_password(email)
         raise HTTPException(status_code=401, detail="Invalid password")
+    _failed_passwords.pop(email, None)
 
     memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)).all()
     _create_remembered_session(db, response, user, memberships)

@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { ArrowRight, CalendarCheck2, Check, ChevronDown, Clock3, Facebook, FileSpreadsheet, Instagram, PieChart, Repeat2, Scale, Users, type LucideIcon } from "lucide-react";
+import { legalLinks } from "@/lib/legal-links";
 import { Link } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand-logo";
+import { CookieConsent } from "@/components/cookie-consent";
 import { DevLoginButton } from "@/components/dev-login-button";
 import { Segmented } from "@/components/ui/segmented";
 import { type Currency, formatMoney } from "@/lib/format";
@@ -504,19 +506,20 @@ export function LandingPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <Link to="/regulamin" className="hover:text-black">
+            <Link to={legalLinks(lang).terms} className="hover:text-black">
               {copy.legal.terms}
             </Link>
-            <Link to="/polityka-prywatnosci" className="hover:text-black">
+            <Link to={legalLinks(lang).privacy} className="hover:text-black">
               {copy.legal.privacy}
             </Link>
-            <Link to="/polityka-cookies" className="hover:text-black">
+            <Link to={legalLinks(lang).cookies} className="hover:text-black">
               {copy.legal.cookies}
             </Link>
             <span>© 2026 Plato</span>
           </div>
         </Container>
       </footer>
+      <CookieConsent />
     </div>
   );
 }

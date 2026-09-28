@@ -506,6 +506,11 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "device.ios_install_steps": "In Safari tap Share, then “Add to Home Screen”.",
     "device.installed": "Installed on this device",
     "device.push_unsupported": "This browser doesn't support notifications",
+    "consent.title": "Cookies",
+    "consent.body": "We'd like to measure our ads with cookies. The app works the same either way.",
+    "consent.more": "Details",
+    "consent.decline": "No thanks",
+    "consent.accept": "Accept",
     // @end-en
   },
   pl: {
@@ -1009,6 +1014,11 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "device.ios_install_steps": "W Safari stuknij Udostępnij, potem „Do ekranu początk.”.",
     "device.installed": "Zainstalowane na tym urządzeniu",
     "device.push_unsupported": "Ta przeglądarka nie obsługuje powiadomień",
+    "consent.title": "Pliki cookies",
+    "consent.body": "Chcemy mierzyć skuteczność reklam za pomocą cookies. Aplikacja działa tak samo w obu przypadkach.",
+    "consent.more": "Szczegóły",
+    "consent.decline": "Nie, dziękuję",
+    "consent.accept": "Akceptuję",
     // @end-pl
   },
   ru: {
@@ -1512,6 +1522,11 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "device.ios_install_steps": "В Safari нажмите «Поделиться», затем «На экран „Домой“».",
     "device.installed": "Установлено на этом устройстве",
     "device.push_unsupported": "Этот браузер не поддерживает уведомления",
+    "consent.title": "Cookies",
+    "consent.body": "Мы хотим измерять рекламу с помощью cookies. Приложение работает одинаково в любом случае.",
+    "consent.more": "Подробнее",
+    "consent.decline": "Нет, спасибо",
+    "consent.accept": "Принять",
     // @end-ru
   },
 };

@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
     # Contact the push services see in our VAPID claims; they use it if our pushes misbehave.
     push_contact_email: str = "support@gastrostuff.pl"
+    # Error monitoring: set SENTRY_DSN to send server errors (and client errors we receive) to Sentry.
+    sentry_dsn: str = ""
     resend_api_key: str = ""
     resend_from_email: str = "noreply@info.owocrm.com"
     auth_session_cookie_name: str = "gastrowo_session"
