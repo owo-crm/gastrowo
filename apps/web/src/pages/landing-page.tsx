@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowRight, CalendarCheck2, Check, ChevronDown, Clock3, Facebook, FileSpreadsheet, Instagram, PieChart, Repeat2, Scale, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, Bell, CalendarCheck2, Check, ChevronDown, Clock3, Facebook, FileSpreadsheet, Instagram, PieChart, Repeat2, Scale, Users, type LucideIcon } from "lucide-react";
 import { legalLinks } from "@/lib/legal-links";
 import { Link } from "react-router-dom";
 
@@ -62,14 +62,15 @@ const COPY: Record<Lang, Copy> = {
       { icon: Scale, title: "Overtime under control", body: "Auto-scheduling stays under 40 hours a week and payroll adds time-and-a-half when someone goes over." },
       { icon: Users, title: "One person, many positions", body: "A server who also tends bar gets both, each with its own pay rate." },
       { icon: Repeat2, title: "Swaps without group chats", body: "Staff ask to swap or pick up a shift in the app. You approve with one tap." },
-      { icon: Clock3, title: "Timesheets", body: "The team logs hours, a manager approves. Overnight shifts count correctly." },
+      { icon: Clock3, title: "Time clock: phone or tablet", body: "Staff clock in from their phone or with a PIN on the tablet by the door, breaks included. On-time punches approve themselves." },
+      { icon: Bell, title: "An app on every phone", body: "Add it to the Home Screen and get a push the moment a schedule, swap or task comes in." },
       { icon: PieChart, title: "Live labor cost", body: "Enter the day's sales and see what share goes to wages." },
       { icon: FileSpreadsheet, title: "Payroll export and calendars", body: "A CSV for your accountant, and every shift in each employee's Google or Apple calendar." },
     ],
     stepsTitle: "Your first schedule today",
     steps: [
       { title: "Create an account", body: "Restaurant name and email. No credit card." },
-      { title: "Invite your team", body: "People join from a link and share their availability." },
+      { title: "Invite your team", body: "Paste your team from a spreadsheet. Everyone joins from a link and shares their availability." },
       { title: "Publish the schedule", body: "Generate the week, adjust it and send it out." },
     ],
     pricingTitle: "Priced per location, not per person",
@@ -84,7 +85,7 @@ const COPY: Record<Lang, Copy> = {
         a: "Free covers one location and up to 15 people, forever. Starter is $26 and Pro is $58 per location per month, about 25% less than 7shifts. Yearly billing gets you two months free.",
       },
       { q: "Do I need a credit card to start?", a: "No. You get the full Pro plan for 30 days, then choose a paid plan or stay on Free." },
-      { q: "Does my team need to install an app?", a: "No. It works in the phone's browser. Staff get an invite link, sign in with a code from their email and see their schedule." },
+      { q: "Does my team need to install an app?", a: "No download from an app store. Staff open the invite link, set a password and can add Platofy to their Home Screen to get push notifications." },
       {
         q: "How do you handle overtime?",
         a: "Auto-scheduling avoids putting anyone over 40 hours in a week. If you assign it by hand you get a warning, and payroll adds the 1.5× premium for hours over 40.",
@@ -120,14 +121,15 @@ const COPY: Record<Lang, Copy> = {
       { icon: Scale, title: "Zgodny z Kodeksem pracy", body: "Pilnuje 11 h odpoczynku dobowego i 35 h tygodniowego, zanim ktoś to zauważy." },
       { icon: Users, title: "Jedna osoba, kilka stanowisk", body: "Kelner, który stoi też za barem, ma oba stanowiska i osobną stawkę dla każdego." },
       { icon: Repeat2, title: "Zamiany bez czatu", body: "Pracownicy proszą o zamianę lub przejęcie zmiany w aplikacji, a Ty akceptujesz jednym kliknięciem." },
-      { icon: Clock3, title: "Ewidencja godzin", body: "Zespół wpisuje godziny, manager zatwierdza. Nocne zmiany liczą się poprawnie." },
+      { icon: Clock3, title: "Odbicia z telefonu lub tabletu", body: "Wejście i wyjście z telefonu albo PIN-em na tablecie przy wejściu, z przerwami. Punktualne odbicia zatwierdzają się same." },
+      { icon: Bell, title: "Aplikacja na każdym telefonie", body: "Dodaj do ekranu początkowego i dostawaj powiadomienia o grafiku, zamianach i zadaniach." },
       { icon: PieChart, title: "Koszt pracy na bieżąco", body: "Wpisz utarg dnia i od razu widzisz, jaki procent zjadają wypłaty." },
       { icon: FileSpreadsheet, title: "Eksport i kalendarz", body: "Plik CSV dla księgowej, a grafik w kalendarzu Google lub iPhone każdego pracownika." },
     ],
     stepsTitle: "Pierwszy grafik jeszcze dziś",
     steps: [
       { title: "Załóż konto", body: "Nazwa lokalu i email. Bez karty płatniczej." },
-      { title: "Zaproś zespół", body: "Pracownicy dołączają z linku i podają dostępność." },
+      { title: "Zaproś zespół", body: "Wklej zespół z arkusza. Każdy dołącza z linku i podaje dostępność." },
       { title: "Opublikuj grafik", body: "Wygeneruj tydzień, popraw i wyślij zespołowi." },
     ],
     pricingTitle: "Płacisz za lokal, nie za osobę",
@@ -142,7 +144,7 @@ const COPY: Record<Lang, Copy> = {
         a: "Free obejmuje jeden lokal i do 15 osób, bez limitu czasu. Starter kosztuje 99 zł, a Pro 219 zł za lokal miesięcznie. Rocznie 2 miesiące gratis.",
       },
       { q: "Czy potrzebuję karty płatniczej?", a: "Nie. Przez 30 dni korzystasz z pełnego planu Pro, potem wybierasz płatny plan albo zostajesz na Free." },
-      { q: "Czy pracownicy muszą instalować aplikację?", a: "Nie. Działa w przeglądarce telefonu. Pracownik dostaje link, loguje się kodem z maila i widzi swój grafik." },
+      { q: "Czy pracownicy muszą instalować aplikację?", a: "Nie ze sklepu. Pracownik otwiera link z zaproszenia, ustawia hasło i może dodać Platofy do ekranu początkowego, aby dostawać powiadomienia." },
       {
         q: "Czy grafik uwzględnia przepisy o czasie pracy?",
         a: "Tak. Automatyczny grafik nie przydzieli zmiany, która łamie 11 godzin odpoczynku dobowego lub 35 godzin tygodniowego. Przy ręcznej zmianie dostaniesz ostrzeżenie.",
@@ -178,14 +180,15 @@ const COPY: Record<Lang, Copy> = {
       { icon: Scale, title: "Переработки под контролем", body: "Автографик держит неделю в пределах 40 часов, а зарплата учитывает полуторный тариф сверх них." },
       { icon: Users, title: "Один человек, несколько позиций", body: "Официант, который стоит и за баром, получает обе позиции, у каждой своя ставка." },
       { icon: Repeat2, title: "Обмены без чатов", body: "Сотрудники просят обмен или подхват смены в приложении, вы подтверждаете одним нажатием." },
-      { icon: Clock3, title: "Табели", body: "Команда вносит часы, менеджер подтверждает. Ночные смены считаются правильно." },
+      { icon: Clock3, title: "Отметки с телефона или планшета", body: "Приход и уход с телефона или по PIN на планшете у входа, с перерывами. Отметки по графику подтверждаются сами." },
+      { icon: Bell, title: "Приложение на каждом телефоне", body: "Добавьте на экран «Домой» и получайте пуши о графике, обменах и задачах." },
       { icon: PieChart, title: "Затраты на персонал", body: "Внесите выручку за день и сразу видно, какую долю съедает зарплата." },
       { icon: FileSpreadsheet, title: "Выгрузка и календарь", body: "CSV для бухгалтера и смены в Google или Apple календаре каждого сотрудника." },
     ],
     stepsTitle: "Первый график уже сегодня",
     steps: [
       { title: "Создайте аккаунт", body: "Название заведения и email. Без карты." },
-      { title: "Пригласите команду", body: "Сотрудники заходят по ссылке и указывают доступность." },
+      { title: "Пригласите команду", body: "Вставьте команду из таблицы. Каждый заходит по ссылке и указывает доступность." },
       { title: "Опубликуйте график", body: "Сгенерируйте неделю, поправьте и отправьте команде." },
     ],
     pricingTitle: "Оплата за точку, а не за человека",
@@ -200,7 +203,7 @@ const COPY: Record<Lang, Copy> = {
         a: "Free: одна точка и до 15 человек, без ограничения по времени. Starter стоит $26, Pro $58 за точку в месяц, примерно на 25% дешевле 7shifts. При оплате за год два месяца бесплатно.",
       },
       { q: "Нужна ли карта, чтобы начать?", a: "Нет. 30 дней вы пользуетесь полным Pro, потом выбираете тариф или остаётесь на Free." },
-      { q: "Нужно ли сотрудникам ставить приложение?", a: "Нет. Всё работает в браузере телефона. Сотрудник получает ссылку, входит по коду из письма и видит свой график." },
+      { q: "Нужно ли сотрудникам ставить приложение?", a: "Не из магазина. Сотрудник открывает ссылку из приглашения, задаёт пароль и может добавить Platofy на экран «Домой», чтобы получать уведомления." },
       {
         q: "Как учитываются переработки?",
         a: "Автографик не ставит человека больше 40 часов в неделю. При ручном назначении будет предупреждение, а зарплата добавит полуторный тариф за часы сверх 40.",

@@ -2625,76 +2625,73 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
     setTimesheetForm({ arrived_at: "11:00", left_at: "22:00", note: "" });
   };
 
+  const availabilityLocked = Boolean(availabilityQuery.data?.locked_at);
   const availabilityCard = canEditOwnAvailability ? (
-    <Card className="min-h-0 max-w-full overflow-x-hidden">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-lg">{isManagerView && !isStaff ? t("schedule.my_availability") : t("schedule.availability")}</CardTitle>
-          {availabilityQuery.data?.locked_at ? <Badge className="border-amber-200 bg-amber-50 text-amber-700">{t("schedule.locked")}</Badge> : null}
-        </div>
-        <CardDescription>{isManagerView && !isStaff ? t("schedule.manager_availability_description") : t("schedule.availability_description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="min-h-0 max-w-full space-y-4 overflow-y-auto overflow-x-hidden pr-1">
-        <div className="grid items-end gap-2 border-b border-[var(--color-separator)] pb-3 md:grid-cols-[1fr_auto]">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--color-text-muted)]">{t("schedule.hours_per_week")}</p>
-            <div className="mt-1 flex items-baseline gap-2">
-              <p className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{availabilityDesiredHours.toFixed(1)}</p>
-              <p className="text-sm text-[var(--color-text-muted)]">{t("schedule.derived_from_ranges")}</p>
-            </div>
-          </div>
-          <Button size="sm" onClick={() => saveAvailabilityMutation.mutate()} disabled={saveAvailabilityMutation.isPending || Boolean(availabilityQuery.data?.locked_at)}>
-            {t("common.save")}
+    <div className="-mx-4 sm:-mx-6">
+      {!isManagerView ? (
+        <div className="flex items-center justify-between gap-2 px-4 pb-2 sm:px-6">
+          <Button size="icon" variant="ghost" aria-label={t("schedule.previous_week")} onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
+            <ChevronLeft className="size-5" />
+          </Button>
+          <span className="text-[15px] font-semibold text-black">
+            {weekDays[0]?.caption} – {weekDays[6]?.caption}
+          </span>
+          <Button size="icon" variant="ghost" aria-label={t("schedule.next_week")} onClick={() => setWeekStart((current) => shiftWeek(current, 7))}>
+            <ChevronRight className="size-5" />
           </Button>
         </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          {weekDays.map((day, index) => {
-            const slots = availabilitySlotsByDay[index] ?? [];
-            const firstSlot = slots[0];
-            const enabled = Boolean(firstSlot);
-            return (
-              <div key={`availability-card-${day.iso}`} className="rounded-[12px] border border-[var(--color-border)] bg-white px-4 py-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{day.title}</p>
-                    <p className="text-xs text-[var(--color-text-muted)]">{day.caption}</p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={Boolean(availabilityQuery.data?.locked_at)}
-                    aria-pressed={enabled}
-                    onClick={() => setAvailabilityDayEnabled(index, !enabled)}
-                    className={`relative inline-flex h-11 w-16 items-center rounded-full p-1 transition ${enabled ? "bg-emerald-500/90" : "bg-slate-200"} disabled:opacity-40`}
-                  >
-                    <span className={`size-7 rounded-full bg-white  transition ${enabled ? "translate-x-8" : "translate-x-0"}`} />
-                  </button>
+      ) : null}
+      <ListSection
+        header={isManagerView && !isStaff ? t("schedule.my_availability") : t("schedule.availability")}
+        footer={availabilityLocked ? t("schedule.week_locked") : isManagerView && !isStaff ? t("schedule.manager_availability_description") : t("schedule.availability_description")}
+      >
+        {weekDays.map((day, index) => {
+          const slots = availabilitySlotsByDay[index] ?? [];
+          const firstSlot = slots[0];
+          const enabled = Boolean(firstSlot);
+          return (
+            <li key={`availability-${day.iso}`} className="px-4 py-2.5 sm:px-6">
+              <div className="flex min-h-[44px] items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[16px] text-black">{day.title}</p>
+                  <p className="text-[13px] text-[#6c6c70]">{enabled ? day.caption : `${day.caption} · ${t("schedule.off")}`}</p>
                 </div>
-                <p className="mt-2 text-xs font-medium text-[var(--color-text-muted)]">{enabled ? t("schedule.available") : t("schedule.off")}</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <input
-                    type="time"
-                    value={firstSlot ? firstSlot.start_time.slice(0, 5) : ""}
-                    disabled={!enabled || Boolean(availabilityQuery.data?.locked_at)}
-                    onChange={(event) => updateAvailabilityDayTime(index, "start_time", event.target.value, firstSlot)}
-                    className="h-11 w-full border-0 border-b border-[var(--color-border)] bg-transparent px-0 text-base text-[var(--color-heading)] outline-none focus:border-[var(--color-primary)] disabled:text-[var(--color-text-muted)] sm:text-sm"
-                  />
-                  <input
-                    type="time"
-                    value={firstSlot ? firstSlot.end_time.slice(0, 5) : ""}
-                    disabled={!enabled || Boolean(availabilityQuery.data?.locked_at)}
-                    onChange={(event) => updateAvailabilityDayTime(index, "end_time", event.target.value, firstSlot)}
-                    className="h-11 w-full border-0 border-b border-[var(--color-border)] bg-transparent px-0 text-base text-[var(--color-heading)] outline-none focus:border-[var(--color-primary)] disabled:text-[var(--color-text-muted)] sm:text-sm"
-                  />
-                </div>
+                <Switch checked={enabled} onChange={(next) => setAvailabilityDayEnabled(index, next)} label={day.title} disabled={availabilityLocked} />
               </div>
-            );
-          })}
-        </div>
-
-        {availabilityQuery.data?.locked_at ? <p className="text-xs text-amber-600">{t("schedule.week_locked")}</p> : null}
-      </CardContent>
-    </Card>
+              {enabled ? (
+                <div className="mt-1.5 flex items-center gap-2 pb-1">
+                  <input
+                    type="time"
+                    aria-label={t("schedule.start_time_label")}
+                    value={firstSlot.start_time.slice(0, 5)}
+                    disabled={availabilityLocked}
+                    onChange={(event) => updateAvailabilityDayTime(index, "start_time", event.target.value, firstSlot)}
+                    className="plain-time-input h-10 min-w-0 flex-1 rounded-[10px] bg-[var(--color-grouped)] px-3 text-center text-[16px] tabular-nums text-black outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-60 sm:max-w-[140px] sm:flex-none"
+                  />
+                  <span className="text-[#6c6c70]">–</span>
+                  <input
+                    type="time"
+                    aria-label={t("schedule.end_time_label")}
+                    value={firstSlot.end_time.slice(0, 5)}
+                    disabled={availabilityLocked}
+                    onChange={(event) => updateAvailabilityDayTime(index, "end_time", event.target.value, firstSlot)}
+                    className="plain-time-input h-10 min-w-0 flex-1 rounded-[10px] bg-[var(--color-grouped)] px-3 text-center text-[16px] tabular-nums text-black outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-60 sm:max-w-[140px] sm:flex-none"
+                  />
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ListSection>
+      <div className="flex items-center justify-between gap-3 px-4 pb-6 sm:px-6">
+        <p className="text-[15px] text-[#3c3c43]">
+          <span className="text-[22px] font-semibold tabular-nums text-black">{availabilityDesiredHours % 1 ? availabilityDesiredHours.toFixed(1) : availabilityDesiredHours}</span> {t("schedule.hours_per_week_short")}
+        </p>
+        <Button onClick={() => saveAvailabilityMutation.mutate()} disabled={saveAvailabilityMutation.isPending || availabilityLocked}>
+          {t("common.save")}
+        </Button>
+      </div>
+    </div>
   ) : null;
 
   const availabilityStatusBadgeClass = (status: TeamAvailabilitySummaryRow["status"]) => {
@@ -2790,7 +2787,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
   );
   const staffOtherSection =
     section === "availability" ? (
-      availabilityCard
+      <div className="px-4 sm:px-6">{availabilityCard}</div>
     ) : section === "requests" ? (
       <ListSection header={t("schedule.my_requests")} footer={t("schedule.my_requests_footer")}>
         {(myRequestsQuery.data ?? []).map((request) => {
@@ -3156,7 +3153,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
           ) : null}
 
           {section === "availability" && teamAvailabilityCard ? <div className="px-4 sm:px-6">{teamAvailabilityCard}</div> : null}
-          {section === "availability" && availabilityCard ? <div className="px-4 sm:px-6">{availabilityCard}</div> : null}
+          {section === "availability" && availabilityCard ? <div className="px-4 pt-4 sm:px-6">{availabilityCard}</div> : null}
 
           {isTimesheetsRoute ? (
             <>
