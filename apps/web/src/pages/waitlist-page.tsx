@@ -24,7 +24,7 @@ export function WaitlistPage() {
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Marketing</p>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)] sm:text-3xl">
-                Early-access waitlist dla Gastrostuff
+                Early-access waitlist dla Plato
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">
                 Ta lista zbiera osoby, które zostawiły email po ofercie otwarcia: 1 miesiąc darmowego dostępu i 50% zniżki na pierwszy płatny miesiąc.

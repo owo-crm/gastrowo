@@ -43,7 +43,7 @@ def otp_email_html(*, title: str, subtitle: str, code: str, expires_in_minutes: 
     <div class="email-wrapper">
         <div class="email-content">
             <div class="logo-container">
-                <div class="brand-logo">GastrOWO</div>
+                <div class="brand-logo">Plato</div>
             </div>
             
             <h1>Confirm your email</h1>
@@ -63,9 +63,9 @@ def otp_email_html(*, title: str, subtitle: str, code: str, expires_in_minutes: 
             <p>If you did not request this code, you can safely ignore this email. Someone may have entered your email address by mistake.</p>
             
             <div class="footer">
-                <p>Sent by <strong>GastrOWO Inc.</strong><br>
+                <p>Sent by <strong>Plato</strong><br>
                 Stryjska 13, Gdynia</p>
-                <p>© 2026 GastrOWO. All rights reserved.</p>
+                <p>© 2026 Plato. All rights reserved.</p>
             </div>
         </div>
     </div>
@@ -79,7 +79,7 @@ def invite_email_html(*, business_name: str, join_link: str) -> str:
       <body style="margin:0;padding:32px;background:#f5f7fb;font-family:Inter,Arial,sans-serif;color:#132238;">
         <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5ebf4;border-radius:24px;overflow:hidden;box-shadow:0 16px 48px rgba(15,23,42,0.06);">
           <div style="padding:32px;background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);">
-            <div style="display:inline-block;padding:8px 14px;border-radius:999px;background:#eef5ff;color:#2f6fed;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">GastrOWO</div>
+            <div style="display:inline-block;padding:8px 14px;border-radius:999px;background:#eef5ff;color:#2f6fed;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">Plato</div>
             <h1 style="margin:20px 0 8px;font-size:28px;line-height:1.1;">You were invited to join {business_name}</h1>
             <p style="margin:0;font-size:15px;line-height:1.7;color:#5d6b80;">Open the link below, request your code, and finish joining the workspace.</p>
           </div>

@@ -107,15 +107,15 @@ def calendar_feed_ics(token: str, db: Session = Depends(get_db)):
         .order_by(Shift.date, Shift.start_time)
     ).all()
 
-    business_name = organization.name if organization else "GastrOWO"
+    business_name = organization.name if organization else "Plato"
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//GastrOWO//Schedule//EN",
+        "PRODID:-//Plato//Schedule//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        f"X-WR-CALNAME:{_ics_escape(business_name)} - GastrOWO",
+        f"X-WR-CALNAME:{_ics_escape(business_name)} - Plato",
         "X-PUBLISHED-TTL:PT1H",
         "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
     ]

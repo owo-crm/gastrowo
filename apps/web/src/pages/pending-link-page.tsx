@@ -31,7 +31,7 @@ export function PendingLinkPage() {
       <div className="pointer-events-none absolute inset-0 " />
       <div className="relative mx-auto flex min-h-[calc(100dvh-3rem)] max-w-3xl flex-col justify-center">
         <div className="mb-6 flex justify-center">
-          <BrandLogo kind="wordmark" className="h-10 w-auto" />
+          <BrandLogo kind="wordmark" className="text-[1.8rem]" />
         </div>
         <Card className="overflow-hidden border border-[rgba(215,224,238,0.96)] bg-white/92 ">
           <CardHeader className="space-y-3 pb-2 text-center">

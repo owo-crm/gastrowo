@@ -242,7 +242,7 @@ def send_otp(payload: OtpSendRequest, db: Session = Depends(get_db)):
     if payload.purpose == OtpPurposeEnum.LOGIN:
         if user is None:
             raise HTTPException(status_code=404, detail="Account with this email was not found")
-        title = "Sign in to GastrOWO"
+        title = "Sign in to Plato"
         subtitle = "Use this code to finish signing in."
     elif payload.purpose == OtpPurposeEnum.OWNER_SIGNUP:
         if user is not None:
@@ -253,7 +253,7 @@ def send_otp(payload: OtpSendRequest, db: Session = Depends(get_db)):
         if user is not None:
             raise HTTPException(status_code=409, detail="Email already exists")
         title = "Verify your worker email"
-        subtitle = "Confirm this email to create your GastrOWO account."
+        subtitle = "Confirm this email to create your Plato account."
     else:
         invite = db.scalar(select(InviteToken).where(InviteToken.token == payload.invite_token))
         if invite is None:

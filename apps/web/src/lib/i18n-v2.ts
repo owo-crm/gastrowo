@@ -416,6 +416,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "kiosk.not_set_up_body": "A manager can set it up in Settings → Business → Time clock.",
     "kiosk.open_settings": "Open Settings",
     "clock.now_on_shift": "On the clock now · {{count}}",
+    "login.mode.signin_description": "Welcome back.",
+    "login.signin.body": "Sign in with your email and password. Forgot it? Use a one-time email code.",
+    "login.password_placeholder": "Your password",
     // @end-en
   },
   pl: {
@@ -829,6 +832,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "kiosk.not_set_up_body": "Kierownik może to ustawić w Ustawienia → Firma → Rejestracja czasu.",
     "kiosk.open_settings": "Otwórz Ustawienia",
     "clock.now_on_shift": "Teraz w pracy · {{count}}",
+    "login.mode.signin_description": "Witaj ponownie.",
+    "login.signin.body": "Zaloguj się e-mailem i hasłem. Nie pamiętasz? Użyj jednorazowego kodu z e-maila.",
+    "login.password_placeholder": "Twoje hasło",
     // @end-pl
   },
   ru: {
@@ -1242,6 +1248,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "kiosk.not_set_up_body": "Менеджер может включить его в Настройки → Бизнес → Учёт времени.",
     "kiosk.open_settings": "Открыть Настройки",
     "clock.now_on_shift": "Сейчас на смене · {{count}}",
+    "login.mode.signin_description": "С возвращением.",
+    "login.signin.body": "Войдите по почте и паролю. Забыли? Используйте одноразовый код из письма.",
+    "login.password_placeholder": "Ваш пароль",
     // @end-ru
   },
 };

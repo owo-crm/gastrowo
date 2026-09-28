@@ -594,7 +594,7 @@ export function LoginPage() {
     <div className="min-h-dvh bg-white">
       <header className="ios-bar sticky top-0 z-20 border-b border-[var(--color-separator)]">
         <div className="mx-auto flex h-14 max-w-[1180px] items-center justify-between gap-4 px-4 sm:px-6">
-          <Link to="/" className="shrink-0" aria-label="Gastrostuff">
+          <Link to="/" className="shrink-0" aria-label="Plato">
             <BrandLogo kind="wordmark" className="text-[1.8rem]" />
           </Link>
           <Segmented

@@ -136,7 +136,7 @@ const COPY: Record<Lang, Copy> = {
     faqTitle: "Najczęstsze pytania",
     faq: [
       {
-        q: "Ile kosztuje Gastrostuff?",
+        q: "Ile kosztuje Plato?",
         a: "Free obejmuje jeden lokal i do 15 osób, bez limitu czasu. Starter kosztuje 99 zł, a Pro 219 zł za lokal miesięcznie. Rocznie 2 miesiące gratis.",
       },
       { q: "Czy potrzebuję karty płatniczej?", a: "Nie. Przez 30 dni korzystasz z pełnego planu Pro, potem wybierasz płatny plan albo zostajesz na Free." },
@@ -307,7 +307,7 @@ export function LandingPage() {
     <div className="min-h-dvh overflow-x-clip bg-white text-black">
       <header className="ios-bar sticky top-0 z-30 border-b border-[var(--color-separator)]">
         <Container className="flex h-14 items-center justify-between gap-3">
-          <Link to="/" className="shrink-0" aria-label="Gastrostuff">
+          <Link to="/" className="shrink-0" aria-label="Plato">
             <BrandLogo kind="wordmark" className="text-[1.8rem]" />
           </Link>
           <nav aria-label={copy.nav.features} className="hidden md:block">
@@ -513,7 +513,7 @@ export function LandingPage() {
             <Link to="/polityka-cookies" className="hover:text-black">
               {copy.legal.cookies}
             </Link>
-            <span>© 2026 Gastrostuff</span>
+            <span>© 2026 Plato</span>
           </div>
         </Container>
       </footer>
