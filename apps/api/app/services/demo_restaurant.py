@@ -107,7 +107,7 @@ US = Locale(
         Person("Luis Hernandez", (("Dishwasher", None),), 17, False, (1, 2)),
         Person("Marcus Reed", (("Dishwasher", None), ("Line cook", 18)), 16, True, (3, 4), 36),
     ),
-    revenue_by_weekday=(3100, 3400, 3700, 4300, 6900, 7600, 5400),
+    revenue_by_weekday=(1150, 1250, 1350, 1550, 2550, 2850, 1950),
     tasks=(
         ("Deep clean the walk-in cooler", "Shelves, floor and door seals. Photo when done."),
         ("Restock the bar before Friday", "Limes, simple syrup, bitters, clean glassware."),
@@ -144,7 +144,7 @@ PL = Locale(
         Person("Marek Szymański", (("Zmywak", None),), 26, False, (1, 2)),
         Person("Adam Krawczyk", (("Zmywak", None), ("Kucharz", 30)), 26, True, (3, 4), 36),
     ),
-    revenue_by_weekday=(9200, 10100, 11200, 12800, 19800, 22400, 16300),
+    revenue_by_weekday=(1650, 1750, 1950, 2250, 3400, 3800, 2650),
     tasks=(
         ("Umyć chłodnię", "Półki, podłoga i uszczelki drzwi. Zdjęcie po skończeniu."),
         ("Uzupełnić bar przed piątkiem", "Limonki, syrop cukrowy, bitters, czyste szkło."),

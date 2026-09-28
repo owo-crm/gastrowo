@@ -318,6 +318,7 @@ export function LandingPage() {
           <nav aria-label={copy.nav.features} className="hidden md:block">
             <ul className="flex items-center gap-7">
               {[
+                ["/how-it-works", copy.hero.secondary],
                 ["#features", copy.nav.features],
                 ["#pricing", copy.nav.pricing],
                 ["#faq", copy.nav.faq],
@@ -367,9 +368,9 @@ export function LandingPage() {
                 <SignupLink context="hero" className="w-full sm:w-auto">
                   {copy.hero.primary} <ArrowRight className="size-5" />
                 </SignupLink>
-                <a href="#features" className="inline-flex min-h-[50px] w-full items-center justify-center rounded-[12px] bg-[var(--color-fill)] px-6 text-[17px] font-semibold text-black sm:w-auto">
+                <Link to="/how-it-works" className="inline-flex min-h-[50px] w-full items-center justify-center rounded-[12px] bg-[var(--color-fill)] px-6 text-[17px] font-semibold text-black sm:w-auto">
                   {copy.hero.secondary}
-                </a>
+                </Link>
               </div>
               <p className="mt-5 text-[15px] text-[var(--color-text-muted)]">{copy.hero.note(fromPrice)}</p>
               <div className="mt-4 flex justify-center sm:hidden">
