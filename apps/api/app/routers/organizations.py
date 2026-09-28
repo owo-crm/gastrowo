@@ -40,6 +40,8 @@ from app.schemas import (
     OrganizationSettingsPatch,
 )
 from app.services.auth_email import send_invite_email
+from app.services.demo_access import is_demo_account
+from app.services.demo_restaurant import seed_demo_restaurant
 from app.services.labor_rules import default_timezone_for, locale_settings
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, require_feature
 
@@ -220,6 +222,18 @@ def patch_current_organization(
     db.commit()
     db.refresh(organization)
     return ok({"id": str(organization.id), "name": organization.name, **locale_settings(organization)})
+
+
+@router.post("/current/demo-restaurant")
+def fill_demo_restaurant(
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """Wipe this business and fill it with a running restaurant. Only for the owner's test account."""
+    if not is_demo_account(db, context.user):
+        raise HTTPException(status_code=403, detail="Demo data is only available on the test account")
+    organization = get_current_organization(context, db)
+    return ok(seed_demo_restaurant(db, organization, context.user))
 
 
 @router.patch("/current/settings")

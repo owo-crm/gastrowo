@@ -29,6 +29,7 @@ class APIModel(BaseModel):
 
 class DevLoginRequest(BaseModel):
     secret: str | None = Field(default=None, max_length=256)
+    as_role: Literal["admin", "staff"] = "admin"
 
 
 class LoginRequest(BaseModel):
@@ -87,6 +88,7 @@ class MeOut(APIModel):
     organization_settings: OrganizationSettingsOut | None = None
     subscription: "SubscriptionSummaryOut | None" = None
     is_platform_admin: bool = False
+    is_demo_account: bool = False
 
 
 Country = Literal["US", "PL"]

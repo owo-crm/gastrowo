@@ -175,3 +175,14 @@ def sync_stripe_locations(db: Session, organization_id: UUID) -> None:
             )
     except Exception:
         logger.exception("Failed to sync Stripe locations for organization %s", organization_id)
+
+
+def grant_comp_pro(db: Session, organization_id: UUID) -> OrganizationSubscription:
+    """Free, never-ending Pro for the owner's own test workspace. Stripe fields are left alone."""
+    subscription = get_or_create_subscription(db, organization_id)
+    subscription.plan = SubscriptionPlanEnum.PRO
+    subscription.status = SubscriptionStatusEnum.ACTIVE
+    subscription.trial_ends_at = None
+    subscription.current_period_ends_at = None
+    db.flush()
+    return subscription

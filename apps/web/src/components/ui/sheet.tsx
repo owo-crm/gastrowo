@@ -45,22 +45,28 @@ export function Sheet({
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
 
+  // Callers pass a new onClose every render; keep the latest one without re-running the effect,
+  // otherwise the panel would steal focus from the input after every keystroke.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
-    panelRef.current?.focus();
+    const panel = panelRef.current;
+    if (panel && !panel.contains(document.activeElement)) panel.focus();
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
   return (
     <OverlayPortal>
       <div className="fixed inset-0 z-[140] flex items-end justify-center md:items-center md:p-6">
-        <div className="ios-backdrop-enter absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
+        <div className="ios-backdrop-enter absolute inset-0 bg-black/40" onClick={() => onCloseRef.current()} aria-hidden />
         <div
           ref={panelRef}
           tabIndex={-1}
