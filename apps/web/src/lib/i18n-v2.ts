@@ -553,6 +553,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "login.invite.title_business": "Join {{business}}",
     "login.mode.join_title": "You are invited",
     "login.mode.join_description": "Your team is already on Platofy — this takes a minute.",
+    "schedule.hours_per_week_short": "h a week",
     // @end-en
   },
   pl: {
@@ -1103,6 +1104,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "login.invite.title_business": "Dołącz do {{business}}",
     "login.mode.join_title": "Masz zaproszenie",
     "login.mode.join_description": "Twój zespół już korzysta z Platofy — to zajmie minutę.",
+    "schedule.hours_per_week_short": "h tygodniowo",
     // @end-pl
   },
   ru: {
@@ -1653,6 +1655,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "login.invite.title_business": "Присоединиться к {{business}}",
     "login.mode.join_title": "Вас пригласили",
     "login.mode.join_description": "Ваша команда уже в Platofy — это займёт минуту.",
+    "schedule.hours_per_week_short": "ч в неделю",
     // @end-ru
   },
 };
