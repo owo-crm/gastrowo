@@ -73,6 +73,7 @@ class OrganizationSettingsOut(APIModel):
     country: str = "US"
     currency: str = "USD"
     labor_rules: str = "US"
+    clock_mode: str = "both"
 
 
 class MeOut(APIModel):

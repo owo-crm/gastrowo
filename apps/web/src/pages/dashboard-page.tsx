@@ -77,6 +77,8 @@ export function DashboardPage() {
     enabled: Boolean(token),
   });
   const data = dashboardQuery.data;
+  const onClockQuery = useQuery({ queryKey: ["clock-team"], queryFn: () => api.clockTeam(token!), enabled: Boolean(token), refetchInterval: 60_000 });
+  const onClock = onClockQuery.data ?? [];
 
   const revenue = sum(data?.totals_by_day ?? [], "revenue");
   const labor = sum(data?.labor_cost_by_day ?? [], "labor_cost_pln");
@@ -181,6 +183,19 @@ export function DashboardPage() {
           ) : null}
         </ListSection>
       )}
+
+      {onClock.length ? (
+        <ListSection header={t("clock.now_on_shift", { count: onClock.length })}>
+          {onClock.map((row) => (
+            <ListRow
+              key={row.id}
+              title={row.full_name}
+              subtitle={[row.shift?.staff_position, row.location_name].filter(Boolean).join(" · ") || t("clock.no_shift")}
+              trailing={<span className="tabular-nums">{t("clock.since", { time: new Date(row.clock_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })}</span>}
+            />
+          ))}
+        </ListSection>
+      ) : null}
 
       <section className="ios-island mx-4 mb-6 px-4 py-5 sm:mx-6 sm:px-5">
         <div className="flex flex-wrap items-baseline justify-between gap-3">

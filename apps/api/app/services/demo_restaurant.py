@@ -24,6 +24,7 @@ from app.models import (
     AssignmentStatusEnum,
     AvailabilitySlot,
     AvailabilityWeek,
+    ClockSession,
     InAppNotification,
     InviteToken,
     Location,
@@ -177,6 +178,7 @@ def clear_business(db: Session, organization_id: UUID, keep_user_id: UUID) -> No
     week_ids = select(AvailabilityWeek.id).where(AvailabilityWeek.organization_id == organization_id)
     location_ids = select(Location.id).where(Location.organization_id == organization_id)
 
+    db.execute(delete(ClockSession).where(ClockSession.organization_id == organization_id))
     db.execute(delete(ShiftRequest).where(ShiftRequest.organization_id == organization_id))
     db.execute(delete(Timesheet).where(Timesheet.organization_id == organization_id))
     db.execute(delete(Assignment).where(Assignment.shift_id.in_(shift_ids)))

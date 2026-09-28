@@ -229,6 +229,7 @@ def _settings_out(organization: Organization | None) -> OrganizationSettingsOut 
         manager_can_manage_business_settings=organization.manager_can_manage_business_settings,
         manager_can_access_notes=organization.manager_can_access_notes,
         manager_can_access_inventory=organization.manager_can_access_inventory,
+        clock_mode=organization.clock_mode or "both",
         **locale_settings(organization),
     )
 

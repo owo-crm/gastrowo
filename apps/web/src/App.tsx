@@ -17,6 +17,7 @@ const PayrollPage = lazy(() => import("@/pages/payroll-page").then((module) => (
 const SettingsPage = lazy(() => import("@/pages/settings-page").then((module) => ({ default: module.SettingsPage })));
 const ReportPage = lazy(() => import("@/pages/report-page").then((module) => ({ default: module.ReportPage })));
 const SchedulePage = lazy(() => import("@/pages/schedule-page").then((module) => ({ default: module.SchedulePage })));
+const KioskPage = lazy(() => import("@/pages/kiosk-page").then((module) => ({ default: module.KioskPage })));
 const TasksPage = lazy(() => import("@/pages/tasks-page").then((module) => ({ default: module.TasksPage })));
 const TeamPage = lazy(() => import("@/pages/team/team-page").then((module) => ({ default: module.TeamPage })));
 const WaitlistPage = lazy(() => import("@/pages/waitlist-page").then((module) => ({ default: module.WaitlistPage })));
@@ -165,6 +166,7 @@ export function App() {
         path="/join"
         element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : hasUnresolvedSession ? <PendingLinkPage /> : <LoginPage />}
       />
+      <Route path="/kiosk" element={<KioskPage />} />
       <Route path="/regulamin" element={<TermsPage />} />
       <Route path="/polityka-prywatnosci" element={<PrivacyPolicyPage />} />
       <Route path="/polityka-cookies" element={<CookiesPolicyPage />} />

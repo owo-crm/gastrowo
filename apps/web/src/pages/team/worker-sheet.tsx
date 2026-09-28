@@ -68,6 +68,7 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
   const [locations, setLocations] = useState<Record<string, { priority: string; rate: string }>>({});
   const [overrides, setOverrides] = useState<Partial<Record<keyof MembershipPermissionOverrides, Override>>>({});
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [newPin, setNewPin] = useState<string | null>(null);
 
   const setup = setupQuery.data;
   useEffect(() => {
@@ -77,6 +78,7 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
     setOverrides(Object.fromEntries(Object.entries(setup.permission_overrides ?? {}).map(([key, value]) => [key, toOverride(value as boolean | null)])));
     setNewPosition("");
     setConfirmRemove(false);
+    setNewPin(null);
   }, [setup]);
 
   const canWorkPositions = setup?.role === "STAFF" || setup?.role === "MANAGER";
@@ -133,6 +135,12 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
       onClose();
     },
     onError: (error) => toast.error(t("team.worker_setup_save_failed"), error instanceof Error ? error.message : undefined),
+  });
+
+  const resetPin = useMutation({
+    mutationFn: () => api.resetClockPin(token!, userId!),
+    onSuccess: (data) => setNewPin(data.pin),
+    onError: (error) => toast.error(t("clock.pin_failed"), error instanceof Error ? error.message : undefined),
   });
 
   const remove = useMutation({
@@ -285,6 +293,19 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
               ))}
             </SheetSection>
           ) : null}
+
+          <SheetSection title={t("clock.header")} footer={newPin ? t("clock.new_pin_footer") : t("clock.reset_pin_footer")}>
+            <div className="flex min-h-12 items-center justify-between gap-3 py-2">
+              <span className="text-[16px] text-black">{t("clock.pin")}</span>
+              {newPin ? (
+                <span className="text-[26px] font-semibold tracking-[0.3em] tabular-nums text-black">{newPin}</span>
+              ) : (
+                <Button size="sm" variant="tinted" onClick={() => resetPin.mutate()} disabled={resetPin.isPending}>
+                  {t("clock.new_pin")}
+                </Button>
+              )}
+            </div>
+          </SheetSection>
 
           {setup.role !== "ADMIN" && setup.user_id !== me?.id ? (
             <SheetSection title={t("team.danger_zone")}>

@@ -15,6 +15,7 @@ export type OrganizationSettings = {
   country?: "US" | "PL";
   currency?: "USD" | "PLN";
   labor_rules?: "US" | "PL";
+  clock_mode?: ClockMode;
 };
 
 export type MembershipPermissionOverrides = {
@@ -595,4 +596,27 @@ export type TimesheetReviewAction = {
   arrived_at?: string;
   left_at?: string;
   review_note?: string;
+};
+
+export type ClockMode = "phone" | "kiosk" | "both";
+
+export type ClockSessionInfo = {
+  id: string;
+  clock_in_at: string;
+  clock_out_at: string | null;
+  source: "phone" | "kiosk";
+  location_name: string | null;
+  shift: { id: string; date: string; start_time: string; end_time: string; staff_position: string | null } | null;
+};
+
+export type ClockMe = { mode: ClockMode; phone_allowed: boolean; has_pin: boolean; open_session: ClockSessionInfo | null };
+
+export type KioskDeviceItem = { id: string; name: string; location_id: string; location_name: string; created_at: string; last_seen_at: string | null };
+
+export type KioskPunchResult = {
+  action: "in" | "out";
+  full_name: string;
+  hours?: number;
+  timesheet_status?: string;
+  session: ClockSessionInfo;
 };
