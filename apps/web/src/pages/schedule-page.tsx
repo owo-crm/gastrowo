@@ -21,6 +21,7 @@ import {
   Trash2,
   XCircle,
 
+  X,
 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -1339,6 +1340,25 @@ function latestTimesheet(entries: TimesheetEntry[]): TimesheetEntry | undefined 
 
 export type ScheduleSection = "calendar" | "availability" | "requests" | "hours";
 
+function RoundAction({ tone, label, onClick, disabled }: { tone: "approve" | "reject"; label: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      disabled={disabled}
+      className={
+        tone === "approve"
+          ? "grid size-10 shrink-0 place-items-center rounded-full bg-[var(--color-success-fill)] text-[var(--color-success)] active:opacity-60 disabled:opacity-40"
+          : "grid size-10 shrink-0 place-items-center rounded-full bg-[var(--color-danger-fill)] text-[var(--color-danger)] active:opacity-60 disabled:opacity-40"
+      }
+    >
+      {tone === "approve" ? <Check className="size-5" strokeWidth={3} /> : <X className="size-5" strokeWidth={3} />}
+    </button>
+  );
+}
+
 export function SchedulePage({ section = "calendar" }: { section?: ScheduleSection }) {
   const { t, lang } = useLanguage();
   const location = useLocation();
@@ -2506,6 +2526,13 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
   }, [locationMembersQuery.data, usersQuery.data]);
 
   const visiblePendingTimesheets = pendingTimesheetsQuery.data ?? [];
+  const pendingByDate = useMemo(() => {
+    const groups = new Map<string, TimesheetEntry[]>();
+    for (const entry of [...visiblePendingTimesheets].sort((a, b) => a.work_date.localeCompare(b.work_date) || a.arrived_at.localeCompare(b.arrived_at))) {
+      groups.set(entry.work_date, [...(groups.get(entry.work_date) ?? []), entry]);
+    }
+    return [...groups.entries()];
+  }, [visiblePendingTimesheets]);
 
   const availabilitySlotsByDay = useMemo(() => {
     const map: Record<number, AvailabilityPreferenceSlot[]> = {};
@@ -2684,66 +2711,63 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
     return t("schedule.status_empty");
   };
 
+  const teamAvailabilityRows = (teamAvailabilityQuery.data ?? []).filter((item) => item.user_id !== me?.id);
+  const dayLetters = weekDays.map((day) => formatDate(day.iso, lang, { weekday: "narrow" }));
   const teamAvailabilityCard = isManagerView ? (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("schedule.team_availability")}</CardTitle>
-        <CardDescription>{t("schedule.team_availability_description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {(teamAvailabilityQuery.data ?? []).filter((item) => item.full_name !== me?.full_name || item.user_id !== me?.id).length ? (
-          <div className="space-y-3">
-            {(teamAvailabilityQuery.data ?? [])
-              .filter((item) => item.user_id !== me?.id)
-              .map((item) => (
-                <div key={item.user_id} className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-[var(--color-separator)] bg-white px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-[var(--color-heading)]">{item.full_name}</p>
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                      {item.desired_hours}h • {t("schedule.items_count", { count: item.slots_count })}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className={availabilityStatusBadgeClass(item.status)}>{availabilityStatusLabel(item.status)}</Badge>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() =>
-                        setTeamAvailabilityEditor({
-                          userId: item.user_id,
-                          fullName: item.full_name,
-                          slots: (item.slots ?? []).map((slot) => ({
-                            day_of_week: slot.day_of_week,
-                            start_time: slot.start_time,
-                            end_time: slot.end_time,
-                            is_available: slot.is_available,
-                          })),
-                        })
-                      }
-                    >
-                      <Pencil className="size-4" /> {t("common.edit")}
-                    </Button>
-                    {item.slots_count > 0 && item.status !== "approved" ? (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => approveAvailabilityMutation.mutate(item.user_id)}
-                        disabled={approveAvailabilityMutation.isPending}
+    <div className="-mx-4 sm:-mx-6">
+      <div className="flex items-center justify-between gap-2 px-4 pb-2 sm:px-6">
+        <Button size="icon" variant="ghost" aria-label={t("schedule.previous_week")} onClick={() => setWeekStart((current) => shiftWeek(current, -7))}>
+          <ChevronLeft className="size-5" />
+        </Button>
+        <span className="text-[15px] font-semibold text-black">
+          {weekDays[0]?.caption} – {weekDays[6]?.caption}
+        </span>
+        <Button size="icon" variant="ghost" aria-label={t("schedule.next_week")} onClick={() => setWeekStart((current) => shiftWeek(current, 7))}>
+          <ChevronRight className="size-5" />
+        </Button>
+      </div>
+      <ListSection header={t("schedule.team_availability")} footer={t("schedule.team_availability_description")}>
+        {teamAvailabilityRows.map((item) => {
+          const availableDays = new Set((item.slots ?? []).filter((slot) => slot.is_available).map((slot) => slot.day_of_week));
+          const openEditor = () =>
+            setTeamAvailabilityEditor({
+              userId: item.user_id,
+              fullName: item.full_name,
+              slots: (item.slots ?? []).map((slot) => ({ day_of_week: slot.day_of_week, start_time: slot.start_time, end_time: slot.end_time, is_available: slot.is_available })),
+            });
+          return (
+            <li key={item.user_id} className="flex items-center gap-3 px-4 py-3 sm:px-6">
+              <button type="button" onClick={openEditor} className="flex min-w-0 flex-1 items-center gap-3 text-left active:opacity-60">
+                <WorkerAvatar name={item.full_name} size={36} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[16px] text-black">{item.full_name}</span>
+                  <span className="mt-1 flex items-center gap-1" aria-label={t("schedule.items_count", { count: item.slots_count })}>
+                    {dayLetters.map((letter, index) => (
+                      <span
+                        key={index}
+                        className={
+                          availableDays.has(index)
+                            ? "grid size-[22px] place-items-center rounded-full bg-[var(--color-success)] text-[11px] font-semibold text-white"
+                            : "grid size-[22px] place-items-center rounded-full bg-[var(--color-fill)] text-[11px] font-semibold text-[#6c6c70]"
+                        }
                       >
-                        <CheckCircle2 className="size-4" /> {t("schedule.approve_availability")}
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-          </div>
-        ) : (
-          <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-            {t("schedule.no_team_availability")}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                        {letter}
+                      </span>
+                    ))}
+                    <span className="ml-1.5 whitespace-nowrap text-[13px] tabular-nums text-[#3c3c43]">{item.desired_hours} h</span>
+                  </span>
+                </span>
+                <Badge tone={item.status === "approved" ? "green" : item.status === "empty" ? "neutral" : "orange"}>{availabilityStatusLabel(item.status)}</Badge>
+              </button>
+              {item.slots_count > 0 && item.status !== "approved" ? (
+                <RoundAction tone="approve" label={t("schedule.approve_availability")} onClick={() => approveAvailabilityMutation.mutate(item.user_id)} disabled={approveAvailabilityMutation.isPending} />
+              ) : null}
+            </li>
+          );
+        })}
+        {!teamAvailabilityRows.length ? <ListRow title={<span className="text-[var(--color-text-muted)]">{t("schedule.no_team_availability")}</span>} /> : null}
+      </ListSection>
+    </div>
   ) : null;
 
 
@@ -3065,7 +3089,18 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
   const pageTitle = section === "calendar" ? (isStaff ? t("sub.my_week") : t("schedule.title")) : t(`sub.${section}`);
 
   return (
-    <AppShell title={pageTitle} fullBleed={section === "calendar" && !isStaff} flush={isStaff}>
+    <AppShell
+      title={pageTitle}
+      fullBleed={section === "calendar" && !isStaff}
+      flush={isStaff || section !== "calendar"}
+      action={
+        !isStaff && isTimesheetsRoute && visiblePendingTimesheets.length ? (
+          <Button size="sm" onClick={() => approveVisibleTimesheetsMutation.mutate(visiblePendingTimesheets)} disabled={approveVisibleTimesheetsMutation.isPending || reviewTimesheetMutation.isPending}>
+            <CheckCircle2 className="size-4" /> {t("schedule.approve_all_count", { count: visiblePendingTimesheets.length })}
+          </Button>
+        ) : undefined
+      }
+    >
       {isStaff && section !== "calendar" ? (
         staffOtherSection
       ) : isStaff ? (
@@ -3091,199 +3126,86 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
       ) : (
 
 
-        <div className="stagger-grid grid gap-5">
-
-          <section className="min-w-0 space-y-5">
-
-            {section === "requests" ? (
-            <Card>
-              <CardHeader>
-                <div>
-                  <CardTitle>{t("schedule.incoming_requests")}</CardTitle>
-
-                  <CardDescription>{t("schedule.incoming_requests_description")}</CardDescription>
-
-                </div>
-
-              </CardHeader>
-
-              <CardContent className="space-y-3">
-
-                {(incomingRequestsQuery.data ?? []).map((item) => {
-
-                  const shift = shiftsById[item.shift_id];
-
-                  return (
-
-                    <div key={item.id} className="surface-muted rounded-[12px] px-4 py-4">
-
-                      <p className="font-medium text-[var(--color-heading)]">{item.requester_name}  {item.request_type.toUpperCase()}</p>
-
-                      <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-
-                        {shift ? `${shift.date}  ${formatTime(shift.start_time)}-${formatTime(shift.end_time)}` : item.shift_id.slice(0, 8)}
-
+        <div>
+          {section === "requests" ? (
+            <ListSection header={t("schedule.incoming_requests")} footer={t("schedule.incoming_requests_description")}>
+              {(incomingRequestsQuery.data ?? []).map((item) => {
+                const shift = shiftsById[item.shift_id];
+                return (
+                  <li key={item.id} className="flex items-center gap-3 px-4 py-3 sm:px-6">
+                    <WorkerAvatar name={item.requester_name} size={36} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[16px] text-black">
+                        {item.requester_name}{" "}
+                        <Badge tone={item.request_type === "swap" ? "orange" : "blue"} className="ml-1 align-middle">
+                          {item.request_type === "swap" ? t("schedule.swap") : t("schedule.pickup")}
+                        </Badge>
                       </p>
-
-                      <div className="mt-3 flex flex-wrap gap-2">
-
-                        <Button size="sm" onClick={() => reviewShiftRequestMutation.mutate({ requestId: item.id, action: "approve" })}>
-
-                          {t("schedule.approve")}
-
-                        </Button>
-
-                        <Button size="sm" variant="secondary" onClick={() => reviewShiftRequestMutation.mutate({ requestId: item.id, action: "reject" })}>
-
-                          {t("schedule.reject")}
-
-                        </Button>
-
-                      </div>
-
+                      <p className="truncate text-[14px] text-[#3c3c43]">
+                        {shift ? `${formatDate(shift.date, lang)} · ${formatTime(shift.start_time)}–${formatTime(shift.end_time)}${shift.staff_position ? ` · ${shift.staff_position}` : ""}` : item.shift_id.slice(0, 8)}
+                      </p>
+                      {item.note ? <p className="mt-0.5 text-[14px] text-black">“{item.note}”</p> : null}
                     </div>
+                    <RoundAction tone="approve" label={t("schedule.approve")} onClick={() => reviewShiftRequestMutation.mutate({ requestId: item.id, action: "approve" })} disabled={reviewShiftRequestMutation.isPending} />
+                    <RoundAction tone="reject" label={t("schedule.reject")} onClick={() => reviewShiftRequestMutation.mutate({ requestId: item.id, action: "reject" })} disabled={reviewShiftRequestMutation.isPending} />
+                  </li>
+                );
+              })}
+              {!incomingRequestsQuery.data?.length ? <ListRow title={<span className="text-[var(--color-text-muted)]">{t("schedule.no_incoming_requests")}</span>} /> : null}
+            </ListSection>
+          ) : null}
 
-                  );
+          {section === "availability" && teamAvailabilityCard ? <div className="px-4 sm:px-6">{teamAvailabilityCard}</div> : null}
+          {section === "availability" && availabilityCard ? <div className="px-4 sm:px-6">{availabilityCard}</div> : null}
 
-                })}
-
-                {!incomingRequestsQuery.data?.length ? (
-
-                  <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-
-                    {t("schedule.no_incoming_requests")}
-
-                  </div>
-
-                ) : null}
-
-              </CardContent>
-
-            </Card>
-            ) : null}
-
-            {section === "availability" && teamAvailabilityCard ? <div>{teamAvailabilityCard}</div> : null}
-            {section === "availability" && availabilityCard ? <div>{availabilityCard}</div> : null}
-
-            {isTimesheetsRoute ? (
-            <Card>
-
-              <CardHeader>
-
-                <div className="flex flex-wrap items-start justify-between gap-3">
-
-                  <div>
-
-                    <CardTitle>{t("schedule.timesheet_approvals")}</CardTitle>
-
-                    <CardDescription>{t("schedule.timesheet_approvals_description")}</CardDescription>
-
-                  </div>
-                  {visiblePendingTimesheets.length ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-9 rounded-[10px] border-0 bg-transparent px-0 text-[var(--color-primary-strong)] hover:bg-transparent"
-                      onClick={() => approveVisibleTimesheetsMutation.mutate(visiblePendingTimesheets)}
-                      disabled={approveVisibleTimesheetsMutation.isPending || reviewTimesheetMutation.isPending}
-                    >
-                      <CheckCircle2 className="size-4" /> {t("schedule.approve_all_visible")}
-                    </Button>
-                  ) : null}
-
+          {isTimesheetsRoute ? (
+            <>
+              {pendingByDate.map(([dateIso, entries]) => (
+                <ListSection key={dateIso} header={formatDate(dateIso, lang, { weekday: "long", month: "short", day: "numeric" })}>
+                  {entries.map((entry) => {
+                    const shift = entry.shift_id ? shiftsById[entry.shift_id] : null;
+                    const employeeName = timesheetUserNameById[entry.user_id] ?? entry.user_id.slice(0, 8);
+                    const deltaLabel = deltaText(shift, entry);
+                    const openCorrection = () =>
+                      setReviewModal({ entry, arrived_at: toTimeInput(entry.arrived_at), left_at: toTimeInput(entry.left_at), review_note: entry.review_note ?? "" });
+                    return (
+                      <li key={entry.id} className="flex items-center gap-3 px-4 py-3 sm:px-6">
+                        <button type="button" onClick={openCorrection} className="flex min-w-0 flex-1 items-center gap-3 text-left active:opacity-60">
+                          <WorkerAvatar name={employeeName} size={36} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[16px] text-black">{employeeName}</span>
+                            <span className="block truncate text-[14px] text-[#3c3c43]">
+                              {formatTime(entry.arrived_at)}–{formatTime(entry.left_at)}
+                              {shift
+                                ? ` · ${t("schedule.planned_short", { time: `${formatTime(shift.start_time)}–${formatTime(shift.end_time)}` })}`
+                                : entry.shift_id
+                                  ? ` · ${t("schedule.planned_entry")}`
+                                  : ` · ${t("schedule.extra_hours_without_shift")}`}
+                            </span>
+                            {entry.note ? <span className="block truncate text-[13px] text-[#6c6c70]">{entry.note}</span> : null}
+                          </span>
+                          {deltaLabel && deltaLabel !== t("schedule.extra_entry") ? (
+                            <Badge tone={deltaLabel.startsWith("+") ? "orange" : deltaLabel.startsWith("-") ? "blue" : "green"}>{deltaLabel}</Badge>
+                          ) : null}
+                        </button>
+                        <RoundAction tone="approve" label={t("schedule.approve")} onClick={() => reviewTimesheetMutation.mutate({ entry, payload: { action: "approve" } })} disabled={reviewTimesheetMutation.isPending} />
+                        <RoundAction tone="reject" label={t("schedule.reject")} onClick={() => reviewTimesheetMutation.mutate({ entry, payload: { action: "reject" } })} disabled={reviewTimesheetMutation.isPending} />
+                      </li>
+                    );
+                  })}
+                </ListSection>
+              ))}
+              {!visiblePendingTimesheets.length ? (
+                <div className="px-4 py-16 text-center sm:px-6">
+                  <CheckCircle2 className="mx-auto size-12 text-[var(--color-success)]" />
+                  <p className="mt-3 text-[20px] font-semibold text-black">{t("schedule.all_hours_reviewed")}</p>
+                  <p className="mt-1 text-[15px] text-[var(--color-text-muted)]">{t("schedule.no_pending_timesheets")}</p>
                 </div>
-
-              </CardHeader>
-
-              <CardContent className="space-y-3 overflow-hidden">
-                {visiblePendingTimesheets.length ? (
-                  <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-[12px] border border-[var(--color-separator)] bg-white px-4 py-3">
-                    <p className="text-sm font-medium text-[var(--color-heading)]">{t("schedule.pending_reports_in_week", { count: visiblePendingTimesheets.length })}</p>
-                    <span className="text-xs text-[var(--color-text-muted)]">{t("schedule.scrollable_list")}</span>
-                  </div>
-                ) : null}
-                <div className="max-h-[520px] space-y-3 overflow-y-auto pr-1">
-
-                {visiblePendingTimesheets.map((entry) => {
-                  const shift = entry.shift_id ? shiftsById[entry.shift_id] : null;
-                  const employeeName = timesheetUserNameById[entry.user_id] ?? entry.user_id.slice(0, 8);
-                  const deltaLabel = deltaText(shift, entry);
-                  return (
-                    <div key={entry.id} className="surface-muted rounded-[12px] px-4 py-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="font-medium text-[var(--color-heading)]">{employeeName}</p>
-                          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                            {workDateLabel(entry.work_date)} • {formatTime(entry.arrived_at)}-{formatTime(entry.left_at)}
-                          </p>
-                          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                            {shift
-                              ? `${shift.staff_position ?? shift.required_role} • ${shift.date} ${formatTime(shift.start_time)}-${formatTime(shift.end_time)}`
-                              : entry.shift_id
-                                ? t("schedule.planned_entry")
-                                : t("schedule.extra_hours_without_shift")}
-                          </p>
-                          {deltaLabel ? <p className={`mt-1 text-xs font-semibold ${deltaLabel.startsWith("+") ? "text-amber-700" : deltaLabel.startsWith("-") ? "text-sky-700" : "text-emerald-700"}`}>
-                            {deltaLabel === t("schedule.extra_entry") ? t("schedule.extra_entry") : t("schedule.delta_vs_plan", { delta: deltaLabel })}
-                          </p> : null}
-                          {entry.note ? <p className="mt-2 text-sm text-[var(--color-heading)]">{entry.note}</p> : null}
-                        </div>
-                        <Badge className={timesheetStatusClass(entry.status)}>{statusText(entry.status)}</Badge>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => reviewTimesheetMutation.mutate({ entry, payload: { action: "approve" } })}
-                          disabled={reviewTimesheetMutation.isPending}
-                        >
-                          <CheckCircle2 className="size-4" /> {t("schedule.approve")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() =>
-                            setReviewModal({
-                              entry,
-                              arrived_at: toTimeInput(entry.arrived_at),
-                              left_at: toTimeInput(entry.left_at),
-                              review_note: entry.review_note ?? "",
-                            })
-                          }
-                        >
-                          {t("schedule.correct")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => reviewTimesheetMutation.mutate({ entry, payload: { action: "reject" } })}
-                          disabled={reviewTimesheetMutation.isPending}
-                        >
-                          <XCircle className="size-4" /> {t("schedule.reject")}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-                </div>
-
-                {!visiblePendingTimesheets.length ? (
-
-                  <div className="rounded-[12px] border border-dashed border-[var(--color-border)] px-4 py-6 text-sm text-[var(--color-text-muted)]">
-
-                    {t("schedule.no_pending_timesheets")}
-
-                  </div>
-
-                ) : null}
-
-              </CardContent>
-
-            </Card>
-            ) : null}
-
-          </section>
-
+              ) : (
+                <p className="px-4 pb-6 text-[13px] text-[var(--color-text-muted)] sm:px-6">{t("schedule.hours_tap_hint")}</p>
+              )}
+            </>
+          ) : null}
         </div>
 
       )}

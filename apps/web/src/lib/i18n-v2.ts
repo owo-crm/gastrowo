@@ -477,6 +477,13 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "platform.delete": "Delete business",
     "platform.delete_confirm": "Deletes {{name}} with all its data and people who belong only to it. Type the name to confirm.",
     "platform.history": "History",
+    "schedule.planned_short": "planned {{time}}",
+    "schedule.all_hours_reviewed": "All hours reviewed",
+    "schedule.hours_tap_hint": "Tap a row to correct the times. On-time clock-ins are approved automatically and don't show up here.",
+    "schedule.approve_all_count": "Approve all {{count}}",
+    "schedule.swap": "Swap",
+    "schedule.pickup": "Pick up",
+    "schedule.incoming_requests_description": "Approving a swap or pickup updates the schedule and tells the people involved.",
     // @end-en
   },
   pl: {
@@ -951,6 +958,13 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "platform.delete": "Usuń firmę",
     "platform.delete_confirm": "Usuwa {{name}} ze wszystkimi danymi i osobami tylko z tej firmy. Wpisz nazwę, aby potwierdzić.",
     "platform.history": "Historia",
+    "schedule.planned_short": "plan {{time}}",
+    "schedule.all_hours_reviewed": "Wszystkie godziny sprawdzone",
+    "schedule.hours_tap_hint": "Stuknij wiersz, aby poprawić godziny. Punktualne odbicia zatwierdzają się same i tu nie trafiają.",
+    "schedule.approve_all_count": "Zatwierdź wszystkie {{count}}",
+    "schedule.swap": "Zamiana",
+    "schedule.pickup": "Przejęcie",
+    "schedule.incoming_requests_description": "Zatwierdzenie zamiany lub przejęcia zmienia grafik i powiadamia zainteresowanych.",
     // @end-pl
   },
   ru: {
@@ -1425,6 +1439,13 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "platform.delete": "Удалить бизнес",
     "platform.delete_confirm": "Удалит {{name}} со всеми данными и людьми только из этого бизнеса. Введите название для подтверждения.",
     "platform.history": "История",
+    "schedule.planned_short": "план {{time}}",
+    "schedule.all_hours_reviewed": "Все часы проверены",
+    "schedule.hours_tap_hint": "Нажмите на строку, чтобы исправить время. Отметки по графику подтверждаются сами и сюда не попадают.",
+    "schedule.approve_all_count": "Подтвердить все {{count}}",
+    "schedule.swap": "Обмен",
+    "schedule.pickup": "Взять смену",
+    "schedule.incoming_requests_description": "Одобрение обмена или взятия смены меняет график и уведомляет участников.",
     // @end-ru
   },
 };
