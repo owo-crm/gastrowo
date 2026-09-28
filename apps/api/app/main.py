@@ -24,6 +24,7 @@ from app.routers import (
     organizations,
     payroll,
     platform,
+    push,
     positions,
     reports,
     schedule,
@@ -34,7 +35,10 @@ from app.routers import (
     workers,
 )
 
+from app.services.push import install_push_hooks
+
 logging.basicConfig(level=logging.INFO)
+install_push_hooks()
 logger = logging.getLogger("workdish.api")
 
 app = FastAPI(title="Workdish API", version="0.1.0")
@@ -103,3 +107,4 @@ app.include_router(dashboard.router)
 app.include_router(payroll.router)
 app.include_router(clock.router)
 app.include_router(platform.router)
+app.include_router(push.router)

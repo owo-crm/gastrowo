@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { CalendarPlus, Copy, ImagePlus, KeyRound, LogOut, Store, Tablet, Trash2 } from "lucide-react";
 
+import { DeviceSection } from "@/components/device-section";
 import { AppShell, LanguageList } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -229,6 +230,7 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
                 <p className="text-[14px] text-[var(--color-text-muted)]">{t("clock.pin_hint")}</p>
               </div>
             </Sheet>
+            <DeviceSection />
             <ListSection header={t("shell.language")}>
               <li className="px-2 py-1 sm:px-4">
                 <LanguageList />

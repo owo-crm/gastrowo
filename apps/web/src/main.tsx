@@ -8,6 +8,7 @@ import { App } from "@/App";
 import { captureTestLoginKey } from "@/components/dev-login-button";
 import { AuthProvider } from "@/lib/auth";
 import { LanguageProvider } from "@/lib/i18n";
+import { registerServiceWorker } from "@/lib/pwa";
 import { ToastProvider } from "@/lib/toast";
 import "@/styles.css";
 
@@ -19,6 +20,7 @@ const queryClient = new QueryClient({
 });
 
 captureTestLoginKey();
+registerServiceWorker();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
