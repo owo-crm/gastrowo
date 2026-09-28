@@ -49,7 +49,8 @@ from app.schemas import (
 )
 from app.services.auth_email import send_otp_email
 from app.services.labor_rules import default_timezone_for, locale_settings
-from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary
+from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, grant_comp_pro
+from app.services.demo_access import dev_login_user, is_demo_account
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -399,23 +400,42 @@ def _dev_login_allowed(secret: str | None) -> bool:
 
 @router.post("/dev-login")
 def dev_login(response: Response, payload: DevLoginRequest | None = None, db: Session = Depends(get_db)):
-    """One-click admin login for testing: DEV_LOGIN_ENABLED outside production, or DEV_LOGIN_SECRET anywhere."""
+    """Test login behind DEV_LOGIN_SECRET (or DEV_LOGIN_ENABLED outside production).
+
+    `as_role="staff"` signs in as a worker of the same test business, so both sides can be tried from a phone.
+    """
     if not _dev_login_allowed(payload.secret if payload else None):
         raise HTTPException(status_code=404, detail="Not Found")
 
-    if settings.dev_login_email:
-        user = db.scalar(select(User).where(User.email == settings.dev_login_email.lower()))
-    else:
-        user = db.scalar(
-            select(User)
-            .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
-            .where(OrganizationMembership.role == RoleEnum.ADMIN)
-            .order_by(User.created_at)
-        )
-    if user is None:
+    admin = dev_login_user(db)
+    if admin is None:
         raise HTTPException(status_code=404, detail="No admin account to log in as")
+    admin_memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == admin.id)).all()
+    admin_membership = next((item for item in admin_memberships if item.role == RoleEnum.ADMIN), admin_memberships[0] if admin_memberships else None)
+    if admin_membership is not None:
+        grant_comp_pro(db, admin_membership.organization_id)
 
-    memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)).all()
+    user = admin
+    memberships = list(admin_memberships)
+    if payload and payload.as_role == "staff":
+        if admin_membership is None:
+            raise HTTPException(status_code=404, detail="The test business has no workers yet")
+        staff_membership = db.scalar(
+            select(OrganizationMembership)
+            .join(User, User.id == OrganizationMembership.user_id)
+            .where(
+                OrganizationMembership.organization_id == admin_membership.organization_id,
+                OrganizationMembership.role == RoleEnum.STAFF,
+            )
+            .order_by(User.email.like("%@demo.gastrostuff.app").desc(), User.created_at)
+        )
+        if staff_membership is None:
+            raise HTTPException(status_code=404, detail="The test business has no workers yet. Fill the demo restaurant first.")
+        user = db.get(User, staff_membership.user_id)
+        memberships = [staff_membership]
+    elif admin_membership is not None:
+        memberships = [admin_membership, *[item for item in admin_memberships if item.id != admin_membership.id]]
+
     _create_remembered_session(db, response, user, memberships)
     db.commit()
     return ok(_issue_auth_payload(user, memberships))
@@ -561,5 +581,6 @@ def me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
         organization_settings=_settings_out(organization),
         subscription=build_subscription_summary(db, active_membership.organization_id if active_membership else None),
         is_platform_admin=user.email.lower() in settings.parsed_platform_admin_emails,
+        is_demo_account=is_demo_account(db, user),
     )
     return ok(payload_out.model_dump(mode="json"))

@@ -160,7 +160,7 @@ export function TasksPage() {
                 <div className="min-w-0 flex-1">
                   <p className={cn("text-[17px] leading-6", done ? "text-[#6c6c70] line-through" : "text-black")}>{task.title}</p>
                   {task.description ? <p className="mt-0.5 whitespace-pre-line text-[15px] leading-5 text-[#3c3c43]">{task.description}</p> : null}
-                  <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[13px] text-[#3c3c43]">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[13px] text-[#3c3c43]">
                     <span className="inline-flex items-center gap-1.5">
                       <WorkerAvatar name={nameById[task.assigned_to] ?? "?"} size={18} />
                       {task.assigned_to === me?.id ? t("tasks.you") : nameById[task.assigned_to] ?? ""}
@@ -174,7 +174,7 @@ export function TasksPage() {
                         locale: lang,
                       })}
                     </span>
-                  </p>
+                  </div>
                   {task.photos.length ? (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {task.photos.map((photo) => (

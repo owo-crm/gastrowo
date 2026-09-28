@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { CalendarPlus, Copy, ImagePlus, LogOut } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { CalendarPlus, Copy, ImagePlus, LogOut, Store } from "lucide-react";
 
 import { AppShell, LanguageList } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListRow, ListSection } from "@/components/ui/list";
 import { Segmented } from "@/components/ui/segmented";
+import { Sheet } from "@/components/ui/sheet";
 import { api, apiAbsoluteUrl } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { loadBusinessLogo, saveBusinessLogo } from "@/lib/business-branding";
@@ -71,6 +72,8 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
   const [country, setCountry] = useState<"US" | "PL">(me?.organization_settings?.country ?? "US");
   const [businessLogo, setBusinessLogo] = useState<string | null>(null);
   const [calendarUrl, setCalendarUrl] = useState<string | null>(null);
+  const [confirmDemo, setConfirmDemo] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     setFullName(me?.full_name ?? "");
@@ -99,6 +102,17 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
       await refreshMe();
     },
     onError: (error) => toast.error(t("profile.business_update_failed"), error instanceof Error ? error.message : undefined),
+  });
+
+  const demoRestaurant = useMutation({
+    mutationFn: () => api.seedDemoRestaurant(token!),
+    onSuccess: async (counts) => {
+      setConfirmDemo(false);
+      await refreshMe();
+      await queryClient.invalidateQueries();
+      toast.success(t("demo.done"), t("demo.done_body", { people: counts.people, shifts: counts.shifts, hours: counts.timesheets, days: counts.revenue_days }));
+    },
+    onError: (error) => toast.error(t("demo.failed"), error instanceof Error ? error.message : undefined),
   });
 
   const calendarFeed = useMutation({
@@ -193,6 +207,31 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
                 {t("common.save")}
               </Button>
             </div>
+            {me?.is_demo_account && me.role === "ADMIN" ? (
+              <>
+                <ListSection header={t("demo.header")} footer={t("demo.footer")}>
+                  <ListRow
+                    leading={<Store className="size-5 text-[var(--color-primary-strong)]" />}
+                    title={<span className="font-semibold text-[var(--color-primary-strong)]">{t("demo.fill")}</span>}
+                    chevron
+                    onClick={() => setConfirmDemo(true)}
+                  />
+                </ListSection>
+                <Sheet
+                  open={confirmDemo}
+                  onClose={() => setConfirmDemo(false)}
+                  title={t("demo.confirm_title")}
+                >
+                  <div className="space-y-3 text-[15px] leading-6 text-black">
+                    <p>{t("demo.confirm_body")}</p>
+                    <p className="text-[var(--color-text-muted)]">{t("demo.confirm_note")}</p>
+                    <Button size="lg" variant="danger" className="w-full" onClick={() => demoRestaurant.mutate()} disabled={demoRestaurant.isPending}>
+                      {demoRestaurant.isPending ? t("demo.working") : t("demo.confirm")}
+                    </Button>
+                  </div>
+                </Sheet>
+              </>
+            ) : null}
           </>
         ) : null}
 

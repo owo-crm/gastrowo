@@ -337,7 +337,6 @@ export function LandingPage() {
                 { value: "ru", label: "RU" },
               ]}
             />
-            <DevLoginButton className="max-sm:hidden" />
             <Link to={SIGNIN_URL} className="px-1 text-[15px] font-semibold text-[var(--color-primary-strong)]">
               {copy.nav.signIn}
             </Link>
@@ -347,6 +346,9 @@ export function LandingPage() {
           </div>
         </Container>
       </header>
+      <div className="flex justify-center px-4 pt-3 empty:hidden">
+        <DevLoginButton />
+      </div>
 
       <main>
         <section className="pt-14 sm:pt-24">

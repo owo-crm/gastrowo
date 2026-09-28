@@ -48,44 +48,48 @@ export function isDevLoginAvailable(): boolean {
   return BUILD_ENABLED || Boolean(readStoredKey());
 }
 
+type TestRole = "admin" | "staff";
+
+/** Two test sign-ins behind the remembered key: the owner's admin, or a worker of the same demo business. */
 export function DevLoginButton({ className }: { className?: string }) {
   const { devLogin } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
-  const [isPending, setIsPending] = useState(false);
+  const [pending, setPending] = useState<TestRole | null>(null);
   const [visible, setVisible] = useState(isDevLoginAvailable);
 
   if (!visible) return null;
 
-  const handleClick = async () => {
-    setIsPending(true);
+  const signIn = async (role: TestRole) => {
+    setPending(role);
     try {
-      await devLogin(readStoredKey());
+      await devLogin(readStoredKey(), role);
       navigate("/", { replace: true });
     } catch (error) {
-      // A rotated or wrong key: stop showing the button in this browser.
-      if (!BUILD_ENABLED) {
+      const status = (error as { status?: number } | null)?.status;
+      // A rotated or wrong key: stop showing the buttons in this browser. A missing worker is not a key problem.
+      if (!BUILD_ENABLED && !(role === "staff" && status === 404 && error instanceof Error && /worker/i.test(error.message))) {
         forgetTestKey();
         setVisible(false);
       }
       toast.error("Test login failed", error instanceof Error ? error.message : undefined);
     } finally {
-      setIsPending(false);
+      setPending(null);
     }
   };
 
+  const chip =
+    "inline-flex min-h-9 items-center gap-1.5 rounded-full border border-dashed border-amber-400 bg-amber-50 px-3 text-[14px] font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-60";
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={isPending}
-      className={cn(
-        "inline-flex min-h-9 items-center gap-2 rounded-xl border border-dashed border-amber-400 bg-amber-50 px-3 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-60",
-        className,
-      )}
-    >
-      <FlaskConical className="size-4" />
-      {isPending ? "Logowanie..." : "Wejdź jako admin (test)"}
-    </button>
+    <div className={cn("inline-flex flex-wrap items-center gap-2", className)}>
+      <button type="button" onClick={() => signIn("admin")} disabled={Boolean(pending)} className={chip}>
+        <FlaskConical className="size-4" />
+        {pending === "admin" ? "…" : "Test: admin"}
+      </button>
+      <button type="button" onClick={() => signIn("staff")} disabled={Boolean(pending)} className={chip}>
+        <FlaskConical className="size-4" />
+        {pending === "staff" ? "…" : "Test: worker"}
+      </button>
+    </div>
   );
 }

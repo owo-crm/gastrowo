@@ -108,8 +108,8 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
-  devLogin(secret?: string | null) {
-    return request<AuthLoginResponse>("/auth/dev-login", { method: "POST", body: JSON.stringify({ secret: secret ?? null }) });
+  devLogin(secret?: string | null, asRole: "admin" | "staff" = "admin") {
+    return request<AuthLoginResponse>("/auth/dev-login", { method: "POST", body: JSON.stringify({ secret: secret ?? null, as_role: asRole }) });
   },
   loginWithPassword(input: { email: string; password: string }) {
     return request<AuthLoginResponse>("/auth/login/password", {
@@ -158,6 +158,13 @@ export const api = {
   },
   me(token: string) {
     return request<MeResponse>("/auth/me", {}, token);
+  },
+  seedDemoRestaurant(token: string) {
+    return request<{ people: number; locations: number; shifts: number; timesheets: number; revenue_days: number; tasks: number; requests: number }>(
+      "/organizations/current/demo-restaurant",
+      { method: "POST" },
+      token,
+    );
   },
   patchCurrentOrganization(token: string, body: { name?: string; country?: "US" | "PL" }) {
     return request<{ id: string; name: string; country: "US" | "PL"; currency: "USD" | "PLN" }>("/organizations/current", {
