@@ -7,13 +7,14 @@ from decimal import Decimal
 MAX_TIMESHEET_HOURS = 16
 
 
-def worked_hours(arrived_at: time, left_at: time) -> Decimal:
-    """Hours between arrival and leaving; leaving earlier than arrival means after midnight."""
+def worked_hours(arrived_at: time, left_at: time, break_minutes: int | None = 0) -> Decimal:
+    """Hours between arrival and leaving, minus the unpaid break; leaving before arrival means after midnight."""
     started = datetime.combine(date.today(), arrived_at)
     ended = datetime.combine(date.today(), left_at)
     if ended <= started:
         ended += timedelta(days=1)
-    return Decimal(str((ended - started).total_seconds() / 3600))
+    seconds = (ended - started).total_seconds() - max(break_minutes or 0, 0) * 60
+    return Decimal(str(max(seconds, 0) / 3600))
 
 
 def validate_timesheet_times(arrived_at: time, left_at: time) -> None:

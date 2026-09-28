@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 import uuid
 from uuid import UUID
 
+from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -38,8 +39,10 @@ from app.schemas import (
     OrganizationPatch,
     OrganizationSettingsOut,
     OrganizationSettingsPatch,
+    TeamImportRequest,
 )
 from app.services.auth_email import send_invite_email
+from app.services.positions import ensure_catalog
 from app.services.demo_access import is_demo_account
 from app.services.demo_restaurant import seed_demo_restaurant
 from app.services.labor_rules import default_timezone_for, locale_settings
@@ -348,6 +351,72 @@ def link_member_by_email(
             "role": membership.role,
         }
     )
+
+
+@router.post("/members/import")
+def import_team(
+    payload: TeamImportRequest,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    """Invite many people at once (from a CSV). Each gets the usual email invite; name, position and
+    rate are applied when they join. Existing accounts are skipped: add those one by one."""
+    organization = get_current_organization(context, db)
+    if not can_manage_team(context.membership, organization):
+        raise HTTPException(status_code=403, detail="Team management access is disabled for this account")
+    summary = build_subscription_summary(db, organization.id)
+    seats_left = None if summary.member_cap is None else max(summary.member_cap - summary.active_members_count, 0)
+    pending = {
+        email.lower()
+        for email in db.scalars(select(InviteToken.email).where(InviteToken.organization_id == organization.id, InviteToken.accepted_at.is_(None))).all()
+    }
+
+    invited: list[str] = []
+    skipped: list[dict] = []
+    seen: set[str] = set()
+    for row in payload.rows:
+        email = row.email.strip().lower()
+        try:
+            email = validate_email(email, check_deliverability=False).normalized.lower()
+        except EmailNotValidError:
+            skipped.append({"email": row.email, "reason": "invalid_email"})
+            continue
+        if email in seen:
+            skipped.append({"email": email, "reason": "duplicate"})
+            continue
+        seen.add(email)
+        if db.scalar(select(User.id).where(User.email == email)) is not None:
+            skipped.append({"email": email, "reason": "has_account"})
+            continue
+        if seats_left is not None and seats_left <= 0:
+            skipped.append({"email": email, "reason": "plan_limit"})
+            continue
+        if email in pending:
+            db.execute(delete(InviteToken).where(InviteToken.organization_id == organization.id, InviteToken.email == email, InviteToken.accepted_at.is_(None)))
+        token = uuid.uuid4().hex
+        db.add(
+            InviteToken(
+                organization_id=organization.id,
+                email=email,
+                role=RoleEnum.STAFF,
+                token=token,
+                invited_by=context.user.id,
+                expires_at=datetime.now(UTC).replace(tzinfo=None) + timedelta(days=7),
+                full_name=(row.name or "").strip() or None,
+                staff_position=(row.position or "").strip() or None,
+                hourly_rate=row.rate,
+            )
+        )
+        if row.position and row.position.strip():
+            ensure_catalog(db, organization.id, [row.position.strip()])
+        db.flush()
+        join_link = f"{settings.frontend_url.rstrip('/')}/join?email={email}&token={token}"
+        send_invite_email(email=email, business_name=organization.name, join_link=join_link)
+        invited.append(email)
+        if seats_left is not None:
+            seats_left -= 1
+    db.commit()
+    return ok({"invited": invited, "skipped": skipped})
 
 
 @router.get("/current/subscription")

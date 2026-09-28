@@ -81,7 +81,7 @@ def _build_payroll_rows(db: Session, organization_id: UUID, start_date: date, en
     payroll_acc: dict[str, dict[str, Decimal]] = {}
     for item in confirmed_timesheets:
         user_key = str(item.user_id)
-        worked_hours = timesheet_hours(item.arrived_at, item.left_at)
+        worked_hours = timesheet_hours(item.arrived_at, item.left_at, item.break_minutes)
         if worked_hours <= 0:
             continue
         default_rate = fallback_rate_for_user(user_key)

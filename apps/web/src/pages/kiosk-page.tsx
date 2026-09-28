@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Delete, LogIn, LogOut } from "lucide-react";
+import { Coffee, Delete, LogIn, LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { api } from "@/lib/api";
@@ -62,11 +62,11 @@ export function KioskPage() {
     return () => window.clearTimeout(timer);
   }, [result, error]);
 
-  const submit = async (value: string) => {
+  const submit = async (value: string, action: "toggle" | "break" = "toggle") => {
     if (!token || busy) return;
     setBusy(true);
     try {
-      setResult(await api.kioskPunch(token, value));
+      setResult(await api.kioskPunch(token, value, action));
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error && caught.message !== "Unknown PIN" ? caught.message : t("kiosk.wrong_pin"));
@@ -128,20 +128,34 @@ export function KioskPage() {
             <span
               className={cn(
                 "grid size-24 place-items-center rounded-full text-white",
-                result.action === "in" ? "bg-[var(--color-success)]" : "bg-[var(--color-primary-strong)]",
+                result.action === "in" || result.action === "break_end"
+                  ? "bg-[var(--color-success)]"
+                  : result.action === "break_start"
+                    ? "bg-[var(--color-warning)]"
+                    : "bg-[var(--color-primary-strong)]",
               )}
             >
-              {result.action === "in" ? <LogIn className="size-11" /> : <LogOut className="size-11" />}
+              {result.action === "in" || result.action === "break_end" ? (
+                <LogIn className="size-11" />
+              ) : result.action === "break_start" ? (
+                <Coffee className="size-11" />
+              ) : (
+                <LogOut className="size-11" />
+              )}
             </span>
             <p className="mt-5 text-[28px] font-semibold text-black">
-              {result.action === "in" ? t("kiosk.hello", { name: result.full_name.split(" ")[0] }) : t("kiosk.bye", { name: result.full_name.split(" ")[0] })}
+              {t(`kiosk.title_${result.action}`, { name: result.full_name.split(" ")[0] })}
             </p>
             <p className="mt-1 text-[18px] text-[var(--color-text-muted)]">
               {result.action === "in"
                 ? result.session.shift
                   ? t("kiosk.in_with_shift", { start: result.session.shift.start_time, end: result.session.shift.end_time })
                   : t("kiosk.in_no_shift")
-                : t("kiosk.out_hours", { hours: (result.hours ?? 0).toFixed(1) })}
+                : result.action === "out"
+                  ? t("kiosk.out_hours", { hours: (result.hours ?? 0).toFixed(1) })
+                  : result.action === "break_start"
+                    ? t("kiosk.break_start_body")
+                    : t("kiosk.break_end_body")}
             </p>
           </div>
         ) : (
@@ -172,14 +186,24 @@ export function KioskPage() {
                 ),
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => void submit(pin)}
-              disabled={pin.length < 4 || busy || device?.enabled === false}
-              className="mt-6 min-h-14 w-full rounded-full bg-[var(--color-primary-strong)] text-[19px] font-semibold text-white disabled:opacity-40"
-            >
-              {t("kiosk.go")}
-            </button>
+            <div className="mt-6 flex w-full gap-3">
+              <button
+                type="button"
+                onClick={() => void submit(pin, "break")}
+                disabled={pin.length < 4 || busy || device?.enabled === false}
+                className="inline-flex min-h-14 flex-1 items-center justify-center gap-2 rounded-full bg-white text-[18px] font-semibold text-black shadow-[0_1px_3px_rgba(0,0,0,0.08)] disabled:opacity-40"
+              >
+                <Coffee className="size-5" /> {t("kiosk.break")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void submit(pin)}
+                disabled={pin.length < 4 || busy || device?.enabled === false}
+                className="min-h-14 flex-[2] rounded-full bg-[var(--color-primary-strong)] text-[18px] font-semibold text-white disabled:opacity-40"
+              >
+                {t("kiosk.go")}
+              </button>
+            </div>
           </>
         )}
       </section>

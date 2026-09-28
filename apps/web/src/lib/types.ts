@@ -159,7 +159,16 @@ export type LinkMemberByEmailResponse =
       debug_join_link?: string | null;
     };
 
-export type Location = { id: string; name: string; timezone: string; manager_user_ids: string[]; manager_names: string[] };
+export type Location = {
+  id: string;
+  name: string;
+  timezone: string;
+  manager_user_ids: string[];
+  manager_names: string[];
+  latitude?: number | null;
+  longitude?: number | null;
+  clock_radius_m?: number;
+};
 export type ShiftTemplate = {
   id: string;
   location_id: string;
@@ -583,6 +592,7 @@ export type TimesheetEntry = {
   left_at: string;
   note: string | null;
   is_restricted_entry: boolean;
+  break_minutes?: number;
   status: TimesheetStatus;
   review_note: string | null;
   reviewed_by: string | null;
@@ -605,16 +615,19 @@ export type ClockSessionInfo = {
   clock_in_at: string;
   clock_out_at: string | null;
   source: "phone" | "kiosk";
+  on_break: boolean;
+  break_started_at: string | null;
+  break_seconds: number;
   location_name: string | null;
   shift: { id: string; date: string; start_time: string; end_time: string; staff_position: string | null } | null;
 };
 
-export type ClockMe = { mode: ClockMode; phone_allowed: boolean; has_pin: boolean; open_session: ClockSessionInfo | null };
+export type ClockMe = { mode: ClockMode; phone_allowed: boolean; has_pin: boolean; needs_location: boolean; open_session: ClockSessionInfo | null };
 
 export type KioskDeviceItem = { id: string; name: string; location_id: string; location_name: string; created_at: string; last_seen_at: string | null };
 
 export type KioskPunchResult = {
-  action: "in" | "out";
+  action: "in" | "out" | "break_start" | "break_end";
   full_name: string;
   hours?: number;
   timesheet_status?: string;

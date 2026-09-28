@@ -53,6 +53,7 @@ from app.services.auth_email import send_otp_email
 from app.services.labor_rules import default_timezone_for, locale_settings
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, grant_comp_pro
 from app.services.demo_access import dev_login_user, is_demo_account
+from app.services.positions import replace_member_positions
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -465,6 +466,22 @@ def dev_login(response: Response, payload: DevLoginRequest | None = None, db: Se
     return ok(_issue_auth_payload(user, memberships))
 
 
+@router.get("/invites/lookup")
+def lookup_invite(token: str, email: str, db: Session = Depends(get_db)):
+    """What the join screen shows before anyone signs in: the business and the name the manager entered."""
+    invite = db.scalar(select(InviteToken).where(InviteToken.token == token))
+    if invite is None or invite.email.lower() != email.lower() or invite.accepted_at is not None:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    organization = db.get(Organization, invite.organization_id)
+    return ok(
+        {
+            "business_name": organization.name if organization else "",
+            "full_name": invite.full_name,
+            "expired": utc_value(invite.expires_at) < utc_now(),
+        }
+    )
+
+
 @router.post("/invites/join/accept")
 def accept_invite(payload: InviteAcceptRequest, response: Response, db: Session = Depends(get_db)):
     """Join by the emailed invite link alone: the link already proves the email, so no code is needed.
@@ -488,8 +505,11 @@ def accept_invite(payload: InviteAcceptRequest, response: Response, db: Session 
     db.flush()
     membership = OrganizationMembership(organization_id=invite.organization_id, user_id=user.id, role=invite.role, max_hours_per_week=40)
     db.add(membership)
+    db.flush()
     for location_id in db.scalars(select(Location.id).where(Location.organization_id == invite.organization_id)).all():
-        db.add(LocationMembership(location_id=location_id, user_id=user.id, priority=DEFAULT_LOCATION_PRIORITY, hourly_rate_pln=0))
+        db.add(LocationMembership(location_id=location_id, user_id=user.id, priority=DEFAULT_LOCATION_PRIORITY, hourly_rate_pln=invite.hourly_rate or 0))
+    if invite.staff_position:
+        replace_member_positions(db, membership, [(invite.staff_position, None, True)])
     db.add(
         InAppNotification(
             organization_id=invite.organization_id,

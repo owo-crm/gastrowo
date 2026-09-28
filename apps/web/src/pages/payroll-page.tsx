@@ -40,7 +40,7 @@ function entryHours(entry: TimesheetEntry): number {
   const [endHour, endMinute] = entry.left_at.split(":").map(Number);
   let minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
   if (minutes <= 0) minutes += 24 * 60;
-  return minutes / 60;
+  return Math.max(minutes - (entry.break_minutes ?? 0), 0) / 60;
 }
 
 const hoursText = (value: number | string) => {
@@ -112,7 +112,7 @@ export function PayrollPage() {
         <ListRow
           key={entry.id}
           title={`${formatDate(entry.work_date, lang)} · ${entry.arrived_at.slice(0, 5)}–${entry.left_at.slice(0, 5)}`}
-          subtitle={entry.is_restricted_entry ? t("schedule.extra_entry") : t("schedule.planned_entry")}
+          subtitle={[entry.is_restricted_entry ? t("schedule.extra_entry") : t("schedule.planned_entry"), entry.break_minutes ? t("payroll.break", { minutes: entry.break_minutes }) : null].filter(Boolean).join(" · ")}
           trailing={<span className="tabular-nums">{hoursText(entryHours(entry))}</span>}
         />
       ))}
