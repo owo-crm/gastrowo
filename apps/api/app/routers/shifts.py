@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import OrgContext, require_org_context
 from app.core.envelope import ok
 from app.db import get_db
-from app.models import Assignment, AssignmentStatusEnum, InAppNotification, RoleEnum, Shift
+from app.models import Assignment, AssignmentStatusEnum, RoleEnum, Shift
 
 router = APIRouter(prefix="/shifts", tags=["shifts"])
 
@@ -38,14 +38,6 @@ def start_shift(
     assignment.started_at = datetime.now(UTC)
     assignment.ended_at = None
 
-    db.add(
-        InAppNotification(
-            organization_id=context.membership.organization_id,
-            user_id=context.user.id,
-            title="Shift started",
-            body=f"You started shift {shift.date.isoformat()} {shift.start_time}-{shift.end_time}",
-        )
-    )
 
     db.commit()
     return ok(
@@ -82,14 +74,6 @@ def end_shift(
     assignment.status = AssignmentStatusEnum.COMPLETED
     assignment.ended_at = datetime.now(UTC)
 
-    db.add(
-        InAppNotification(
-            organization_id=context.membership.organization_id,
-            user_id=context.user.id,
-            title="Shift ended",
-            body=f"You ended shift {shift.date.isoformat()} {shift.start_time}-{shift.end_time}",
-        )
-    )
 
     db.commit()
     return ok(

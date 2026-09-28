@@ -358,6 +358,11 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "demo.done": "Demo restaurant is ready",
     "demo.done_body": "{people} people, {shifts} shifts, {hours} hour entries, {days} days of revenue",
     "demo.failed": "Couldn't build the demo restaurant",
+    "tasks.new_badge": "New tasks",
+    "login.password": "Password",
+    "login.workers_by_invite": "Setting up for your team? Workers don't sign up here — once your business is ready, you invite them from Team and they join with the link.",
+    "login.invite.body_simple": "Your manager invited you. Add your name and a password, and you're in.",
+    "login.invite.password_hint": "At least 8 characters. You'll sign in with this email and password.",
     // @end-en
   },
   pl: {
@@ -713,6 +718,11 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "demo.done": "Restauracja demo gotowa",
     "demo.done_body": "{people} osób, {shifts} zmian, {hours} wpisów godzin, {days} dni utargów",
     "demo.failed": "Nie udało się zbudować restauracji demo",
+    "tasks.new_badge": "Nowe zadania",
+    "login.password": "Hasło",
+    "login.workers_by_invite": "Zakładasz dla zespołu? Pracownicy nie rejestrują się tutaj — gdy firma będzie gotowa, zaprosisz ich w zakładce Zespół, a oni dołączą przez link.",
+    "login.invite.body_simple": "Twój kierownik Cię zaprosił. Wpisz imię i hasło — i gotowe.",
+    "login.invite.password_hint": "Co najmniej 8 znaków. Będziesz logować się tym e-mailem i hasłem.",
     // @end-pl
   },
   ru: {
@@ -1068,6 +1078,11 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "demo.done": "Демо-ресторан готов",
     "demo.done_body": "{people} человек, {shifts} смен, {hours} записей часов, {days} дней выручки",
     "demo.failed": "Не удалось собрать демо-ресторан",
+    "tasks.new_badge": "Новые задачи",
+    "login.password": "Пароль",
+    "login.workers_by_invite": "Сотрудники здесь не регистрируются — когда бизнес будет готов, пригласите их во вкладке «Команда», и они присоединятся по ссылке.",
+    "login.invite.body_simple": "Вас пригласил менеджер. Укажите имя и пароль — и готово.",
+    "login.invite.password_hint": "Минимум 8 символов. Входить будете по этой почте и паролю.",
     // @end-ru
   },
 };

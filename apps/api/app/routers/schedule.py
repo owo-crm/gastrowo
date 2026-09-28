@@ -13,6 +13,7 @@ from app.core.deps import OrgContext, require_org_context
 from app.core.envelope import ok
 from app.db import get_db
 from app.models import (
+    NotificationTypeEnum,
     Assignment,
     AssignmentStatusEnum,
     InAppNotification,
@@ -392,8 +393,10 @@ def _notify_manager_and_ADMIN_about_request(
             InAppNotification(
                 organization_id=organization_id,
                 user_id=reviewer_id,
+                type=NotificationTypeEnum.SHIFT_REQUEST,
                 title="New shift request",
-                body=f"{shift_request.request_type.value.title()} request created for shift {shift_request.shift_id}",
+                body=f"{shift_request.request_type.value.title()} request waiting for you",
+                action_url="/schedule/requests",
             )
         )
 
@@ -1436,8 +1439,10 @@ def patch_shift_request(
             InAppNotification(
                 organization_id=organization_id,
                 user_id=request_item.requester_user_id,
+                type=NotificationTypeEnum.SHIFT_REQUEST,
                 title="Shift request updated",
                 body=f"Your request has been {request_item.status.value}.",
+                action_url="/schedule/requests",
             )
         )
     else:

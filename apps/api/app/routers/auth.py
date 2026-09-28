@@ -34,6 +34,7 @@ from app.models import (
     hash_auth_session_token,
 )
 from app.schemas import (
+    InviteAcceptRequest,
     DevLoginRequest,
     InviteJoinVerifyRequest,
     LoginRequest,
@@ -385,8 +386,6 @@ def login_with_password(payload: LoginRequest, response: Response, db: Session =
         raise HTTPException(status_code=401, detail="Invalid password")
 
     memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)).all()
-    if not memberships or memberships[0].role != RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="Password login is available only for owners")
     _create_remembered_session(db, response, user, memberships)
     db.commit()
     return ok(_issue_auth_payload(user, memberships))
@@ -439,6 +438,50 @@ def dev_login(response: Response, payload: DevLoginRequest | None = None, db: Se
     _create_remembered_session(db, response, user, memberships)
     db.commit()
     return ok(_issue_auth_payload(user, memberships))
+
+
+@router.post("/invites/join/accept")
+def accept_invite(payload: InviteAcceptRequest, response: Response, db: Session = Depends(get_db)):
+    """Join by the emailed invite link alone: the link already proves the email, so no code is needed.
+
+    Only for a new email. An existing account must not be signed in by whoever holds a link, so it
+    keeps the code flow (and managers add existing accounts directly anyway).
+    """
+    email = payload.email.lower()
+    invite = db.scalar(select(InviteToken).where(InviteToken.token == payload.invite_token))
+    if invite is None or invite.email.lower() != email:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    if invite.accepted_at is not None:
+        raise HTTPException(status_code=409, detail="Invite already used")
+    if utc_value(invite.expires_at) < utc_now():
+        raise HTTPException(status_code=410, detail="Invite expired. Ask your manager for a new one.")
+    if db.scalar(select(User).where(User.email == email)) is not None:
+        raise HTTPException(status_code=409, detail="This email already has an account. Sign in instead.")
+
+    user = User(email=email, full_name=payload.full_name.strip()[:120], password_hash=hash_password(payload.password))
+    db.add(user)
+    db.flush()
+    membership = OrganizationMembership(organization_id=invite.organization_id, user_id=user.id, role=invite.role, max_hours_per_week=40)
+    db.add(membership)
+    for location_id in db.scalars(select(Location.id).where(Location.organization_id == invite.organization_id)).all():
+        db.add(LocationMembership(location_id=location_id, user_id=user.id, priority=DEFAULT_LOCATION_PRIORITY, hourly_rate_pln=0))
+    db.add(
+        InAppNotification(
+            organization_id=invite.organization_id,
+            user_id=invite.invited_by,
+            type=NotificationTypeEnum.TEAM,
+            title="Invite accepted",
+            body=f"{user.full_name} joined your business",
+            action_url="/team",
+            entity_kind="user",
+            entity_id=str(user.id),
+        )
+    )
+    db.delete(invite)
+    db.flush()
+    _create_remembered_session(db, response, user, [membership])
+    db.commit()
+    return ok(_issue_auth_payload(user, [membership]))
 
 
 @router.post("/invites/join/verify")

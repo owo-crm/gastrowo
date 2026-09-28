@@ -14,7 +14,6 @@ import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { DevLoginButton } from "@/components/dev-login-button";
 
-type Persona = "owner" | "worker";
 type AuthMode = "onboarding" | "signin";
 type SourceOption = "Google" | "Instagram" | "TikTok" | "Recommendation" | "Friends" | "Other";
 type AuthFieldError = {
@@ -62,7 +61,7 @@ function LegalAuthNotice() {
 }
 
 export function LoginPage() {
-  const { sendOtp, verifyOtp, loginWithPassword, completeOwnerOnboarding, verifyInviteJoin } = useAuth();
+  const { sendOtp, verifyOtp, loginWithPassword, completeOwnerOnboarding, acceptInvite } = useAuth();
   const toast = useToast();
   const { lang, setLang, t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -74,7 +73,6 @@ export function LoginPage() {
 
   const [mode, setMode] = useState<AuthMode>(requestedMode);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [persona, setPersona] = useState<Persona>("owner");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -87,7 +85,7 @@ export function LoginPage() {
   const [source, setSource] = useState<SourceOption | "">("");
   // US first; Polish browsers start on Poland. The owner can change it here or later in Settings.
   const [country, setCountry] = useState<"US" | "PL">(() => (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("pl") ? "PL" : "US"));
-  const [passwordLogin, setPasswordLogin] = useState(false);
+  const [passwordLogin, setPasswordLogin] = useState(true);
   const [loginPassword, setLoginPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<AuthFieldError>({});
@@ -198,13 +196,8 @@ export function LoginPage() {
       const response = await verifyOtp({
         email: effectiveEmail,
         code: otpCode,
-        purpose: persona === "owner" ? "owner_signup" : "worker_signup",
-        full_name: persona === "worker" ? fullName.trim() : undefined,
+        purpose: "owner_signup",
       });
-      if (persona === "worker") {
-        toast.success("Account created");
-        return;
-      }
       if (!response.verification_token) {
         throw new Error(t("login.missing_token"));
       }
@@ -283,10 +276,14 @@ export function LoginPage() {
   };
 
   const handleInviteJoin = async () => {
+    if (password.length < 8) {
+      toast.error(t("login.password_short"), t("login.password_short_body"));
+      return;
+    }
     setIsSubmitting(true);
     try {
       setFieldErrors({});
-      await verifyInviteJoin({ email: effectiveEmail, code: otpCode, invite_token: inviteToken, full_name: fullName.trim() || undefined });
+      await acceptInvite({ email: effectiveEmail, invite_token: inviteToken, full_name: fullName.trim(), password });
       toast.success(t("login.business_joined"));
       searchParams.delete("token");
       searchParams.delete("email");
@@ -301,48 +298,28 @@ export function LoginPage() {
 
   const renderInviteJoin = () => (
     <div className="space-y-5">
-      <StepPill current={1} total={1} label={t("login.step", { current: 1, total: 1 })} />
       <div>
         <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.invite.title")}</h2>
-        <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.invite.body")}</p>
+        <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.invite.body_simple")}</p>
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.email")}</label>
         <Input value={effectiveEmail} disabled />
       </div>
-      {renderInlineError("email")}
       <div className="space-y-2">
         <label htmlFor="invite-full-name" className="text-sm font-medium text-[var(--color-heading)]">{t("login.full_name")}</label>
         <Input id="invite-full-name" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder={t("login.full_name_placeholder")} autoComplete="name" />
       </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Button type="button" onClick={() => handleSendCode("invite_join")} disabled={isSubmitting}>
-          <Mail className="size-4" /> {t("login.send_code")}
-        </Button>
-        <DevHint code={debugCode} label={t("login.dev_code", { code: "" }).replace(/\s*$/, "")} />
+      <div className="space-y-2">
+        <label htmlFor="invite-password" className="text-sm font-medium text-[var(--color-heading)]">{t("login.password")}</label>
+        <Input id="invite-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" />
+        <p className="text-[13px] text-[var(--color-text-muted)]">{t("login.invite.password_hint")}</p>
       </div>
-      {otpSent ? (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.code_label")}</label>
-            <Input
-              value={otpCode}
-              onChange={(event) => {
-                clearFieldError("code");
-                clearFieldError("general");
-                setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6));
-              }}
-              inputMode="numeric"
-              placeholder={t("login.code_placeholder")}
-            />
-          </div>
-          {renderInlineError("code")}
-          {renderInlineError("general")}
-          <Button type="button" className="w-full" onClick={handleInviteJoin} disabled={isSubmitting || otpCode.length !== 6}>
-            {t("login.join_business")}
-          </Button>
-        </div>
-      ) : null}
+      {renderInlineError("email")}
+      {renderInlineError("general")}
+      <Button type="button" size="lg" className="w-full" onClick={handleInviteJoin} disabled={isSubmitting || fullName.trim().length < 2 || password.length < 8}>
+        {t("login.join_business")}
+      </Button>
       <LegalAuthNotice />
     </div>
   );
@@ -457,30 +434,7 @@ export function LoginPage() {
             <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.full_name")}</label>
             <Input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder={t("login.full_name_placeholder")} />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setPersona("owner")}
-              className={cn(
-                "rounded-[12px] border px-4 py-4 text-left transition",
-                persona === "owner" ? "border-[var(--color-primary)] bg-[rgba(47,111,237,0.08)]" : "border-[var(--color-border)] bg-white",
-              )}
-            >
-              <p className="font-semibold text-[var(--color-heading)]">{t("login.owner_title")}</p>
-              <p className="mt-1 text-sm text-[var(--color-text-muted)]">{t("login.owner_body")}</p>
-            </button>
-            <button
-              type="button"
-              onClick={() => setPersona("worker")}
-              className={cn(
-                "rounded-[12px] border px-4 py-4 text-left transition",
-                persona === "worker" ? "border-[var(--color-primary)] bg-[rgba(47,111,237,0.08)]" : "border-[var(--color-border)] bg-white",
-              )}
-            >
-              <p className="font-semibold text-[var(--color-heading)]">{t("login.worker_title")}</p>
-              <p className="mt-1 text-sm text-[var(--color-text-muted)]">{t("login.worker_body")}</p>
-            </button>
-          </div>
+          <p className="rounded-[14px] bg-[var(--color-grouped)] px-4 py-3 text-[14px] leading-5 text-[var(--color-text-muted)]">{t("login.workers_by_invite")}</p>
           <div className="flex items-center justify-between gap-3">
             <button type="button" className="text-sm text-[var(--color-primary-strong)]" onClick={switchToSignin}>
               {t("login.have_account")}
@@ -521,7 +475,7 @@ export function LoginPage() {
           </div>
           {renderInlineError("email")}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button type="button" onClick={() => handleSendCode(persona === "owner" ? "owner_signup" : "worker_signup")} disabled={isSubmitting || !effectiveEmail}>
+            <Button type="button" onClick={() => handleSendCode("owner_signup")} disabled={isSubmitting || !effectiveEmail}>
               <Mail className="size-4" /> {t("login.send_code")}
             </Button>
             <DevHint code={debugCode} label={t("login.dev_code", { code: "" }).replace(/\s*$/, "")} />

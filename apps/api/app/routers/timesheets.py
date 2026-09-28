@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import OrgContext, require_org_context
 from app.core.envelope import ok
 from app.db import get_db
-from app.models import Assignment, RoleEnum, Shift, Timesheet, TimesheetStatusEnum
+from app.models import NotificationTypeEnum, Assignment, RoleEnum, Shift, Timesheet, TimesheetStatusEnum
 from app.schemas import TimesheetCreate, TimesheetEntry, TimesheetReviewAction
 from app.services.notifications import notify_admins_and_managers, notify_users
 from app.services.billing import require_feature
@@ -126,8 +126,11 @@ def create_timesheet(
     notify_admins_and_managers(
         db,
         organization_id,
-        "Timesheet submitted",
+        "Hours to approve",
         f"{context.user.full_name} - {work_date.isoformat()} - {payload.arrived_at}-{payload.left_at} - {delta_text}",
+        notification_type=NotificationTypeEnum.TIMESHEET,
+        action_url="/schedule/hours",
+        actor_id=context.user.id,
     )
     db.commit()
     db.refresh(item)
@@ -202,18 +205,16 @@ def review_timesheet(
     item.review_note = payload.review_note
     item.reviewed_by = context.user.id
     item.reviewed_at = now
+    # The worker hears the outcome; other managers don't need a notice for every approval.
     notify_users(
         db,
         context.membership.organization_id,
         [item.user_id],
-        f"Timesheet {item.status.value}",
+        f"Hours {item.status.value}",
         f"{item.work_date.isoformat()} - {item.arrived_at}-{item.left_at}",
-    )
-    notify_admins_and_managers(
-        db,
-        context.membership.organization_id,
-        f"Timesheet {item.status.value}",
-        f"{item.work_date.isoformat()} - {item.arrived_at}-{item.left_at}",
+        notification_type=NotificationTypeEnum.TIMESHEET,
+        action_url="/schedule/hours",
+        actor_id=context.user.id,
     )
 
     db.commit()

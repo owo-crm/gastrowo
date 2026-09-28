@@ -11,7 +11,7 @@ from app.core.deps import OrgContext, get_current_organization, require_org_cont
 from app.core.envelope import ok
 from app.core.permissions import can_delete_revenue_reports, can_submit_revenue_reports
 from app.db import get_db
-from app.models import Location, RevenueReport, RoleEnum
+from app.models import NotificationTypeEnum, Location, RevenueReport, RoleEnum
 from app.schemas import RevenueReportCreate
 from app.services.notifications import notify_admins_and_managers
 from app.services.billing import require_feature
@@ -54,6 +54,9 @@ def create_revenue_report(
         context.membership.organization_id,
         "Revenue report saved",
         f"{location.name} - {payload.revenue} {payload.currency} - {payload.report_date.isoformat()}",
+        notification_type=NotificationTypeEnum.REPORT,
+        action_url="/overview/revenue",
+        actor_id=context.user.id,
     )
     db.commit()
     db.refresh(report)

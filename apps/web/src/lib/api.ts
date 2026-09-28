@@ -135,6 +135,9 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
+  acceptInvite(input: { email: string; invite_token: string; full_name: string; password: string }) {
+    return request<AuthLoginResponse>("/auth/invites/join/accept", { method: "POST", body: JSON.stringify(input) });
+  },
   verifyInviteJoin(input: { email: string; code: string; invite_token: string; full_name?: string }) {
     return request<AuthLoginResponse>("/auth/invites/join/verify", {
       method: "POST",

@@ -210,6 +210,13 @@ class OwnerOnboardingCompleteRequest(BaseModel):
     country: Country = "US"
 
 
+class InviteAcceptRequest(BaseModel):
+    email: EmailStr
+    invite_token: str = Field(min_length=8, max_length=255)
+    full_name: str = Field(min_length=2, max_length=120)
+    password: str = Field(min_length=8, max_length=128)
+
+
 class InviteJoinVerifyRequest(BaseModel):
     email: EmailStr
     code: str = Field(min_length=6, max_length=6)
