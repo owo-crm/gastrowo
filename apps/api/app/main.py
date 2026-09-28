@@ -16,6 +16,7 @@ from app.routers import (
     availability,
     billing,
     calendar,
+    clock,
     dashboard,
     locations,
     marketing,
@@ -99,3 +100,4 @@ app.include_router(reports.router)
 app.include_router(notifications.router)
 app.include_router(dashboard.router)
 app.include_router(payroll.router)
+app.include_router(clock.router)

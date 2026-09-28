@@ -26,6 +26,7 @@ type AuthContextValue = {
     country?: "US" | "PL";
   }) => Promise<void>;
   verifyInviteJoin: (payload: { email: string; code: string; invite_token: string; full_name?: string }) => Promise<void>;
+  acceptInvite: (payload: { email: string; invite_token: string; full_name: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -209,6 +210,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await applySession(response.access_token);
   };
 
+  const acceptInvite = async (payload: { email: string; invite_token: string; full_name: string; password: string }) => {
+    const response = await api.acceptInvite(payload);
+    await applySession(response.access_token);
+  };
+
   const logout = async () => {
     authRunIdRef.current += 1;
     sessionStorage.setItem(EXPLICIT_LOGOUT_STORAGE_KEY, "1");
@@ -239,6 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       devLogin,
       completeOwnerOnboarding,
       verifyInviteJoin,
+      acceptInvite,
       logout,
     }),
     [token, me, isLoading, hasExplicitLogoutGuard],

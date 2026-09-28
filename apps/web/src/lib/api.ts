@@ -1,4 +1,9 @@
 import type {
+  ClockMe,
+  ClockMode,
+  ClockSessionInfo,
+  KioskDeviceItem,
+  KioskPunchResult,
   AssignmentOverridePayload,
   BillingCheckoutCycle,
   BillingCheckoutSession,
@@ -134,6 +139,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     });
+  },
+  acceptInvite(input: { email: string; invite_token: string; full_name: string; password: string }) {
+    return request<AuthLoginResponse>("/auth/invites/join/accept", { method: "POST", body: JSON.stringify(input) });
   },
   verifyInviteJoin(input: { email: string; code: string; invite_token: string; full_name?: string }) {
     return request<AuthLoginResponse>("/auth/invites/join/verify", {
@@ -607,5 +615,43 @@ export const api = {
   },
   deleteNotification(token: string, notificationId: string) {
     return request<{ deleted: boolean; id: string }>(`/notifications/${notificationId}`, { method: "DELETE" }, token);
+  },
+  clockMe(token: string) {
+    return request<ClockMe>("/clock/me", {}, token);
+  },
+  clockIn(token: string) {
+    return request<ClockSessionInfo>("/clock/in", { method: "POST" }, token);
+  },
+  clockOut(token: string) {
+    return request<{ session: ClockSessionInfo; timesheet_status: string }>("/clock/out", { method: "POST" }, token);
+  },
+  setMyClockPin(token: string, pin: string) {
+    return request<{ has_pin: boolean }>("/clock/pin", { method: "PUT", body: JSON.stringify({ pin }) }, token);
+  },
+  resetClockPin(token: string, userId: string) {
+    return request<{ pin: string }>(`/clock/pins/${userId}`, { method: "POST" }, token);
+  },
+  clockTeam(token: string) {
+    return request<Array<ClockSessionInfo & { user_id: string; full_name: string }>>("/clock/team", {}, token);
+  },
+  setClockMode(token: string, mode: ClockMode) {
+    return request<{ mode: ClockMode }>("/clock/settings", { method: "PATCH", body: JSON.stringify({ mode }) }, token);
+  },
+  listKiosks(token: string) {
+    return request<KioskDeviceItem[]>("/clock/kiosks", {}, token);
+  },
+  createKiosk(token: string, body: { location_id: string; name?: string }) {
+    return request<{ id: string; token: string; location_name: string }>("/clock/kiosks", { method: "POST", body: JSON.stringify(body) }, token);
+  },
+  deleteKiosk(token: string, id: string) {
+    return request<{ deleted: boolean }>(`/clock/kiosks/${id}`, { method: "DELETE" }, token);
+  },
+  kioskDevice(kioskToken: string) {
+    return request<{ name: string; business_name: string; location_name: string; timezone: string; enabled: boolean }>("/kiosk/device", {
+      headers: { "X-Kiosk-Token": kioskToken },
+    });
+  },
+  kioskPunch(kioskToken: string, pin: string) {
+    return request<KioskPunchResult>("/kiosk/punch", { method: "POST", body: JSON.stringify({ pin }), headers: { "X-Kiosk-Token": kioskToken } });
   },
 };

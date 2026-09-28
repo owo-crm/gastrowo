@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Check, Plus, Trash2 } from "lucide-react";
 
-import { AppShell } from "@/components/layout/app-shell";
+import { AppShell, useNotifications } from "@/components/layout/app-shell";
 import { WorkerAvatar } from "@/components/worker-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,14 @@ export function TasksPage() {
   const usersQuery = useQuery({ queryKey: ["users"], queryFn: () => api.listUsers(token!), enabled: Boolean(token) });
   const locationsQuery = useQuery({ queryKey: ["locations"], queryFn: () => api.listLocations(token!), enabled: Boolean(token) });
   const tasksQuery = useQuery({ queryKey: ["tasks"], queryFn: () => api.listTasks(token!), enabled: Boolean(token) });
+
+  // Opening Tasks is what "reads" task notices: the red dot on the tab goes away here.
+  const notificationsQuery = useNotifications();
+  const unreadTaskNoticeIds = (notificationsQuery.data?.items ?? []).filter((item) => item.type === "task" && !item.read_at).map((item) => item.id).join(",");
+  useEffect(() => {
+    if (!token || !unreadTaskNoticeIds) return;
+    void api.markNotificationsRead(token, unreadTaskNoticeIds.split(",")).then(() => queryClient.invalidateQueries({ queryKey: ["notifications"] }));
+  }, [token, unreadTaskNoticeIds, queryClient]);
 
   const nameById = useMemo(() => Object.fromEntries((usersQuery.data ?? []).map((user) => [user.id, user.full_name])), [usersQuery.data]);
   const locationById = useMemo(() => Object.fromEntries((locationsQuery.data ?? []).map((location) => [location.id, location.name])), [locationsQuery.data]);

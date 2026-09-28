@@ -33,6 +33,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Segmented } from "@/components/ui/segmented";
 import { StaffWeek } from "@/components/schedule/staff-week";
+import { ClockCard } from "@/components/clock/clock-card";
 import { DayList, DayStrip, WeekGrid, type GridDay, type GridPerson, type GridShift } from "@/components/schedule/week-grid";
 import { currencyOf, formatDate, formatMoney } from "@/lib/format";
 import { useMediaQuery } from "@/lib/use-media-query";
@@ -3068,6 +3069,8 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
       {isStaff && section !== "calendar" ? (
         staffOtherSection
       ) : isStaff ? (
+        <>
+        <ClockCard />
         <StaffWeek
           token={token!}
           meId={me?.id}
@@ -3082,6 +3085,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
           onPrev={() => setWeekStart((current) => shiftWeek(current, -7))}
           onNext={() => setWeekStart((current) => shiftWeek(current, 7))}
         />
+        </>
       ) : section === "calendar" ? (
         managerCalendar
       ) : (

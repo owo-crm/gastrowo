@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, CheckCircle2, ChevronRight, Clock3, Coins, CreditCard, FilePlus2, Lock, LogOut, Trash2, XCircle } from "lucide-react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 
 import { CloseButton } from "@/components/ui/sheet";
 import { api } from "@/lib/api";
@@ -10,7 +10,7 @@ import { loadBusinessLogo } from "@/lib/business-branding";
 import { formatRelativeTimestamp } from "@/lib/date";
 import { type Lang, useLanguage } from "@/lib/i18n";
 import { findActive, getHomeRoute, getNavSections, type NavSection, type NavSub } from "@/lib/navigation";
-import type { NotificationItem } from "@/lib/types";
+import type { NotificationItem, NotificationListResponse } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Settings-style colored tile per section. */
@@ -74,6 +74,26 @@ function useOutsideClose(open: boolean, close: () => void) {
   return ref;
 }
 
+/** One shared query for the bell, the Tasks dot and the Tasks page. */
+export function useNotifications() {
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ["notifications"],
+    queryFn: () => api.listNotifications(token!, 20),
+    enabled: Boolean(token),
+    refetchInterval: 60_000,
+  });
+}
+
+function useHasNewTasks() {
+  const query = useNotifications();
+  return (query.data?.items ?? []).some((item) => item.type === "task" && !item.read_at);
+}
+
+function NewDot({ className }: { className?: string }) {
+  return <span className={cn("absolute size-2.5 rounded-full bg-[var(--color-danger)] ring-2 ring-white", className)} aria-hidden />;
+}
+
 function NotificationsButton() {
   const { token } = useAuth();
   const { t, lang } = useLanguage();
@@ -81,19 +101,35 @@ function NotificationsButton() {
   const [open, setOpen] = useState(false);
   const ref = useOutsideClose(open, () => setOpen(false));
 
-  const notificationsQuery = useQuery({
-    queryKey: ["notifications"],
-    queryFn: () => api.listNotifications(token!, 20),
-    enabled: Boolean(token),
-    refetchInterval: 60_000,
-  });
+  const navigate = useNavigate();
+  const notificationsQuery = useNotifications();
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ["notifications"] });
-  const deleteMutation = useMutation({ mutationFn: (id: string) => api.deleteNotification(token!, id), onSuccess: invalidate });
+  // Deleting feels instant: the row goes away at once and comes back only if the server refuses.
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.deleteNotification(token!, id),
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["notifications"] });
+      const previous = queryClient.getQueryData<NotificationListResponse>(["notifications"]);
+      if (previous) {
+        const removed = previous.items.find((item) => item.id === id);
+        queryClient.setQueryData<NotificationListResponse>(["notifications"], {
+          items: previous.items.filter((item) => item.id !== id),
+          unread_count: Math.max(0, previous.unread_count - (removed && !removed.read_at ? 1 : 0)),
+        });
+      }
+      return { previous };
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(["notifications"], context.previous);
+    },
+    onSettled: invalidate,
+  });
   const markReadMutation = useMutation({ mutationFn: (ids: string[]) => api.markNotificationsRead(token!, ids), onSuccess: invalidate });
 
   const items = notificationsQuery.data?.items ?? [];
   const unreadCount = notificationsQuery.data?.unread_count ?? 0;
-  const unreadIds = useMemo(() => items.filter((item) => !item.read_at).map((item) => item.id), [items]);
+  // Task notices stay unread until the person opens Tasks, so the red dot there keeps pointing at new work.
+  const unreadIds = useMemo(() => items.filter((item) => !item.read_at && item.type !== "task").map((item) => item.id), [items]);
 
   useEffect(() => {
     if (open && unreadIds.length && !markReadMutation.isPending) markReadMutation.mutate(unreadIds);
@@ -129,7 +165,17 @@ function NotificationsButton() {
                   <span className={cn("mt-0.5 grid size-8 shrink-0 place-items-center rounded-full", presentation.className)}>
                     <presentation.Icon className="size-4" />
                   </span>
-                  <div className="min-w-0 flex-1">
+                  <div
+                    className={cn("min-w-0 flex-1", item.action_url && "cursor-pointer")}
+                    onClick={
+                      item.action_url
+                        ? () => {
+                            setOpen(false);
+                            navigate(item.action_url!);
+                          }
+                        : undefined
+                    }
+                  >
                     <p className="text-[15px] font-semibold text-black">{item.title}</p>
                     <p className="mt-0.5 line-clamp-2 text-[14px] leading-5 text-[var(--color-text-muted)]">{item.body}</p>
                     <p className="mt-1 text-[12px] text-[var(--color-text-muted)]">
@@ -274,6 +320,8 @@ function SubLink({ item }: { item: NavSub }) {
 
 function SidebarSection({ section, active }: { section: NavSection; active: boolean }) {
   const { t } = useLanguage();
+  const hasNewTasks = useHasNewTasks();
+  const dot = section.key === "tasks" && hasNewTasks;
   const single = section.subs.length === 1;
   const first = section.subs[0];
 
@@ -290,6 +338,7 @@ function SidebarSection({ section, active }: { section: NavSection; active: bool
       >
         <SectionTile section={section} />
         <span className="flex-1">{t(`section.${section.key}`)}</span>
+        {dot ? <span className="size-2.5 rounded-full bg-[var(--color-danger)]" aria-label={t("tasks.new_badge")} /> : null}
         {first.locked ? <Lock className="size-3.5 shrink-0 text-[#3c3c43]" /> : null}
       </NavLink>
     );
@@ -345,6 +394,7 @@ function MobileSubTabs({ section }: { section: NavSection }) {
 
 function TabBar({ sections, activeKey }: { sections: NavSection[]; activeKey?: string }) {
   const { t } = useLanguage();
+  const hasNewTasks = useHasNewTasks();
   return (
     <nav
       className="ios-glass fixed inset-x-3 bottom-[max(10px,env(safe-area-inset-bottom))] z-[120] rounded-full p-1 lg:hidden"
@@ -364,7 +414,10 @@ function TabBar({ sections, activeKey }: { sections: NavSection[]; activeKey?: s
                   active ? "bg-[rgba(0,122,255,0.12)] text-[var(--color-primary-strong)]" : "text-black",
                 )}
               >
-                <section.icon className="size-[22px]" strokeWidth={active ? 2.4 : 2} aria-hidden />
+                <span className="relative">
+                  <section.icon className="size-[22px]" strokeWidth={active ? 2.4 : 2} aria-hidden />
+                  {section.key === "tasks" && hasNewTasks ? <NewDot className="-right-1 -top-0.5" /> : null}
+                </span>
                 <span className="truncate">{t(`section.${section.key}`)}</span>
               </Link>
             </li>

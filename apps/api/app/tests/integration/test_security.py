@@ -138,3 +138,19 @@ def test_dev_login_with_secret_works_in_production(client, monkeypatch):
 def test_short_dev_login_secret_is_rejected():
     with pytest.raises(ValueError):
         Settings(dev_login_secret="short")
+
+
+def test_invite_link_joins_without_a_code_but_never_takes_over_an_account(client):
+    from app.tests.integration.test_api_flow import auth_header, signup_ADMIN
+
+    admin, _ = signup_ADMIN(client, organization_name="Invite Diner", email="owner@invite-diner.com")
+    link = client.post("/organizations/members/link-by-email", headers=auth_header(admin), json={"email": "new@invite-diner.com"}).json()["data"]["debug_join_link"]
+    token = link.split("token=")[1]
+
+    assert client.post("/auth/invites/join/accept", json={"email": "other@invite-diner.com", "invite_token": token, "full_name": "Nope", "password": "Passw0rd!"}).status_code == 404
+    joined = client.post("/auth/invites/join/accept", json={"email": "new@invite-diner.com", "invite_token": token, "full_name": "New Cook", "password": "Passw0rd!"})
+    assert joined.status_code == 200, joined.text
+    assert joined.json()["data"]["role"] == "STAFF"
+    # One use only, and the password works for the next sign-in.
+    assert client.post("/auth/invites/join/accept", json={"email": "new@invite-diner.com", "invite_token": token, "full_name": "New Cook", "password": "Passw0rd!"}).status_code == 404
+    assert client.post("/auth/login", json={"email": "new@invite-diner.com", "password": "Passw0rd!"}).status_code == 200

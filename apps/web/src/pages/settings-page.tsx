@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalendarPlus, Copy, ImagePlus, LogOut, Store } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { CalendarPlus, Copy, ImagePlus, KeyRound, LogOut, Store, Tablet, Trash2 } from "lucide-react";
 
 import { AppShell, LanguageList } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import { loadBusinessLogo, saveBusinessLogo } from "@/lib/business-branding";
 import { imageFileToDataUrl } from "@/lib/file";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
+import type { ClockMode } from "@/lib/types";
+import { saveKioskToken } from "@/pages/kiosk-page";
 
 export type SettingsSection = "profile" | "business" | "calendar";
 
@@ -74,6 +77,49 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
   const [calendarUrl, setCalendarUrl] = useState<string | null>(null);
   const [confirmDemo, setConfirmDemo] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [pinSheet, setPinSheet] = useState(false);
+  const [pinValue, setPinValue] = useState("");
+  const [kioskSheet, setKioskSheet] = useState(false);
+  const [kioskLocation, setKioskLocation] = useState("");
+  const canManageClock = me?.role === "ADMIN" || me?.role === "MANAGER";
+  const clockMode: ClockMode = me?.organization_settings?.clock_mode ?? "both";
+
+  const clockMeQuery = useQuery({ queryKey: ["clock-me"], queryFn: () => api.clockMe(token!), enabled: Boolean(token) && section === "profile" });
+  const kiosksQuery = useQuery({ queryKey: ["kiosks"], queryFn: () => api.listKiosks(token!), enabled: Boolean(token) && section === "business" && canManageClock });
+  const locationsQuery = useQuery({ queryKey: ["locations"], queryFn: () => api.listLocations(token!), enabled: Boolean(token) && section === "business" && canManageClock });
+
+  const saveMode = useMutation({
+    mutationFn: (mode: ClockMode) => api.setClockMode(token!, mode),
+    onSuccess: async () => {
+      await refreshMe();
+      void queryClient.invalidateQueries({ queryKey: ["clock-me"] });
+    },
+    onError: (error) => toast.error(t("clock.save_failed"), error instanceof Error ? error.message : undefined),
+  });
+  const savePin = useMutation({
+    mutationFn: () => api.setMyClockPin(token!, pinValue),
+    onSuccess: () => {
+      setPinSheet(false);
+      setPinValue("");
+      toast.success(t("clock.pin_saved"));
+      void queryClient.invalidateQueries({ queryKey: ["clock-me"] });
+    },
+    onError: (error) => toast.error(t("clock.pin_failed"), error instanceof Error ? error.message : undefined),
+  });
+  const createKiosk = useMutation({
+    mutationFn: () => api.createKiosk(token!, { location_id: kioskLocation || locationsQuery.data?.[0]?.id || "", name: t("clock.tablet_default_name") }),
+    onSuccess: (device) => {
+      saveKioskToken(device.token);
+      setKioskSheet(false);
+      navigate("/kiosk");
+    },
+    onError: (error) => toast.error(t("clock.save_failed"), error instanceof Error ? error.message : undefined),
+  });
+  const removeKiosk = useMutation({
+    mutationFn: (id: string) => api.deleteKiosk(token!, id),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["kiosks"] }),
+  });
 
   useEffect(() => {
     setFullName(me?.full_name ?? "");
@@ -156,6 +202,33 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
                 {t("common.save")}
               </Button>
             </div>
+            <ListSection header={t("clock.header")} footer={t("clock.pin_footer")}>
+              <ListRow
+                leading={<KeyRound className="size-5 text-[var(--color-primary-strong)]" />}
+                title={t("clock.my_pin")}
+                trailing={clockMeQuery.data?.has_pin ? t("clock.pin_set") : t("clock.pin_not_set")}
+                chevron
+                onClick={() => setPinSheet(true)}
+              />
+            </ListSection>
+            <Sheet
+              open={pinSheet}
+              onClose={() => setPinSheet(false)}
+              title={t("clock.my_pin")}
+              action={{ label: t("common.save"), onClick: () => savePin.mutate(), disabled: !/^\d{4,6}$/.test(pinValue) || savePin.isPending }}
+            >
+              <div className="space-y-2">
+                <Input
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="••••"
+                  value={pinValue}
+                  onChange={(event) => setPinValue(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  className="text-center text-[28px] tracking-[0.4em]"
+                />
+                <p className="text-[14px] text-[var(--color-text-muted)]">{t("clock.pin_hint")}</p>
+              </div>
+            </Sheet>
             <ListSection header={t("shell.language")}>
               <li className="px-2 py-1 sm:px-4">
                 <LanguageList />
@@ -207,6 +280,72 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
                 {t("common.save")}
               </Button>
             </div>
+            {canManageClock ? (
+              <>
+                <ListSection header={t("clock.header")} footer={t("clock.mode_footer")}>
+                  <li className="px-4 py-3 sm:px-6">
+                    <Segmented
+                      className="w-full"
+                      ariaLabel={t("clock.header")}
+                      value={clockMode}
+                      onChange={(mode) => saveMode.mutate(mode)}
+                      options={[
+                        { value: "phone", label: t("clock.mode_phone") },
+                        { value: "kiosk", label: t("clock.mode_kiosk") },
+                        { value: "both", label: t("clock.mode_both") },
+                      ]}
+                    />
+                  </li>
+                </ListSection>
+                {clockMode !== "phone" ? (
+                  <ListSection header={t("clock.tablets")} footer={t("clock.tablets_footer")}>
+                    {(kiosksQuery.data ?? []).map((device) => (
+                      <ListRow
+                        key={device.id}
+                        leading={<Tablet className="size-5 text-[var(--color-text-muted)]" />}
+                        title={device.name}
+                        subtitle={device.location_name}
+                        trailing={
+                          <button
+                            type="button"
+                            aria-label={t("clock.remove_tablet")}
+                            onClick={() => removeKiosk.mutate(device.id)}
+                            className="grid size-9 place-items-center rounded-full text-[#3c3c43] hover:bg-[var(--color-danger-fill)] hover:text-[var(--color-danger)]"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        }
+                      />
+                    ))}
+                    <ListRow
+                      leading={<Tablet className="size-5 text-[var(--color-primary-strong)]" />}
+                      title={<span className="font-semibold text-[var(--color-primary-strong)]">{t("clock.use_this_device")}</span>}
+                      chevron
+                      onClick={() => setKioskSheet(true)}
+                    />
+                  </ListSection>
+                ) : null}
+                <Sheet
+                  open={kioskSheet}
+                  onClose={() => setKioskSheet(false)}
+                  title={t("clock.use_this_device")}
+                  action={{ label: t("clock.start_kiosk"), onClick: () => createKiosk.mutate(), disabled: createKiosk.isPending || !(locationsQuery.data ?? []).length }}
+                >
+                  <div className="space-y-4 text-[15px] leading-6 text-black">
+                    <p>{t("clock.kiosk_explain")}</p>
+                    {(locationsQuery.data ?? []).length > 1 ? (
+                      <Segmented
+                        className="w-full"
+                        ariaLabel={t("team.location")}
+                        value={kioskLocation || locationsQuery.data![0].id}
+                        onChange={setKioskLocation}
+                        options={(locationsQuery.data ?? []).map((location) => ({ value: location.id, label: location.name }))}
+                      />
+                    ) : null}
+                  </div>
+                </Sheet>
+              </>
+            ) : null}
             {me?.is_demo_account && me.role === "ADMIN" ? (
               <>
                 <ListSection header={t("demo.header")} footer={t("demo.footer")}>

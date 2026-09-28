@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session
 from app.core.deps import OrgContext, require_org_context
 from app.core.envelope import ok
 from app.db import get_db
-from app.models import RoleEnum, Task, TaskPhoto, TaskStatusEnum
+from app.models import InAppNotification, NotificationTypeEnum, RoleEnum, Task, TaskPhoto, TaskStatusEnum
 from app.schemas import TaskCreate, TaskPatch, TaskPhotoCreate
-from app.services.notifications import notify_admins_and_managers, notify_users
+from app.services.notifications import notify_users
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -79,19 +79,20 @@ def create_task(
         status=TaskStatusEnum.PENDING,
     )
     db.add(task)
-    notify_users(
-        db,
-        context.membership.organization_id,
-        [payload.assigned_to],
-        "Task created",
-        payload.title,
-    )
-    notify_admins_and_managers(
-        db,
-        context.membership.organization_id,
-        "Task created",
-        payload.title,
-    )
+    db.flush()
+    # Only the person who has to do it hears about it, and never about a task they gave themselves.
+    if payload.assigned_to != context.user.id:
+        notify_users(
+            db,
+            context.membership.organization_id,
+            [payload.assigned_to],
+            "New task",
+            payload.title,
+            notification_type=NotificationTypeEnum.TASK,
+            action_url="/tasks",
+            entity_kind="task",
+            entity_id=str(task.id),
+        )
     db.commit()
     db.refresh(task)
 
@@ -114,13 +115,18 @@ def patch_task(
 
     task.status = payload.status
     task.completed_at = datetime.now(UTC) if payload.status == TaskStatusEnum.DONE else None
-    if payload.status == TaskStatusEnum.DONE:
-        notify_admins_and_managers(
+    # The person who asked for it learns it's done; nobody is told about their own action.
+    if payload.status == TaskStatusEnum.DONE and task.created_by and task.created_by != context.user.id:
+        notify_users(
             db,
             context.membership.organization_id,
-            "Task completed",
+            [task.created_by],
+            "Task done",
             task.title,
-            extra_user_ids=[task.assigned_to],
+            notification_type=NotificationTypeEnum.TASK,
+            action_url="/tasks",
+            entity_kind="task",
+            entity_id=str(task.id),
         )
     db.commit()
 
@@ -138,13 +144,8 @@ def delete_task(
     if task is None or task.organization_id != context.membership.organization_id:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    notify_admins_and_managers(
-        db,
-        context.membership.organization_id,
-        "Task deleted",
-        task.title,
-        extra_user_ids=[task.assigned_to],
-    )
+    # Clear this task's own notices so nobody opens a task that no longer exists.
+    db.execute(delete(InAppNotification).where(InAppNotification.entity_kind == "task", InAppNotification.entity_id == str(task_id)))
     db.execute(delete(TaskPhoto).where(TaskPhoto.task_id == task_id))
     db.delete(task)
     db.commit()

@@ -256,11 +256,15 @@ def _ensure_runtime_schema_compat() -> None:
             organization_columns = {column["name"] for column in inspector.get_columns("organizations")}
             if "country" not in organization_columns:
                 connection.execute(text("ALTER TABLE organizations ADD COLUMN country VARCHAR(2) NOT NULL DEFAULT 'PL'"))
+            if "clock_mode" not in organization_columns:
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN clock_mode VARCHAR(16) NOT NULL DEFAULT 'both'"))
 
         if "organization_memberships" in tables:
             membership_columns = {column["name"] for column in inspector.get_columns("organization_memberships")}
             if "staff_position" not in membership_columns:
                 connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN staff_position VARCHAR(80)"))
+            if "clock_pin_digest" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN clock_pin_digest VARCHAR(64)"))
             if "staff_can_submit_revenue_reports_override" not in membership_columns:
                 connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN staff_can_submit_revenue_reports_override BOOLEAN"))
             if "staff_can_delete_revenue_reports_override" not in membership_columns:

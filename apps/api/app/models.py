@@ -156,6 +156,8 @@ class Organization(Base):
     manager_can_access_inventory: Mapped[bool] = mapped_column(Boolean, default=True)
     # "US" or "PL": drives currency, labour rules and CSV format. Businesses created before this existed are Polish.
     country: Mapped[str] = mapped_column(String(2), default="US")
+    # How people clock in: "phone" (their own app), "kiosk" (a shared tablet with PINs) or "both".
+    clock_mode: Mapped[str] = mapped_column(String(16), default="both")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
@@ -209,6 +211,8 @@ class OrganizationMembership(Base):
     manager_can_manage_business_settings_override: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     manager_can_access_notes_override: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     manager_can_access_inventory_override: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # Keyed digest of the personal time-clock PIN, so a tablet can find the person by PIN alone.
+    clock_pin_digest: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     organization: Mapped[Organization] = relationship()
     user: Mapped[User] = relationship()
@@ -502,3 +506,34 @@ class OtpChallenge(Base):
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failed_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class KioskDevice(Base):
+    """A shared tablet at a location that people clock in on with their PIN."""
+
+    __tablename__ = "kiosk_devices"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    location_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("locations.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ClockSession(Base):
+    """One clock-in to clock-out. Closing it writes the timesheet entry."""
+
+    __tablename__ = "clock_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    location_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
+    shift_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("shifts.id", ondelete="SET NULL"), nullable=True)
+    source: Mapped[str] = mapped_column(String(16), default="phone")
+    clock_in_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    clock_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    timesheet_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("timesheets.id", ondelete="SET NULL"), nullable=True)

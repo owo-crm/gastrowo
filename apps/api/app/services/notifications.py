@@ -20,8 +20,10 @@ def notify_users(
     action_url: str | None = None,
     entity_kind: str | None = None,
     entity_id: str | None = None,
+    actor_id: UUID | None = None,
 ) -> None:
-    seen: set[UUID] = set()
+    """Nobody is told about their own action: `actor_id` is always skipped."""
+    seen: set[UUID] = {actor_id} if actor_id else set()
     for user_id in user_ids:
         if user_id in seen:
             continue
@@ -51,6 +53,7 @@ def notify_admins_and_managers(
     action_url: str | None = None,
     entity_kind: str | None = None,
     entity_id: str | None = None,
+    actor_id: UUID | None = None,
 ) -> None:
     memberships = db.scalars(
         select(OrganizationMembership).where(
@@ -70,4 +73,5 @@ def notify_admins_and_managers(
         action_url=action_url,
         entity_kind=entity_kind,
         entity_id=entity_id,
+        actor_id=actor_id,
     )

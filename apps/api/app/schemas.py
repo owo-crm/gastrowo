@@ -73,6 +73,7 @@ class OrganizationSettingsOut(APIModel):
     country: str = "US"
     currency: str = "USD"
     labor_rules: str = "US"
+    clock_mode: str = "both"
 
 
 class MeOut(APIModel):
@@ -208,6 +209,13 @@ class OwnerOnboardingCompleteRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     source: str = Field(min_length=2, max_length=80)
     country: Country = "US"
+
+
+class InviteAcceptRequest(BaseModel):
+    email: EmailStr
+    invite_token: str = Field(min_length=8, max_length=255)
+    full_name: str = Field(min_length=2, max_length=120)
+    password: str = Field(min_length=8, max_length=128)
 
 
 class InviteJoinVerifyRequest(BaseModel):
