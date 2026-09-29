@@ -260,6 +260,11 @@ def _ensure_runtime_schema_compat() -> None:
                 connection.execute(text("ALTER TABLE organizations ADD COLUMN clock_mode VARCHAR(16) NOT NULL DEFAULT 'both'"))
             if "schedule_respect_hour_limits" not in organization_columns:
                 connection.execute(text("ALTER TABLE organizations ADD COLUMN schedule_respect_hour_limits BOOLEAN NOT NULL DEFAULT TRUE"))
+            if "is_sandbox" not in organization_columns:
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN is_sandbox BOOLEAN NOT NULL DEFAULT FALSE"))
+            if "sandbox_expires_at" not in organization_columns:
+                ddl = "TIMESTAMP WITH TIME ZONE" if engine.dialect.name == "postgresql" else "DATETIME"
+                connection.execute(text(f"ALTER TABLE organizations ADD COLUMN sandbox_expires_at {ddl}"))
 
         for table, column, ddl in (
             ("timesheets", "break_minutes", "INTEGER NOT NULL DEFAULT 0"),

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import logging
+import time as time_module
+from uuid import UUID
+
+from starlette.concurrency import run_in_threadpool
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -11,7 +15,9 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.envelope import error_payload, ok
-from app.db import SessionLocal, init_db
+from contextlib import contextmanager
+
+from app.db import SessionLocal, get_db, init_db
 from app.routers import (
     auth,
     availability,
@@ -36,6 +42,9 @@ from app.routers import (
     workers,
 )
 
+from app.core.security import decode_token
+from app.models import Organization
+from app.services import sandbox as sandbox_service
 from app.services.push import install_push_hooks
 from app.services.timeclock import backfill_pins, install_pin_hooks
 
@@ -51,6 +60,59 @@ logger = logging.getLogger("workdish.api")
 
 app = FastAPI(title="Workdish API", version="0.1.0")
 
+
+
+@contextmanager
+def _request_db():
+    """The same session the routes get, so test overrides of get_db apply here too."""
+    generator = app.dependency_overrides.get(get_db, get_db)()
+    try:
+        yield next(generator)
+    finally:
+        generator.close()
+
+
+def _sandbox_organization_blocked(authorization: str) -> bool:
+    """True when the caller's business is a public demo."""
+    if not authorization.lower().startswith("bearer "):
+        return False
+    try:
+        org_id = UUID(str(decode_token(authorization[7:]).get("org_id")))
+    except Exception:  # noqa: BLE001 - a bad token is the route's own 401 to give
+        return False
+    with _request_db() as db:
+        organization = db.get(Organization, org_id)
+        return bool(organization and organization.is_sandbox)
+
+
+_last_sandbox_cleanup = 0.0
+
+
+def _cleanup_sandboxes() -> None:
+    with _request_db() as db:
+        sandbox_service.cleanup_expired(db)
+
+
+@app.middleware("http")
+async def sandbox_guard(request: Request, call_next):
+    """Demo businesses can't open a kiosk, pay, invite real people or subscribe to push."""
+    global _last_sandbox_cleanup
+    if sandbox_service.is_blocked(request.method, request.url.path):
+        if await run_in_threadpool(_sandbox_organization_blocked, request.headers.get("authorization", "")):
+            return JSONResponse(
+                status_code=403,
+                content=error_payload(code="DEMO_FEATURE_OFF", message="Not available in the demo", details=None),
+            )
+    if time_module.monotonic() - _last_sandbox_cleanup > 600:
+        _last_sandbox_cleanup = time_module.monotonic()
+        try:
+            await run_in_threadpool(_cleanup_sandboxes)
+        except Exception:  # noqa: BLE001 - cleanup must never break a request
+            logger.exception("Demo cleanup failed")
+    return await call_next(request)
+
+
+# Added last so it wraps everything above, including the demo guard's 403.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.parsed_cors_origins,

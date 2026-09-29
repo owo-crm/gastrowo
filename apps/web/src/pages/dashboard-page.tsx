@@ -84,7 +84,10 @@ export function DashboardPage() {
   const labor = sum(data?.labor_cost_by_day ?? [], "labor_cost_pln");
   const hours = Number(data?.timesheets_summary?.approved_worked_hours ?? 0);
   const pending = Number(data?.timesheets_summary?.pending_count ?? 0);
-  const laborPercent = revenue > 0 ? (labor / revenue) * 100 : null;
+  // Compare like with like: labor only on the days that already have revenue, not the rest of the week.
+  const revenueDays = new Set((data?.totals_by_day ?? []).map((row) => row.date));
+  const laborOnRevenueDays = (data?.labor_cost_by_day ?? []).reduce((total, row) => (revenueDays.has(row.date) ? total + Number(row.labor_cost_pln) : total), 0);
+  const laborPercent = revenue > 0 ? (laborOnRevenueDays / revenue) * 100 : null;
 
   const chartData = useMemo(
     () =>

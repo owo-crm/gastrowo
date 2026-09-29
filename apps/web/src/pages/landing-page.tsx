@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowRight, Bell, CalendarCheck2, Check, ChevronDown, Clock3, Facebook, FileSpreadsheet, Instagram, PieChart, Repeat2, Scale, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, Bell, CalendarCheck2, Check, ChevronDown, Clock3, Facebook, FileSpreadsheet, Instagram, PieChart, PlayCircle, Repeat2, Scale, Users, type LucideIcon } from "lucide-react";
 import { legalLinks } from "@/lib/legal-links";
 import { Link } from "react-router-dom";
 
@@ -368,10 +368,18 @@ export function LandingPage() {
                 <SignupLink context="hero" className="w-full sm:w-auto">
                   {copy.hero.primary} <ArrowRight className="size-5" />
                 </SignupLink>
+                <Link
+                  to="/demo"
+                  onClick={() => trackMarketingEvent("demo_click", { context: "hero", page: window.location.pathname })}
+                  className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[12px] bg-[var(--color-accent)] px-6 text-[17px] font-semibold text-[var(--color-primary-strong)] sm:w-auto"
+                >
+                  <PlayCircle className="size-5" /> {t("demo.cta")}
+                </Link>
                 <Link to="/how-it-works" className="inline-flex min-h-[50px] w-full items-center justify-center rounded-[12px] bg-[var(--color-fill)] px-6 text-[17px] font-semibold text-black sm:w-auto">
                   {copy.hero.secondary}
                 </Link>
               </div>
+              <p className="mt-3 text-[14px] text-[var(--color-text-muted)]">{t("demo.cta_note")}</p>
               <p className="mt-5 text-[15px] text-[var(--color-text-muted)]">{copy.hero.note(fromPrice)}</p>
               <div className="mt-4 flex justify-center sm:hidden">
                 <Segmented
@@ -494,6 +502,11 @@ export function LandingPage() {
             <SignupLink context="final-cta" variant="white" className="mt-8">
               {copy.hero.primary} <ArrowRight className="size-5" />
             </SignupLink>
+            <div className="mt-4">
+              <Link to="/demo" onClick={() => trackMarketingEvent("demo_click", { context: "final-cta", page: window.location.pathname })} className="text-[16px] font-semibold text-white underline underline-offset-4">
+                {t("demo.cta")}
+              </Link>
+            </div>
           </Container>
         </section>
       </main>

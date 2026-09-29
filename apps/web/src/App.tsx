@@ -10,6 +10,7 @@ import { getHomeRoute } from "@/lib/navigation";
 import { useLanguage } from "@/lib/i18n";
 
 // App pages load on demand so the landing and login stay small.
+const DemoPage = lazy(() => import("@/pages/demo-page").then((module) => ({ default: module.DemoPage })));
 const DashboardPage = lazy(() => import("@/pages/dashboard-page").then((module) => ({ default: module.DashboardPage })));
 const BillingPage = lazy(() => import("@/pages/billing-page").then((module) => ({ default: module.BillingPage })));
 const NotesDocumentsPage = lazy(() => import("@/pages/notes-documents-page").then((module) => ({ default: module.NotesDocumentsPage })));
@@ -171,6 +172,7 @@ export function App() {
         path="/join"
         element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : hasUnresolvedSession ? <PendingLinkPage /> : <LoginPage />}
       />
+      <Route path="/demo" element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : <DemoPage />} />
       <Route path="/kiosk" element={<KioskPage />} />
       <Route path="/how-it-works" element={<HowItWorksPage />} />
       <Route path="/terms" element={<TermsPageEn />} />

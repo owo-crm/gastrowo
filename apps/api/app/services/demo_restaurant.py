@@ -13,7 +13,9 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
+from urllib.parse import quote
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -107,7 +109,7 @@ US = Locale(
         Person("Luis Hernandez", (("Dishwasher", None),), 17, False, (1, 2)),
         Person("Marcus Reed", (("Dishwasher", None), ("Line cook", 18)), 16, True, (3, 4), 36),
     ),
-    revenue_by_weekday=(1150, 1250, 1350, 1550, 2550, 2850, 1950),
+    revenue_by_weekday=(1900, 1950, 2050, 2250, 2950, 3250, 2400),
     tasks=(
         ("Deep clean the walk-in cooler", "Shelves, floor and door seals. Photo when done."),
         ("Restock the bar before Friday", "Limes, simple syrup, bitters, clean glassware."),
@@ -144,7 +146,7 @@ PL = Locale(
         Person("Marek Szymański", (("Zmywak", None),), 26, False, (1, 2)),
         Person("Adam Krawczyk", (("Zmywak", None), ("Kucharz", 30)), 26, True, (3, 4), 36),
     ),
-    revenue_by_weekday=(1650, 1750, 1950, 2250, 3400, 3800, 2650),
+    revenue_by_weekday=(2700, 2800, 2950, 3200, 4100, 4500, 3300),
     tasks=(
         ("Umyć chłodnię", "Półki, podłoga i uszczelki drzwi. Zdjęcie po skończeniu."),
         ("Uzupełnić bar przed piątkiem", "Limonki, syrop cukrowy, bitters, czyste szkło."),
@@ -308,7 +310,54 @@ def _shift_time(value: time, minutes: int) -> time:
     return moment.time()
 
 
-def seed_demo_restaurant(db: Session, organization: Organization, admin: User) -> dict[str, int]:
+def _svg_photo(lines: list[tuple[str, int, str]], height: int = 360, background: str = "#fbfaf7") -> str:
+    """A small drawn "photo" (receipt, checklist) as a data URL, so demo rows have something to open."""
+    rows = []
+    y = 44
+    for text, size, weight in lines:
+        safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        rows.append(f'<text x="24" y="{y}" font-family="Courier New, monospace" font-size="{size}" font-weight="{weight}" fill="#222">{safe}</text>')
+        y += size + 12
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="280" height="{height}" viewBox="0 0 280 {height}">'
+        f'<rect width="280" height="{height}" fill="#d9d4ca"/><rect x="10" y="10" width="260" height="{height - 20}" rx="4" fill="{background}"/>'
+        + "".join(rows)
+        + "</svg>"
+    )
+    return "data:image/svg+xml;utf8," + quote(svg)
+
+
+def display_name(organization: Organization) -> str:
+    """A demo business keeps a unique suffix in the database; people see just the restaurant's name."""
+    return organization.name.split(" · demo ")[0] if organization.is_sandbox else organization.name
+
+
+def _receipt_photo(business: str, location: str, day: date, amount: Decimal, currency: str) -> str:
+    card = (amount * Decimal("0.71")).quantize(Decimal("0.01"))
+    cash = amount - card
+    return _svg_photo(
+        [
+            (business[:22], 16, "bold"),
+            (location[:22], 13, "normal"),
+            (day.isoformat(), 13, "normal"),
+            ("-" * 24, 13, "normal"),
+            (f"Card   {card:>12} {currency}", 13, "normal"),
+            (f"Cash   {cash:>12} {currency}", 13, "normal"),
+            ("-" * 24, 13, "normal"),
+            (f"TOTAL  {amount:>12} {currency}", 15, "bold"),
+            ("Z-report  #" + day.strftime("%j"), 12, "normal"),
+        ]
+    )
+
+
+def _task_photo(title: str) -> str:
+    words = title.split()
+    first, second = " ".join(words[:3]), " ".join(words[3:])
+    return _svg_photo([("DONE", 22, "bold"), (first[:24], 14, "normal"), (second[:24], 14, "normal"), ("checked by shift lead", 12, "normal")], 240, "#eef7ee")
+
+
+def seed_demo_restaurant(db: Session, organization: Organization, admin: User, *, past_weeks: int = 2, sandbox: bool = False) -> dict[str, int]:
+    """`sandbox=True` builds the public demo: a month back, people on the clock now, photos and request history."""
     organization_id = organization.id
     loc = PL if organization.country == "PL" else US
     currency = currency_for(organization.country)
@@ -364,7 +413,7 @@ def seed_demo_restaurant(db: Session, organization: Organization, admin: User) -
 
     today = date.today()
     this_week = _week_start(today)
-    weeks = [this_week + timedelta(weeks=offset) for offset in (-2, -1, 0, 1)]
+    weeks = [this_week + timedelta(weeks=offset) for offset in range(-past_weeks, 2)]
     for week in weeks:
         for user, _membership, person in people:
             _availability(db, organization_id, user.id, week, person, rng)
@@ -497,7 +546,8 @@ def seed_demo_restaurant(db: Session, organization: Organization, admin: User) -
             if location is second and day.weekday() == 0:
                 continue
             amount = Decimal(str(round(base * factor * rng.uniform(0.88, 1.12), 2)))
-            db.add(RevenueReport(organization_id=organization_id, location_id=location.id, report_date=day, revenue=amount, currency=currency, created_by=admin.id))
+            photo = _receipt_photo(display_name(organization), location.name, day, amount, currency) if sandbox and rng.random() < 0.45 else None
+            db.add(RevenueReport(organization_id=organization_id, location_id=location.id, report_date=day, revenue=amount, currency=currency, photo_url=photo, created_by=admin.id))
         revenue_days += 1
         day += timedelta(days=1)
 
@@ -568,6 +618,9 @@ def seed_demo_restaurant(db: Session, organization: Organization, admin: User) -
             )
             requests += 1
 
+    if sandbox:
+        _sandbox_extras(db, organization, admin, main, second, loc, people, staff_users, weeks, rng)
+
     # Scheduling notices from apply are noise here; keep a few that point the owner at real work.
     db.execute(delete(InAppNotification).where(InAppNotification.organization_id == organization_id))
     notices = [
@@ -586,6 +639,141 @@ def seed_demo_restaurant(db: Session, organization: Organization, admin: User) -
         "shifts": shifts,
         "timesheets": timesheets,
         "revenue_days": revenue_days,
-        "tasks": len(loc.tasks),
+        "tasks": len(db.scalars(select(Task.id).where(Task.organization_id == organization_id)).all()),
         "requests": requests,
     }
+
+
+def _sandbox_extras(
+    db: Session,
+    organization: Organization,
+    admin: User,
+    main: Location,
+    second: Location,
+    loc: Locale,
+    people: list[tuple[User, OrganizationMembership, Person]],
+    staff_users: list[User],
+    weeks: list[date],
+    rng: random.Random,
+) -> None:
+    """What a month of a running restaurant leaves behind, on top of the regular demo fill."""
+    organization_id = organization.id
+    today = date.today()
+    now = datetime.now(UTC)
+
+    # Task history: the same chores came around every week, done with a photo; a few still open.
+    for week in weeks[:-2]:
+        for index, (title, description) in enumerate(loc.tasks[:4]):
+            assignee = staff_users[(index * 5 + week.toordinal()) % len(staff_users)]
+            created = datetime.combine(week + timedelta(days=index), time(9), tzinfo=UTC)
+            task = Task(
+                organization_id=organization_id,
+                location_id=main.id if index % 3 else second.id,
+                title=title,
+                description=description,
+                assigned_to=assignee.id,
+                created_by=admin.id,
+                status=TaskStatusEnum.DONE,
+                created_at=created,
+                completed_at=created + timedelta(hours=rng.randint(2, 30)),
+            )
+            db.add(task)
+            db.flush()
+            if rng.random() < 0.7:
+                db.add(TaskPhoto(task_id=task.id, photo_url=_task_photo(title), uploaded_by=assignee.id, created_at=task.completed_at))
+    for task in db.scalars(select(Task).where(
+            Task.organization_id == organization_id,
+            Task.status == TaskStatusEnum.DONE,
+            Task.id.not_in(select(TaskPhoto.task_id)),
+        )
+    ).all():
+        db.add(TaskPhoto(task_id=task.id, photo_url=_task_photo(task.title), uploaded_by=task.assigned_to, created_at=task.completed_at or now))
+
+    # Requests already handled: a few swaps and pickups approved or turned down over the month.
+    past = db.execute(
+        select(Assignment, Shift)
+        .join(Shift, Shift.id == Assignment.shift_id)
+        .where(Shift.organization_id == organization_id, Shift.date < today - timedelta(days=2), Shift.required_role == RoleEnum.STAFF)
+        .order_by(Shift.date)
+    ).all()
+    for index, (assignment, shift) in enumerate(past[:: max(1, len(past) // 6)][:6]):
+        approved = index % 3 != 2
+        created = datetime.combine(shift.date - timedelta(days=3), time(14), tzinfo=UTC)
+        db.add(
+            ShiftRequest(
+                organization_id=organization_id,
+                shift_id=shift.id,
+                requester_user_id=assignment.user_id,
+                requester_assignment_id=assignment.id if index % 2 == 0 else None,
+                request_type=ShiftRequestTypeEnum.SWAP if index % 2 == 0 else ShiftRequestTypeEnum.PICKUP,
+                status=ShiftRequestStatusEnum.APPROVED if approved else ShiftRequestStatusEnum.REJECTED,
+                note=loc.note_swap if index % 2 == 0 else loc.note_pickup,
+                resolved_by=admin.id,
+                created_at=created,
+                resolved_at=created + timedelta(hours=5),
+            )
+        )
+
+    # Two more swaps waiting for the manager, later in the week.
+    notes = (
+        ("Wizyta u lekarza rano, mogę wziąć wieczór.", "Egzamin na uczelni — ktoś się zamieni?")
+        if organization.country == "PL"
+        else ("Doctor's appointment in the morning, happy to take an evening instead.", "Exam at college that day — anyone want to trade?")
+    )
+    upcoming = db.execute(
+        select(Assignment, Shift)
+        .join(Shift, Shift.id == Assignment.shift_id)
+        .where(Shift.organization_id == organization_id, Shift.date > today + timedelta(days=1), Shift.required_role == RoleEnum.STAFF)
+        .order_by(Shift.date, Shift.start_time)
+    ).all()
+    for note, (assignment, shift) in zip(notes, upcoming[5::9]):
+        db.add(
+            ShiftRequest(
+                organization_id=organization_id,
+                shift_id=shift.id,
+                requester_user_id=assignment.user_id,
+                requester_assignment_id=assignment.id,
+                request_type=ShiftRequestTypeEnum.SWAP,
+                status=ShiftRequestStatusEnum.PENDING,
+                note=note,
+                created_at=now - timedelta(hours=rng.randint(2, 20)),
+            )
+        )
+
+    # Next week's availability: three people sent theirs and wait for approval.
+    next_week = weeks[-1]
+    for user in staff_users[:3]:
+        week = db.scalar(select(AvailabilityWeek).where(AvailabilityWeek.organization_id == organization_id, AvailabilityWeek.user_id == user.id, AvailabilityWeek.week_start == next_week))
+        if week is not None:
+            week.approved_at = None
+            week.approved_by = None
+
+    # Who is working right now: everyone whose shift today has started clocked in, one of them is on a break.
+    todays = db.execute(
+        select(Assignment, Shift, Location)
+        .join(Shift, Shift.id == Assignment.shift_id)
+        .join(Location, Location.id == Shift.location_id)
+        .where(Shift.organization_id == organization_id, Shift.date == today)
+        .order_by(Shift.start_time)
+    ).all()
+    on_break_given = False
+    for assignment, shift, location in todays:
+        zone = ZoneInfo(location.timezone or "UTC")
+        start = datetime.combine(today, shift.start_time, tzinfo=zone)
+        end = datetime.combine(today + timedelta(days=1 if shift.end_time <= shift.start_time else 0), shift.end_time, tzinfo=zone)
+        if not (start <= now.astimezone(zone) < end):
+            continue
+        clock_in = (start + timedelta(minutes=rng.choice([-6, -3, 0, 2, 4]))).astimezone(UTC)
+        session = ClockSession(
+            organization_id=organization_id,
+            user_id=assignment.user_id,
+            location_id=location.id,
+            shift_id=shift.id,
+            source=rng.choice(["phone", "kiosk"]),
+            clock_in_at=min(clock_in, now - timedelta(minutes=1)),
+        )
+        if not on_break_given and now - session.clock_in_at > timedelta(hours=3):
+            session.break_started_at = now - timedelta(minutes=12)
+            on_break_given = True
+        db.add(session)
+    db.flush()

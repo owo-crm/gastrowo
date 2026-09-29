@@ -121,6 +121,9 @@ export const api = {
   devLogin(secret?: string | null, asRole: "admin" | "staff" = "admin") {
     return request<AuthLoginResponse>("/auth/dev-login", { method: "POST", body: JSON.stringify({ secret: secret ?? null, as_role: asRole }) });
   },
+  publicDemo(country: "US" | "PL") {
+    return request<AuthLoginResponse>("/auth/demo", { method: "POST", body: JSON.stringify({ country }) });
+  },
   loginWithPassword(input: { email: string; password: string }) {
     return request<AuthLoginResponse>("/auth/login/password", {
       method: "POST",

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { CalendarPlus, Copy, ImagePlus, KeyRound, LogOut, Store, Tablet, Trash2 } from "lucide-react";
 
+import { DemoOffNote } from "@/components/demo-off";
 import { DeviceSection } from "@/components/device-section";
 import { AppShell, LanguageList } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -345,7 +346,9 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
                     />
                   </li>
                 </ListSection>
-                {clockMode !== "phone" ? (
+                {me?.is_sandbox ? (
+                  <DemoOffNote header={t("clock.tablets")} body={t("demo.off_kiosk")} />
+                ) : clockMode !== "phone" ? (
                   <ListSection header={t("clock.tablets")} footer={t("clock.tablets_footer")}>
                     {(kiosksQuery.data ?? []).map((device) => (
                       <ListRow

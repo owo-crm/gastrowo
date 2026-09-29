@@ -8,6 +8,7 @@ from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.services.demo_restaurant import display_name
 from app.core.config import settings
 from app.core.deps import OrgContext, require_org_context
 from app.core.envelope import ok
@@ -107,7 +108,7 @@ def calendar_feed_ics(token: str, db: Session = Depends(get_db)):
         .order_by(Shift.date, Shift.start_time)
     ).all()
 
-    business_name = organization.name if organization else "Platofy"
+    business_name = display_name(organization) if organization else "Platofy"
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     lines = [
         "BEGIN:VCALENDAR",
