@@ -27,14 +27,15 @@
 Ключи для push генерируются автоматически и хранятся в базе — ничего задавать не нужно.
 
 ## 3. Stripe (боевой режим)
-- [ ] Создать 2 продукта (Starter, Pro) и 8 цен, **за точку** (quantity = число точек):
+- [ ] Создать 3 продукта: Starter, Pro и «Pro — дополнительная точка». Цены **фиксированные** (quantity = 1): Starter покрывает 1 точку, Pro — до 3. Доп. точка — за каждую сверх трёх (количество выставляется само).
 
   | | USD / мес | USD / год | PLN / мес | PLN / год |
   | --- | --- | --- | --- | --- |
   | Starter | 26 | 260 | 99 | 990 |
   | Pro | 58 | 580 | 219 | 2190 |
+  | Pro — доп. точка | 15 | 150 | 59 | 590 |
 
-- [ ] ID цен вписать в `STRIPE_PRICE_{STARTER,PRO}_{USD,PLN}_{MONTHLY,ANNUAL}`, ключ — в `STRIPE_SECRET_KEY`.
+- [ ] ID цен вписать в `STRIPE_PRICE_{STARTER,PRO}_{USD,PLN}_{MONTHLY,ANNUAL}` и `STRIPE_PRICE_PRO_EXTRA_LOCATION_{USD,PLN}_{MONTHLY,ANNUAL}`, ключ — в `STRIPE_SECRET_KEY`.
 - [ ] Webhook: `https://<api>/billing/webhooks/stripe`, события `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`; секрет — в `STRIPE_WEBHOOK_SECRET`.
 - [ ] Включить Customer Portal (отмена, смена карты).
 - [ ] Решить с налогами: Stripe Tax для sales tax в США.

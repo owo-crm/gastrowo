@@ -102,7 +102,7 @@ const EN: Copy = {
   ],
   final: {
     title: "Try it with your own team this week",
-    body: "Free for one location and up to 15 people. Paid plans from $26 per location — about 25% less than the big names.",
+    body: "Free for one location and up to 15 people. Paid plans from $26 a month, and Pro covers up to three locations — never per person.",
     cta: "Start free",
     note: "30-day Pro trial · no card",
   },
@@ -176,7 +176,7 @@ const PL: Copy = {
   ],
   final: {
     title: "Wypróbuj z własnym zespołem w tym tygodniu",
-    body: "Za darmo dla jednego lokalu i do 15 osób. Płatne plany od 99 zł za lokal.",
+    body: "Za darmo dla jednego lokalu i do 15 osób. Płatne plany od 99 zł miesięcznie, a Pro obejmuje do trzech lokali — nigdy za osobę.",
     cta: "Zacznij za darmo",
     note: "30 dni Pro gratis · bez karty",
   },
@@ -250,7 +250,7 @@ const RU: Copy = {
   ],
   final: {
     title: "Попробуйте со своей командой на этой неделе",
-    body: "Бесплатно для одной точки и до 15 человек. Платные планы от $26 за точку — примерно на 25% дешевле крупных сервисов.",
+    body: "Бесплатно для одной точки и до 15 человек. Платные планы от $26 в месяц, а Pro покрывает до трёх точек — никогда не за человека.",
     cta: "Начать бесплатно",
     note: "30 дней Pro бесплатно · без карты",
   },

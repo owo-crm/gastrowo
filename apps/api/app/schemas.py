@@ -254,6 +254,8 @@ class SubscriptionSummaryOut(APIModel):
     soft_limit_reached: bool = False
     billable_seats: int = 1
     billable_locations: int = 1
+    included_locations: int | None = None
+    extra_locations: int = 0
     has_payment_method: bool = False
     features: list[str] = Field(default_factory=list)
 
