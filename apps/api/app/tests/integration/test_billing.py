@@ -47,7 +47,7 @@ def test_expired_trial_falls_back_to_free_with_member_limit(client, db_session):
     assert sixteenth.status_code == 402
 
 
-def test_pro_has_no_member_or_location_limits(client, db_session):
+def test_pro_has_no_member_limit_and_three_locations_included(client, db_session):
     headers = _workspace(
         db_session,
         members=30,
@@ -59,12 +59,19 @@ def test_pro_has_no_member_or_location_limits(client, db_session):
     assert summary["plan"] == "pro"
     assert summary["member_cap"] is None
     assert summary["location_cap"] is None
+    assert summary["included_locations"] == 3
 
     invite = client.post("/organizations/members/link-by-email", headers=headers, json={"email": "thirty-one@billing-example.com"})
     assert invite.status_code == 200
     for name in ("Brooklyn", "Queens", "Harlem"):
         assert client.post("/locations", headers=headers, json={"name": name, "timezone": "America/New_York"}).status_code == 200
-    assert client.get("/organizations/current/subscription", headers=headers).json()["data"]["billable_locations"] == 3
+    summary = client.get("/organizations/current/subscription", headers=headers).json()["data"]
+    assert summary["billable_locations"] == 3
+    assert summary["extra_locations"] == 0
+
+    for name in ("Bronx", "Staten Island"):
+        assert client.post("/locations", headers=headers, json={"name": name, "timezone": "America/New_York"}).status_code == 200
+    assert client.get("/organizations/current/subscription", headers=headers).json()["data"]["extra_locations"] == 2
 
 
 def test_free_plan_has_one_location(client, db_session):
@@ -73,21 +80,45 @@ def test_free_plan_has_one_location(client, db_session):
     assert first.status_code == 200, first.text
     second = client.post("/locations", headers=headers, json={"name": "Queens", "timezone": "America/New_York"})
     assert second.status_code == 402
-    assert "Starter" in second.json()["error"]["message"]
+    assert "Pro" in second.json()["error"]["message"]
 
 
-def test_starter_allows_thirty_people_per_location(client, db_session):
+def test_starter_is_one_location_and_thirty_people(client, db_session):
     headers = _workspace(db_session, members=30, plan=SubscriptionPlanEnum.STANDARD, status=SubscriptionStatusEnum.ACTIVE)
     assert client.post("/locations", headers=headers, json={"name": "Brooklyn", "timezone": "America/New_York"}).status_code == 200
     summary = client.get("/organizations/current/subscription", headers=headers).json()["data"]
     assert summary["member_cap"] == 30
+    assert summary["location_cap"] == 1
+    assert summary["included_locations"] is None
     blocked = client.post("/organizations/members/link-by-email", headers=headers, json={"email": "thirty-one@billing-example.com"})
     assert blocked.status_code == 402
 
-    assert client.post("/locations", headers=headers, json={"name": "Queens", "timezone": "America/New_York"}).status_code == 200
-    assert client.get("/organizations/current/subscription", headers=headers).json()["data"]["member_cap"] == 60
-    allowed = client.post("/organizations/members/link-by-email", headers=headers, json={"email": "thirty-one@billing-example.com"})
-    assert allowed.status_code == 200
+    second = client.post("/locations", headers=headers, json={"name": "Queens", "timezone": "America/New_York"})
+    assert second.status_code == 402
+    assert "Starter plan includes one location" in second.json()["error"]["message"]
+
+
+def test_stripe_items_follow_extra_locations(monkeypatch):
+    from app.core.config import settings
+    from app.services.billing import stripe_items_update
+
+    monkeypatch.setattr(settings, "stripe_price_pro_usd_monthly", "price_pro_m")
+    monkeypatch.setattr(settings, "stripe_price_starter_usd_monthly", "price_starter_m")
+    monkeypatch.setattr(settings, "stripe_price_pro_extra_location_usd_monthly", "price_extra_m")
+    pro = {"id": "si_plan", "quantity": 1, "price": {"id": "price_pro_m"}}
+
+    assert stripe_items_update([pro], 3) == []
+    assert stripe_items_update([pro], 5) == [{"price": "price_extra_m", "quantity": 2}]
+    extra = {"id": "si_extra", "quantity": 2, "price": {"id": "price_extra_m"}}
+    assert stripe_items_update([pro, extra], 6) == [{"id": "si_extra", "quantity": 3}]
+    assert stripe_items_update([pro, extra], 2) == [{"id": "si_extra", "deleted": True}]
+    # Old per-location subscriptions are brought back to a single plan unit.
+    assert stripe_items_update([{"id": "si_plan", "quantity": 4, "price": {"id": "price_pro_m"}}], 4) == [
+        {"id": "si_plan", "quantity": 1},
+        {"price": "price_extra_m", "quantity": 1},
+    ]
+    starter = {"id": "si_plan", "quantity": 1, "price": {"id": "price_starter_m"}}
+    assert stripe_items_update([starter], 2) == []
 
 
 def test_features_follow_the_plan(client, db_session):

@@ -275,7 +275,7 @@ def link_member_by_email(
     subscription_summary = build_subscription_summary(db, context.membership.organization_id)
     if subscription_summary.member_cap is not None and subscription_summary.active_members_count >= subscription_summary.member_cap:
         limit = subscription_summary.member_cap
-        hint = "Upgrade to Starter for 30 people per location." if subscription_summary.plan.value == "free" else "Add a location or upgrade to Pro for no limit."
+        hint = "Upgrade to Starter for up to 30 people." if subscription_summary.plan.value == "free" else "Upgrade to Pro for no limit."
         raise HTTPException(status_code=402, detail=f"Your plan covers {limit} people. {hint}")
     normalized_email = payload.email.lower()
     user = db.scalar(select(User).where(User.email == normalized_email))

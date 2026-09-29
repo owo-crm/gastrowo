@@ -1,4 +1,4 @@
-"""Plan rules: Free for one small location; Starter and Pro are billed per location (Stripe quantity = locations)."""
+"""Plan rules: Free and Starter cover one location; Pro includes three and bills each extra location as an add-on."""
 
 from __future__ import annotations
 
@@ -19,8 +19,10 @@ logger = logging.getLogger("gastrowo.billing")
 
 FREE_MEMBER_LIMIT = 15
 FREE_LOCATION_LIMIT = 1
-# Starter covers up to 30 people per paid location; Pro has no people limit.
-STARTER_MEMBERS_PER_LOCATION = 30
+STARTER_MEMBER_LIMIT = 30
+STARTER_LOCATION_LIMIT = 1
+# Pro: no people limit, three locations in the base price, each further location is an add-on.
+PRO_INCLUDED_LOCATIONS = 3
 # New team members start as schedulable in every location (0 would exclude them from auto-planning).
 DEFAULT_LOCATION_PRIORITY = 3
 
@@ -106,12 +108,26 @@ def member_cap_for(plan: SubscriptionPlanEnum, locations: int) -> int | None:
     if plan == SubscriptionPlanEnum.FREE:
         return FREE_MEMBER_LIMIT
     if plan == SubscriptionPlanEnum.STANDARD:
-        return STARTER_MEMBERS_PER_LOCATION * max(locations, 1)
+        return STARTER_MEMBER_LIMIT
     return None
 
 
 def location_cap_for(plan: SubscriptionPlanEnum) -> int | None:
-    return FREE_LOCATION_LIMIT if plan == SubscriptionPlanEnum.FREE else None
+    if plan == SubscriptionPlanEnum.FREE:
+        return FREE_LOCATION_LIMIT
+    if plan == SubscriptionPlanEnum.STANDARD:
+        return STARTER_LOCATION_LIMIT
+    return None
+
+
+def included_locations_for(plan: SubscriptionPlanEnum) -> int | None:
+    """Locations covered by the base price; None when the plan has no location add-on."""
+    return PRO_INCLUDED_LOCATIONS if _PLAN_RANK[plan] >= _PLAN_RANK[SubscriptionPlanEnum.PRO] else None
+
+
+def extra_locations_for(plan: SubscriptionPlanEnum, locations: int) -> int:
+    included = included_locations_for(plan)
+    return max(locations - included, 0) if included is not None else 0
 
 
 def count_members(db: Session, organization_id: UUID) -> int:
@@ -121,10 +137,15 @@ def count_members(db: Session, organization_id: UUID) -> int:
 
 
 def require_location_slot(db: Session, organization_id: UUID) -> None:
-    """Free covers one location; more locations need a paid plan (priced per location)."""
-    cap = location_cap_for(organization_plan(db, organization_id))
+    """Free and Starter cover one location; Pro includes three and bills each extra one as an add-on."""
+    plan = organization_plan(db, organization_id)
+    cap = location_cap_for(plan)
     if cap is not None and count_locations(db, organization_id) >= cap:
-        raise HTTPException(status_code=402, detail="The Free plan includes one location. Upgrade to Starter to add more.")
+        plan_name = "Free" if plan == SubscriptionPlanEnum.FREE else PLAN_NAMES[SubscriptionPlanEnum.STANDARD]
+        raise HTTPException(
+            status_code=402,
+            detail=f"The {plan_name} plan includes one location. Upgrade to Pro for up to {PRO_INCLUDED_LOCATIONS} locations.",
+        )
 
 
 def build_subscription_summary(db: Session, organization_id: UUID | None) -> SubscriptionSummaryOut | None:
@@ -149,13 +170,75 @@ def build_subscription_summary(db: Session, organization_id: UUID | None) -> Sub
         soft_limit_reached=member_cap is not None and members >= member_cap,
         billable_seats=billable_locations,
         billable_locations=billable_locations,
+        included_locations=included_locations_for(plan),
+        extra_locations=extra_locations_for(plan, locations),
         has_payment_method=bool(subscription.stripe_subscription_id),
         features=allowed_features(plan),
     )
 
 
+def plan_price_table() -> dict[tuple[SubscriptionPlanEnum, str, str], str]:
+    """(plan, billing cycle, currency) -> Stripe price id for the flat plan price (quantity 1)."""
+    return {
+        (SubscriptionPlanEnum.STANDARD, "monthly", "USD"): settings.stripe_price_starter_usd_monthly,
+        (SubscriptionPlanEnum.STANDARD, "annual", "USD"): settings.stripe_price_starter_usd_annual,
+        (SubscriptionPlanEnum.PRO, "monthly", "USD"): settings.stripe_price_pro_usd_monthly,
+        (SubscriptionPlanEnum.PRO, "annual", "USD"): settings.stripe_price_pro_usd_annual,
+        (SubscriptionPlanEnum.STANDARD, "monthly", "PLN"): settings.stripe_price_starter_pln_monthly,
+        (SubscriptionPlanEnum.STANDARD, "annual", "PLN"): settings.stripe_price_starter_pln_annual,
+        (SubscriptionPlanEnum.PRO, "monthly", "PLN"): settings.stripe_price_pro_pln_monthly,
+        (SubscriptionPlanEnum.PRO, "annual", "PLN"): settings.stripe_price_pro_pln_annual,
+    }
+
+
+def extra_location_price_table() -> dict[tuple[str, str], str]:
+    """(billing cycle, currency) -> Stripe price id for one Pro location beyond the included three."""
+    return {
+        ("monthly", "USD"): settings.stripe_price_pro_extra_location_usd_monthly,
+        ("annual", "USD"): settings.stripe_price_pro_extra_location_usd_annual,
+        ("monthly", "PLN"): settings.stripe_price_pro_extra_location_pln_monthly,
+        ("annual", "PLN"): settings.stripe_price_pro_extra_location_pln_annual,
+    }
+
+
+def _price_id(item) -> str | None:
+    price = item["price"] if "price" in item else None
+    return price["id"] if price else None
+
+
+def stripe_items_update(items: list, locations: int) -> list[dict]:
+    """Changes that bring a Stripe subscription's items in line with the location count.
+
+    The plan item always has quantity 1. A Pro subscription carries an add-on item whose quantity is the
+    number of locations beyond the included three; it is added, resized or removed as locations change.
+    """
+    plans = {price: key for key, price in plan_price_table().items() if price}
+    extras = {price for price in extra_location_price_table().values() if price}
+    plan_item = next((item for item in items if _price_id(item) in plans), None)
+    extra_item = next((item for item in items if _price_id(item) in extras), None)
+    if plan_item is None:
+        return []
+    plan, cycle, currency = plans[_price_id(plan_item)]
+    changes: list[dict] = []
+    if plan_item["quantity"] != 1:
+        changes.append({"id": plan_item["id"], "quantity": 1})
+    wanted = extra_locations_for(plan, locations)
+    if extra_item is not None:
+        if wanted == 0:
+            changes.append({"id": extra_item["id"], "deleted": True})
+        elif extra_item["quantity"] != wanted:
+            changes.append({"id": extra_item["id"], "quantity": wanted})
+    elif wanted > 0:
+        extra_price = extra_location_price_table().get((cycle, currency), "")
+        if extra_price:
+            changes.append({"price": extra_price, "quantity": wanted})
+        else:
+            logger.error("Pro extra-location price is not configured for %s/%s", cycle, currency)
+    return changes
+
+
 def sync_stripe_locations(db: Session, organization_id: UUID) -> None:
-    """Keep the Stripe quantity equal to the number of locations. Best effort: never blocks changes."""
+    """Keep the Stripe add-on quantity equal to the extra locations. Best effort: never blocks changes."""
     subscription = db.scalar(select(OrganizationSubscription).where(OrganizationSubscription.organization_id == organization_id))
     if subscription is None or not subscription.stripe_subscription_id or not settings.stripe_secret_key:
         return
@@ -163,16 +246,9 @@ def sync_stripe_locations(db: Session, organization_id: UUID) -> None:
         stripe = import_module("stripe")
         stripe.api_key = settings.stripe_secret_key
         remote = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
-        items = remote["items"]["data"]
-        if not items:
-            return
-        quantity = max(count_locations(db, organization_id), 1)
-        if items[0]["quantity"] != quantity:
-            stripe.Subscription.modify(
-                subscription.stripe_subscription_id,
-                items=[{"id": items[0]["id"], "quantity": quantity}],
-                proration_behavior="create_prorations",
-            )
+        changes = stripe_items_update(remote["items"]["data"], count_locations(db, organization_id))
+        if changes:
+            stripe.Subscription.modify(subscription.stripe_subscription_id, items=changes, proration_behavior="create_prorations")
     except Exception:
         logger.exception("Failed to sync Stripe locations for organization %s", organization_id)
 

@@ -10,7 +10,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { type Currency, formatMoney } from "@/lib/format";
 import { type Lang, useLanguage } from "@/lib/i18n";
 import { trackMarketingEvent } from "@/lib/marketing-analytics";
-import { PRICE_PER_LOCATION, SEVENSHIFTS_USD, monthlyPrice, plans } from "@/lib/plans";
+import { PLAN_PRICE, PRO_EXTRA_LOCATION_PRICE, SEVENSHIFTS_USD, monthlyPrice, plans } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 const SIGNUP_URL = "/login?mode=onboarding";
@@ -45,7 +45,7 @@ const COPY: Record<Lang, Copy> = {
       body: "Availability, overtime and labor cost are handled for you. You just hit publish.",
       primary: "Start free",
       secondary: "See how it works",
-      note: (price) => `30-day Pro trial · no card · from ${price} per location`,
+      note: (price) => `30-day Pro trial · no card · from ${price} a month`,
     },
     preview: {
       title: "Schedule · May 20–26",
@@ -73,8 +73,8 @@ const COPY: Record<Lang, Copy> = {
       { title: "Invite your team", body: "Paste your team from a spreadsheet. Everyone joins from a link and shares their availability." },
       { title: "Publish the schedule", body: "Generate the week, adjust it and send it out." },
     ],
-    pricingTitle: "Priced per location, not per person",
-    pricingBody: "Free forever for one small restaurant. Every new account starts with 30 days of Pro.",
+    pricingTitle: "One price for your whole team",
+    pricingBody: "Never per person. Free forever for one small restaurant, Pro covers up to three locations. Every new account starts with 30 days of Pro.",
     pricingCta: { free: "Start free", paid: "Try 30 days free" },
     mostPopular: "Most popular",
     compare: (percent) => `${percent}% less than 7shifts`,
@@ -82,7 +82,7 @@ const COPY: Record<Lang, Copy> = {
     faq: [
       {
         q: "How much does it cost?",
-        a: "Free covers one location and up to 15 people, forever. Starter is $26 and Pro is $58 per location per month, about 25% less than 7shifts. Yearly billing gets you two months free.",
+        a: "Free covers one location and up to 15 people, forever. Starter is $26 a month for one location and up to 30 people. Pro is $58 a month for up to three locations with no people limit, and $15 for each location after that. Yearly billing gets you two months free.",
       },
       { q: "Do I need a credit card to start?", a: "No. You get the full Pro plan for 30 days, then choose a paid plan or stay on Free." },
       { q: "Does my team need to install an app?", a: "No download from an app store. Staff open the invite link, set a password and can add Platofy to their Home Screen to get push notifications." },
@@ -104,7 +104,7 @@ const COPY: Record<Lang, Copy> = {
       body: "Dostępność zespołu, Kodeks pracy i koszt pracy liczą się same. Ty tylko publikujesz.",
       primary: "Zacznij za darmo",
       secondary: "Zobacz, jak działa",
-      note: (price) => `30 dni Pro gratis · bez karty · od ${price} za lokal`,
+      note: (price) => `30 dni Pro gratis · bez karty · od ${price} miesięcznie`,
     },
     preview: {
       title: "Grafik · 20–26 maja",
@@ -132,8 +132,8 @@ const COPY: Record<Lang, Copy> = {
       { title: "Zaproś zespół", body: "Wklej zespół z arkusza. Każdy dołącza z linku i podaje dostępność." },
       { title: "Opublikuj grafik", body: "Wygeneruj tydzień, popraw i wyślij zespołowi." },
     ],
-    pricingTitle: "Płacisz za lokal, nie za osobę",
-    pricingBody: "Jeden mały lokal za darmo na zawsze. Każde nowe konto zaczyna od 30 dni planu Pro.",
+    pricingTitle: "Jedna cena za cały zespół",
+    pricingBody: "Nigdy za osobę. Jeden mały lokal za darmo na zawsze, Pro obejmuje do trzech lokali. Każde nowe konto zaczyna od 30 dni planu Pro.",
     pricingCta: { free: "Zacznij za darmo", paid: "Wypróbuj 30 dni gratis" },
     mostPopular: "Najczęściej wybierany",
     compare: (percent) => `${percent}% taniej niż 7shifts`,
@@ -141,7 +141,7 @@ const COPY: Record<Lang, Copy> = {
     faq: [
       {
         q: "Ile kosztuje Platofy?",
-        a: "Free obejmuje jeden lokal i do 15 osób, bez limitu czasu. Starter kosztuje 99 zł, a Pro 219 zł za lokal miesięcznie. Rocznie 2 miesiące gratis.",
+        a: "Free obejmuje jeden lokal i do 15 osób, bez limitu czasu. Starter to 99 zł miesięcznie za jeden lokal i do 30 osób. Pro to 219 zł miesięcznie za maksymalnie trzy lokale bez limitu osób, a każdy kolejny lokal kosztuje 59 zł. Rocznie 2 miesiące gratis.",
       },
       { q: "Czy potrzebuję karty płatniczej?", a: "Nie. Przez 30 dni korzystasz z pełnego planu Pro, potem wybierasz płatny plan albo zostajesz na Free." },
       { q: "Czy pracownicy muszą instalować aplikację?", a: "Nie ze sklepu. Pracownik otwiera link z zaproszenia, ustawia hasło i może dodać Platofy do ekranu początkowego, aby dostawać powiadomienia." },
@@ -163,7 +163,7 @@ const COPY: Record<Lang, Copy> = {
       body: "Доступность команды, переработки и затраты на персонал считаются сами. Вы только публикуете.",
       primary: "Начать бесплатно",
       secondary: "Как это работает",
-      note: (price) => `30 дней Pro бесплатно · без карты · от ${price} за точку`,
+      note: (price) => `30 дней Pro бесплатно · без карты · от ${price} в месяц`,
     },
     preview: {
       title: "График · 20–26 мая",
@@ -191,8 +191,8 @@ const COPY: Record<Lang, Copy> = {
       { title: "Пригласите команду", body: "Вставьте команду из таблицы. Каждый заходит по ссылке и указывает доступность." },
       { title: "Опубликуйте график", body: "Сгенерируйте неделю, поправьте и отправьте команде." },
     ],
-    pricingTitle: "Оплата за точку, а не за человека",
-    pricingBody: "Одна небольшая точка бесплатно навсегда. Каждый новый аккаунт начинает с 30 дней Pro.",
+    pricingTitle: "Одна цена за всю команду",
+    pricingBody: "Никогда не за человека. Одна небольшая точка бесплатно навсегда, в Pro входят до трёх точек. Каждый новый аккаунт начинает с 30 дней Pro.",
     pricingCta: { free: "Начать бесплатно", paid: "30 дней бесплатно" },
     mostPopular: "Чаще всего выбирают",
     compare: (percent) => `На ${percent}% дешевле 7shifts`,
@@ -200,7 +200,7 @@ const COPY: Record<Lang, Copy> = {
     faq: [
       {
         q: "Сколько это стоит?",
-        a: "Free: одна точка и до 15 человек, без ограничения по времени. Starter стоит $26, Pro $58 за точку в месяц, примерно на 25% дешевле 7shifts. При оплате за год два месяца бесплатно.",
+        a: "Free: одна точка и до 15 человек, без ограничения по времени. Starter — $26 в месяц за одну точку и до 30 человек. Pro — $58 в месяц до трёх точек без лимита людей, каждая следующая точка $15. При оплате за год два месяца бесплатно.",
       },
       { q: "Нужна ли карта, чтобы начать?", a: "Нет. 30 дней вы пользуетесь полным Pro, потом выбираете тариф или остаётесь на Free." },
       { q: "Нужно ли сотрудникам ставить приложение?", a: "Не из магазина. Сотрудник открывает ссылку из приглашения, задаёт пароль и может добавить Platofy на экран «Домой», чтобы получать уведомления." },
@@ -306,7 +306,7 @@ export function LandingPage() {
   const { lang, setLang, t } = useLanguage();
   const copy = COPY[lang] ?? COPY.en;
   const currency = currencyForLang(lang);
-  const fromPrice = formatMoney(PRICE_PER_LOCATION[currency].standard.monthly, currency, lang);
+  const fromPrice = formatMoney(PLAN_PRICE[currency].standard.monthly, currency, lang);
 
   return (
     <div className="min-h-dvh overflow-x-clip bg-white text-black">
@@ -446,6 +446,11 @@ export function LandingPage() {
                       <span className="text-[40px] font-bold leading-none tracking-tight text-black">{formatMoney(price, currency, lang)}</span>
                       <span className="text-[14px] text-[var(--color-text-muted)]">{plan.key === "free" ? t("plan.forever") : t("plan.per_location_month")}</span>
                     </p>
+                    {plan.key === "pro" ? (
+                      <p className="mt-2 text-[14px] text-[var(--color-text-muted)]">
+                        {t("plan.pro_extra", { price: formatMoney(PRO_EXTRA_LOCATION_PRICE[currency].monthly, currency, lang) })}
+                      </p>
+                    ) : null}
                     {saving ? <p className="mt-2 text-[14px] font-semibold text-[var(--color-success)]">{copy.compare(saving)}</p> : null}
                     <ul className="mt-6 flex-1 space-y-2.5">
                       {Array.from({ length: plan.features }, (_, index) => (

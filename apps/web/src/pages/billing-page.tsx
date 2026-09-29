@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { currencyOf, formatDate, formatMoney } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
-import { PRICE_PER_LOCATION, SEVENSHIFTS_USD, normalizePlan, planTitleKey, plans, type PaidPlan } from "@/lib/plans";
+import { PLAN_PRICE, PRO_EXTRA_LOCATION_PRICE, SEVENSHIFTS_USD, normalizePlan, planTitleKey, planTotal, plans, type PaidPlan } from "@/lib/plans";
 import { useToast } from "@/lib/toast";
 import type { BillingCheckoutCycle, SubscriptionSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -114,8 +114,8 @@ export function BillingPage() {
           {plans.map((plan) => {
             const isCurrent = currentPlan === plan.key;
             const paid = plan.key !== "free" ? plan.key : null;
-            const price = paid ? PRICE_PER_LOCATION[currency][paid][cycle] : 0;
-            const saving = paid && currency === "USD" ? Math.round((1 - PRICE_PER_LOCATION.USD[paid].monthly / SEVENSHIFTS_USD[paid]) * 100) : null;
+            const price = paid ? PLAN_PRICE[currency][paid][cycle] : 0;
+            const saving = paid && currency === "USD" ? Math.round((1 - PLAN_PRICE.USD[paid].monthly / SEVENSHIFTS_USD[paid]) * 100) : null;
             return (
               <section key={plan.key} className={cn("ios-island flex flex-col px-5 py-6", isCurrent && "ring-2 ring-[var(--color-primary-strong)]")}>
                 <div className="flex items-center justify-between gap-2">
@@ -130,9 +130,14 @@ export function BillingPage() {
                   </span>
                 </p>
                 {saving ? <p className="mt-1.5 text-[14px] font-semibold text-[var(--color-success)]">{t("plan.cheaper_than", { percent: saving })}</p> : null}
-                {paid ? (
+                {paid === "pro" ? (
                   <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
-                    {t("billing.your_total", { count: locations, total: formatMoney(price * locations, currency, lang), period: perPeriod })}
+                    {t("plan.pro_extra", { price: formatMoney(PRO_EXTRA_LOCATION_PRICE[currency][cycle], currency, lang) })}
+                  </p>
+                ) : null}
+                {paid === "pro" && locations > 1 ? (
+                  <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
+                    {t("billing.your_total", { count: locations, total: formatMoney(planTotal(paid, locations, currency, cycle), currency, lang), period: perPeriod })}
                   </p>
                 ) : null}
                 <ul className="mt-5 flex-1 space-y-2.5">
