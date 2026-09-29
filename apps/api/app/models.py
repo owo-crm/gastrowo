@@ -161,6 +161,9 @@ class Organization(Base):
     clock_mode: Mapped[str] = mapped_column(String(16), default="both")
     # Auto-schedule treats weekly hour limits (desired hours, 40 h overtime) as hard limits; off = warnings only.
     schedule_respect_hour_limits: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Public "demo look" business: one per visitor, some features off, deleted when it expires.
+    is_sandbox: Mapped[bool] = mapped_column(Boolean, default=False)
+    sandbox_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 

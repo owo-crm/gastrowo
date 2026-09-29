@@ -45,6 +45,7 @@ from app.schemas import (
 from app.services.auth_email import send_invite_email
 from app.services.positions import ensure_catalog
 from app.services.demo_access import is_demo_account
+from app.services.demo_restaurant import display_name
 from app.services.demo_restaurant import seed_demo_restaurant
 from app.services.labor_rules import default_timezone_for, locale_settings
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, require_feature
@@ -207,6 +208,9 @@ def patch_current_organization(
     _require_business_settings_access(context, organization)
     if payload.name is not None:
         normalized_name = payload.name.strip()
+        if organization.is_sandbox:
+            # A demo keeps its unique suffix, so it can never take a real business's name.
+            normalized_name = f"{normalized_name[:120]} · demo {organization.name.rsplit(' · demo ', 1)[-1]}"
         existing = db.scalar(
             select(Organization).where(
                 Organization.name == normalized_name,
@@ -225,7 +229,7 @@ def patch_current_organization(
         organization.country = payload.country
     db.commit()
     db.refresh(organization)
-    return ok({"id": str(organization.id), "name": organization.name, **locale_settings(organization)})
+    return ok({"id": str(organization.id), "name": display_name(organization), **locale_settings(organization)})
 
 
 @router.post("/current/demo-restaurant")

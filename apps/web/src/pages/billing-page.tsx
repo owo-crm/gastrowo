@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Check, CreditCard } from "lucide-react";
 
+import { DemoOffNote } from "@/components/demo-off";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,14 @@ export function BillingPage() {
   const atLimit = Boolean(subscription?.member_cap && subscription.active_members_count >= subscription.member_cap);
   const badge = subscription ? statusBadge(subscription, t, lang) : null;
   const perPeriod = cycle === "monthly" ? t("billing.per_month") : t("billing.per_year");
+
+  if (me?.is_sandbox) {
+    return (
+      <AppShell title={t("sub.billing")} subtitle={t("billing.subtitle")} flush>
+        <DemoOffNote body={t("demo.off_billing")} />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={t("sub.billing")} subtitle={t("billing.subtitle")} flush>

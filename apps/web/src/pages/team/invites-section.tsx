@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileSpreadsheet, MailPlus } from "lucide-react";
 
+import { DemoOffNote } from "@/components/demo-off";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListRow, ListSection } from "@/components/ui/list";
@@ -15,7 +16,7 @@ import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 
 export function InvitesSection() {
-  const { token } = useAuth();
+  const { token, me } = useAuth();
   const { t, lang } = useLanguage();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -63,6 +64,8 @@ export function InvitesSection() {
     if (!clean) return;
     send.mutate({ email: clean, name: name.trim().length >= 2 ? name.trim() : undefined });
   };
+
+  if (me?.is_sandbox) return <DemoOffNote header={t("team.add_worker_title")} body={t("demo.off_invites")} />;
 
   return (
     <div>

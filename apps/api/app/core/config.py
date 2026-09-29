@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     dev_login_email: str = ""
     # Secret test login that also works in production: open /?test=<secret> once in the browser.
     dev_login_secret: str = ""
+    # Public "demo look": each visitor gets a throwaway business with a month of made-up data.
+    public_demo_enabled: bool = True
+    public_demo_hours: int = 24
+    public_demo_per_ip_per_hour: int = 5
+    public_demo_max_live: int = 300
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 

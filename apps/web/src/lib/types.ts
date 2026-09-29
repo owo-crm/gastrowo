@@ -85,6 +85,9 @@ export type MeResponse = {
   id: string;
   is_platform_admin?: boolean;
   is_demo_account?: boolean;
+  /** The public "demo look" business: made-up data, some features off, deleted when it expires. */
+  is_sandbox?: boolean;
+  sandbox_expires_at?: string | null;
   email: string;
   full_name: string;
   avatar_url?: string | null;

@@ -6,7 +6,7 @@ import time as time_module
 import secrets
 from uuid import UUID
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -35,6 +35,7 @@ from app.models import (
     hash_auth_session_token,
 )
 from app.schemas import (
+    PublicDemoRequest,
     InviteAcceptRequest,
     DevLoginRequest,
     InviteJoinVerifyRequest,
@@ -52,7 +53,9 @@ from app.schemas import (
 from app.services.auth_email import send_otp_email
 from app.services.labor_rules import default_timezone_for, locale_settings
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, grant_comp_pro
+from app.services import sandbox as sandbox_service
 from app.services.demo_access import dev_login_user, is_demo_account
+from app.services.demo_restaurant import display_name
 from app.services.positions import replace_member_positions
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -467,6 +470,43 @@ def dev_login(response: Response, payload: DevLoginRequest | None = None, db: Se
     return ok(_issue_auth_payload(user, memberships))
 
 
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    return forwarded.split(",")[0].strip() or (request.client.host if request.client else "unknown")
+
+
+@router.post("/demo")
+def public_demo(request: Request, response: Response, payload: PublicDemoRequest | None = None, db: Session = Depends(get_db)):
+    """Anyone can open the "demo look": a fresh business of their own with a month of made-up data.
+
+    It is a separate business per visitor (nothing shared with other visitors or real businesses),
+    signed in only in this browser, and deleted after PUBLIC_DEMO_HOURS.
+    """
+    if not settings.public_demo_enabled:
+        raise HTTPException(status_code=404, detail="Not Found")
+    sandbox_service.cleanup_expired(db)
+    if sandbox_service.live_count(db) >= settings.public_demo_max_live:
+        raise HTTPException(status_code=503, detail="The demo is busy right now. Please try again later.")
+    try:
+        sandbox_service.check_rate(_client_ip(request))
+    except PermissionError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+
+    user, membership, organization = sandbox_service.create_sandbox(db, payload.country if payload else "US")
+    session_token = generate_auth_session_token()
+    db.add(
+        AuthSession(
+            user_id=user.id,
+            organization_id=organization.id,
+            token_hash=hash_auth_session_token(session_token),
+            expires_at=organization.sandbox_expires_at,
+        )
+    )
+    db.commit()
+    _set_auth_session_cookie(response, session_token)
+    return ok(_issue_auth_payload(user, [membership]))
+
+
 @router.get("/invites/lookup")
 def lookup_invite(token: str, email: str, db: Session = Depends(get_db)):
     """What the join screen shows before anyone signs in: the business and the name the manager entered."""
@@ -614,6 +654,16 @@ def bootstrap_session(
         _clear_auth_session_cookie(response)
         return ok(None)
     memberships = db.scalars(select(OrganizationMembership).where(OrganizationMembership.user_id == user.id)).all()
+    sandbox = db.get(Organization, memberships[0].organization_id) if memberships else None
+    if sandbox is not None and sandbox.is_sandbox:
+        # A demo ends when it expires; its session is never extended past that.
+        if sandbox.sandbox_expires_at is None or utc_value(sandbox.sandbox_expires_at) <= utc_now():
+            sandbox_service.delete_sandbox(db, sandbox.id)
+            _clear_auth_session_cookie(response)
+            return ok(None)
+        session.last_seen_at = utc_now()
+        db.commit()
+        return ok(SessionBootstrapResponse(**_issue_auth_payload(user, memberships)).model_dump(mode="json"))
     session.last_seen_at = utc_now()
     session.expires_at = utc_now() + timedelta(days=settings.auth_session_ttl_days)
     db.commit()
@@ -663,7 +713,7 @@ def me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
         full_name=user.full_name,
         avatar_url=user.avatar_url,
         active_organization_id=active_membership.organization_id if active_membership else None,
-        active_organization_name=organization.name if organization else None,
+        active_organization_name=display_name(organization) if organization else None,
         role=active_membership.role if active_membership else None,
         is_linked=bool(memberships),
         memberships=[MembershipOut.model_validate(item) for item in memberships],
@@ -671,5 +721,7 @@ def me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
         subscription=build_subscription_summary(db, active_membership.organization_id if active_membership else None),
         is_platform_admin=user.email.lower() in settings.parsed_platform_admin_emails,
         is_demo_account=is_demo_account(db, user),
+        is_sandbox=bool(organization and organization.is_sandbox),
+        sandbox_expires_at=organization.sandbox_expires_at if organization and organization.is_sandbox else None,
     )
     return ok(payload_out.model_dump(mode="json"))

@@ -366,6 +366,30 @@ function SidebarSection({ section, active }: { section: NavSection; active: bool
   );
 }
 
+/** Always visible in the public demo: what this is, and the way out to a real account. */
+function DemoBanner() {
+  const { logout } = useAuth();
+  const { t } = useLanguage();
+  const navigate = useNavigate();
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 bg-[#1c1c1e] px-4 py-2 text-[14px] text-white sm:px-6" role="note">
+      <span className="rounded-full bg-[var(--color-warning)] px-2 py-0.5 text-[12px] font-bold uppercase tracking-wide text-black">{t("demo.badge")}</span>
+      <span className="min-w-0 flex-1 max-sm:hidden">{t("demo.banner")}</span>
+      <span className="min-w-0 flex-1 sm:hidden">{t("demo.banner_short")}</span>
+      <button
+        type="button"
+        onClick={async () => {
+          await logout();
+          navigate("/login?mode=onboarding");
+        }}
+        className="inline-flex min-h-8 shrink-0 items-center rounded-full bg-white px-3.5 text-[14px] font-semibold text-black"
+      >
+        {t("demo.create_account")}
+      </button>
+    </div>
+  );
+}
+
 /** Sub-tabs of the current section on phones: a scrollable row of pills under the title. */
 function MobileSubTabs({ section }: { section: NavSection }) {
   const { t } = useLanguage();
@@ -470,6 +494,7 @@ export function AppShell({
       </aside>
 
       <div className="lg:pl-[272px]">
+        {me?.is_sandbox ? <DemoBanner /> : null}
         <header className="ios-bar sticky top-0 z-30">
           <div className={cn("flex min-h-[var(--nav-height)] items-center gap-2 pl-4 pr-2 pt-1 sm:pl-6", !fullBleed && "mx-auto max-w-[1180px]")}>
             <div className="min-w-0 flex-1 py-2">

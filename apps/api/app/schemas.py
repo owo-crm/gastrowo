@@ -27,6 +27,10 @@ class APIModel(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PublicDemoRequest(BaseModel):
+    country: Literal["US", "PL"] = "US"
+
+
 class DevLoginRequest(BaseModel):
     secret: str | None = Field(default=None, max_length=256)
     as_role: Literal["admin", "staff"] = "admin"
@@ -91,6 +95,8 @@ class MeOut(APIModel):
     subscription: "SubscriptionSummaryOut | None" = None
     is_platform_admin: bool = False
     is_demo_account: bool = False
+    is_sandbox: bool = False
+    sandbox_expires_at: datetime | None = None
 
 
 Country = Literal["US", "PL"]

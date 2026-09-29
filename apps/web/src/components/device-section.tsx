@@ -10,7 +10,7 @@ import { useToast } from "@/lib/toast";
 
 /** "This device": push notifications and installing Platofy on the Home Screen. */
 export function DeviceSection() {
-  const { token } = useAuth();
+  const { token, me } = useAuth();
   const { t } = useLanguage();
   const toast = useToast();
   const [pushOn, setPushOn] = useState(false);
@@ -49,6 +49,9 @@ export function DeviceSection() {
       setBusy(false);
     }
   };
+
+  // Push goes to real phones; the demo has no one to send it to.
+  if (me?.is_sandbox) return null;
 
   return (
     <ListSection header={t("device.header")} footer={iosNeedsInstall ? t("device.ios_footer") : t("device.footer")}>

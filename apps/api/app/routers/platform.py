@@ -129,7 +129,7 @@ def _counts(db: Session) -> tuple[dict[UUID, int], dict[UUID, int]]:
 
 @router.get("/stats")
 def platform_stats(_: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
-    organizations = db.scalars(select(Organization)).all()
+    organizations = db.scalars(select(Organization).where(Organization.is_sandbox.is_(False))).all()
     by_plan: dict[str, int] = {}
     paying = trialing = 0
     for organization in organizations:
@@ -152,7 +152,7 @@ def platform_stats(_: User = Depends(require_platform_admin), db: Session = Depe
 
 @router.get("/organizations")
 def list_organizations(q: str = "", _: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
-    query = select(Organization).order_by(Organization.created_at.desc())
+    query = select(Organization).where(Organization.is_sandbox.is_(False)).order_by(Organization.created_at.desc())
     term = q.strip().lower()
     if term:
         owner_org_ids = select(OrganizationMembership.organization_id).join(User, User.id == OrganizationMembership.user_id).where(func.lower(User.email).contains(term))
