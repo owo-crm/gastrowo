@@ -159,6 +159,8 @@ class Organization(Base):
     country: Mapped[str] = mapped_column(String(2), default="US")
     # How people clock in: "phone" (their own app), "kiosk" (a shared tablet with PINs) or "both".
     clock_mode: Mapped[str] = mapped_column(String(16), default="both")
+    # Auto-schedule treats weekly hour limits (desired hours, 40 h overtime) as hard limits; off = warnings only.
+    schedule_respect_hour_limits: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 

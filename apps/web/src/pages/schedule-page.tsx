@@ -2835,6 +2835,11 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
   const editorMember = sortedLocationMembers.find((member) => member.id === previewEditorModal?.userId) ?? null;
   const editorPosition = previewEditorModal?.position ?? (editorMember ? positionsByUser[editorMember.id]?.[0] ?? editorMember.staff_position ?? "" : "");
   const editorPositionOptions = Array.from(new Set([...(positionsCatalogQuery.data ?? []).map((item) => item.name), ...(editorPosition ? [editorPosition] : [])])).map((name) => ({ value: name, label: name }));
+  // US rules: flag anyone this shift would push past 40 hours in the week (paid at 1.5×).
+  const usOvertimeRules = me?.organization_settings?.labor_rules !== "PL";
+  const editorOriginalEntry = previewEditorModal?.overrideId
+    ? Object.values(previewEntriesByDate).flat().find((entry) => entry.overrideId === previewEditorModal.overrideId)
+    : undefined;
   const editorPeople = previewEditorModal
     ? sortedLocationMembers
         .filter((member) => member.role !== "ADMIN")
@@ -2843,7 +2848,19 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
           const positions = positionsByUser[member.id] ?? (member.staff_position ? [member.staff_position] : []);
           const canWork = member.role === "MANAGER" || !editorPosition || positions.some((item) => item.toLowerCase() === editorPosition.toLowerCase());
           const hours = previewHoursByUser[member.id] ?? 0;
-          return { id: member.id, name: member.full_name, positions, canWork, tone: availability.tone, label: availability.label, rank: (canWork ? 0 : 10) + availability.rank, hours: hours % 1 ? hours.toFixed(1) : hours };
+          const alreadyCounted = editorOriginalEntry?.assigned_user_id === member.id ? shiftHours(editorOriginalEntry.startTime, editorOriginalEntry.endTime) : 0;
+          const hoursAfter = hours - alreadyCounted + shiftHours(previewEditorModal.startTime, previewEditorModal.endTime);
+          const overtime = usOvertimeRules && hoursAfter > 40 + 1e-9;
+          const tone = overtime ? ("warning" as const) : availability.tone;
+          const hoursLabel = hoursAfter % 1 ? hoursAfter.toFixed(1) : hoursAfter;
+          // Keep an availability problem visible and append the overtime note to it.
+          const label = !overtime
+            ? availability.label
+            : availability.tone === "warning"
+              ? `${availability.label} · ${t("schedule.overtime_short", { hours: hoursLabel })}`
+              : t("schedule.overtime_warning", { hours: hoursLabel });
+          const rank = (canWork ? 0 : 10) + Math.max(availability.rank, overtime ? 3 : 0);
+          return { id: member.id, name: member.full_name, positions, canWork, tone, label, rank, hours: hours % 1 ? hours.toFixed(1) : hours };
         })
         .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name))
     : [];

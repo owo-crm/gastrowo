@@ -74,6 +74,7 @@ class OrganizationSettingsOut(APIModel):
     currency: str = "USD"
     labor_rules: str = "US"
     clock_mode: str = "both"
+    schedule_respect_hour_limits: bool = True
 
 
 class MeOut(APIModel):
@@ -103,6 +104,10 @@ class OrganizationCreate(BaseModel):
 class OrganizationPatch(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=160)
     country: Country | None = None
+
+
+class SchedulingSettingsPatch(BaseModel):
+    respect_hour_limits: bool
 
 
 class OrganizationSettingsPatch(BaseModel):

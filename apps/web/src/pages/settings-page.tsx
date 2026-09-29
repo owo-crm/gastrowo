@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ListRow, ListSection } from "@/components/ui/list";
 import { Segmented } from "@/components/ui/segmented";
 import { Sheet } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { api, apiAbsoluteUrl } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { loadBusinessLogo, saveBusinessLogo } from "@/lib/business-branding";
@@ -90,6 +91,12 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
   const kiosksQuery = useQuery({ queryKey: ["kiosks"], queryFn: () => api.listKiosks(token!), enabled: Boolean(token) && section === "business" && canManageClock });
   const locationsQuery = useQuery({ queryKey: ["locations"], queryFn: () => api.listLocations(token!), enabled: Boolean(token) && section === "business" && canManageClock });
 
+  const respectHourLimits = me?.organization_settings?.schedule_respect_hour_limits !== false;
+  const saveHourLimits = useMutation({
+    mutationFn: (next: boolean) => api.setScheduleHourLimits(token!, next),
+    onSuccess: () => refreshMe(),
+    onError: (error) => toast.error(t("settings.hour_limits_failed"), error instanceof Error ? error.message : undefined),
+  });
   const saveMode = useMutation({
     mutationFn: (mode: ClockMode) => api.setClockMode(token!, mode),
     onSuccess: async () => {
@@ -284,6 +291,19 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
             </div>
             {canManageClock ? (
               <>
+                <ListSection header={t("settings.scheduling")} footer={respectHourLimits ? t("settings.hour_limits_on") : t("settings.hour_limits_off")}>
+                  <ListRow
+                    title={t("settings.hour_limits")}
+                    trailing={
+                      <Switch
+                        checked={respectHourLimits}
+                        label={t("settings.hour_limits")}
+                        disabled={saveHourLimits.isPending}
+                        onChange={(next) => saveHourLimits.mutate(next)}
+                      />
+                    }
+                  />
+                </ListSection>
                 <ListSection header={t("clock.header")} footer={t("clock.mode_footer")}>
                   <li className="px-4 py-3 sm:px-6">
                     <Segmented

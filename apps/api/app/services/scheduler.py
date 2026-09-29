@@ -17,6 +17,7 @@ from app.models import (
     InAppNotification,
     Location,
     LocationMembership,
+    Organization,
     OrganizationMembership,
     RoleEnum,
     Shift,
@@ -491,6 +492,9 @@ def _load_existing_manual_state(
     return hours_by_user, windows_by_user
 
 
+HOUR_LIMIT_REASONS = {"desired_hours_cap_exceeded", "weekly_overtime"}
+
+
 def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, location_id: UUID | None = None) -> SchedulePlanResult:
     week_end = week_start + timedelta(days=6)
     demand_specs = _load_demand_specs(db, organization_id, week_start, location_id=location_id)
@@ -522,6 +526,9 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
         role_buckets[membership.role].append(membership)
     member_positions = positions_by_user(db, organization_id)
     country = organization_country(db, organization_id)
+    organization = db.get(Organization, organization_id)
+    # Off: going over desired hours or 40 h is a warning, and such people are only used when nobody else fits.
+    respect_hour_limits = organization is None or organization.schedule_respect_hour_limits is not False
     polish_rules = labor_rules_for(country) == "PL"
 
     location_memberships = db.scalars(
@@ -645,6 +652,10 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
                 )
             reasons.extend(weekly_overtime_issue(country, current_hours + shift_hours))
 
+            over_hours = [reason for reason in reasons if reason in HOUR_LIMIT_REASONS]
+            if over_hours and not respect_hour_limits:
+                reasons = [reason for reason in reasons if reason not in HOUR_LIMIT_REASONS]
+
             is_manager_pick = demand.preferred_user_id is not None and membership.user_id == demand.preferred_user_id
             if is_manager_pick and reasons and "overlap" not in reasons:
                 # A day off, another position or a full week is the manager's call, not a reason to leave the shift empty.
@@ -668,11 +679,13 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
                 continue
 
             assert location_member is not None
-            eligible.append((membership, location_member, current_hours, user, start_covered))
+            eligible.append((membership, location_member, current_hours, user, start_covered, over_hours if not respect_hour_limits else []))
 
         eligible.sort(
             key=lambda item: (
                 0 if demand.preferred_user_id and item[0].user_id == demand.preferred_user_id else 1,
+                # People who would go over their hours only fill what nobody else can.
+                1 if item[5] else 0,
                 -item[1].priority,
                 # Among equals, prefer people for whom this is their main position.
                 0 if is_primary_position(item[0], member_positions.get(item[0].user_id), demand.staff_position) else 1,
@@ -682,6 +695,9 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
             )
         )
         selected = eligible[: demand.required_count]
+        for item in selected:
+            if item[5]:
+                warnings.append(f"{item[3].full_name} {demand.date.isoformat()} {demand.start_time}-{demand.end_time}: over hour limit ({', '.join(item[5])})")
 
         # Keep apply actionable, but surface shifts where nobody covers the actual start time.
         has_assigned_start_coverage = any(item[4] for item in selected)
@@ -709,7 +725,7 @@ def plan_week_schedule(db: Session, organization_id: UUID, week_start: date, loc
             if user_id not in selected_user_ids:
                 rejected_candidates.append(rejected_candidate)
 
-        for membership, location_member, _, user, _start_covered in selected:
+        for membership, location_member, _, user, _start_covered, _over_hours in selected:
             updated_hours = hours_by_user.get(membership.user_id, 0.0) + shift_hours
             cost_pln = _decimal_hour_cost(
                 rate_for(member_positions.get(membership.user_id), demand.staff_position, location_member.hourly_rate_pln),

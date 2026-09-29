@@ -14,7 +14,7 @@ import { UPGRADE_ROUTE } from "@/lib/navigation";
 import { useToast } from "@/lib/toast";
 import type { OrganizationSettings } from "@/lib/types";
 
-type Toggle = keyof Omit<OrganizationSettings, "country" | "currency" | "labor_rules" | "clock_mode">;
+type Toggle = keyof Omit<OrganizationSettings, "country" | "currency" | "labor_rules" | "clock_mode" | "schedule_respect_hour_limits">;
 
 const STAFF: Toggle[] = ["staff_can_submit_revenue_reports", "staff_can_delete_revenue_reports"];
 const MANAGERS: Toggle[] = [

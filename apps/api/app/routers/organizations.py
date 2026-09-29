@@ -31,6 +31,7 @@ from app.models import (
     User,
 )
 from app.schemas import (
+    SchedulingSettingsPatch,
     LinkByEmailRequest,
     MemberRemovalImpactOut,
     MemberRemovalResultOut,
@@ -261,6 +262,20 @@ def patch_current_organization_settings(
     db.commit()
     db.refresh(organization)
     return ok(_serialize_settings(organization))
+
+
+@router.patch("/current/scheduling")
+def patch_scheduling_settings(
+    payload: SchedulingSettingsPatch,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    """Whether auto-schedule keeps people inside their weekly hour limits or only warns about them."""
+    organization = get_current_organization(context, db)
+    _require_business_settings_access(context, organization)
+    organization.schedule_respect_hour_limits = payload.respect_hour_limits
+    db.commit()
+    return ok({"respect_hour_limits": organization.schedule_respect_hour_limits})
 
 
 @router.post("/members/link-by-email")
