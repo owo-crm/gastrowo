@@ -139,3 +139,27 @@ def test_tablet_break_button(client):
     assert client.post("/kiosk/punch", headers=device, json={"pin": pin, "action": "break"}).json()["data"]["action"] == "break_start"
     assert client.post("/kiosk/punch", headers=device, json={"pin": pin, "action": "break"}).json()["data"]["action"] == "break_end"
     assert client.post("/kiosk/punch", headers=device, json={"pin": pin}).json()["data"]["action"] == "out"
+
+
+def test_tablet_shows_the_person_first_and_punches_only_on_request(client, db_session):
+    admin, _staff, location_id, staff_id = _team(client)
+    _shift_now(db_session, location_id, staff_id, started_hours_ago=0.1)
+    device = {"X-Kiosk-Token": client.post("/clock/kiosks", headers=auth_header(admin), json={"location_id": location_id}).json()["data"]["token"]}
+    pin = client.get(f"/workers/{staff_id}/setup", headers=auth_header(admin)).json()["data"]["clock_pin"]
+
+    assert client.post("/kiosk/lookup", headers=device, json={"pin": "0000" if pin != "0000" else "1111"}).status_code == 404
+    seen = client.post("/kiosk/lookup", headers=device, json={"pin": pin}).json()["data"]
+    assert "Cook" in seen["full_name"] and seen["open_session"] is None
+    assert seen["shift"] and seen["shift"]["staff_position"] == "Line cook"
+    # Looking changes nothing.
+    assert db_session.scalar(select(ClockSession).where(ClockSession.user_id == UUID(staff_id))) is None
+
+    assert client.post("/kiosk/punch", headers=device, json={"pin": pin, "action": "out"}).status_code == 409
+    started = client.post("/kiosk/punch", headers=device, json={"pin": pin, "action": "in"})
+    assert started.status_code == 200 and started.json()["data"]["action"] == "in"
+    assert client.post("/kiosk/punch", headers=device, json={"pin": pin, "action": "in"}).status_code == 409
+    assert client.post("/kiosk/lookup", headers=device, json={"pin": pin}).json()["data"]["open_session"]["clock_in_at"]
+
+    ended = client.post("/kiosk/punch", headers=device, json={"pin": pin, "action": "out"})
+    assert ended.status_code == 200 and ended.json()["data"]["action"] == "out"
+    assert client.post("/kiosk/punch", headers=device, json={"pin": pin, "action": "out"}).status_code == 409

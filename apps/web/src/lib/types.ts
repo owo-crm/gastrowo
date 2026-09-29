@@ -628,6 +628,13 @@ export type ClockMe = { mode: ClockMode; phone_allowed: boolean; has_pin: boolea
 
 export type KioskDeviceItem = { id: string; name: string; location_id: string; location_name: string; created_at: string; last_seen_at: string | null };
 
+export type KioskLookup = {
+  full_name: string;
+  open_session: ClockSessionInfo | null;
+  shift: { start_time: string; end_time: string; staff_position: string | null } | null;
+  server_now: string;
+};
+
 export type KioskPunchResult = {
   action: "in" | "out" | "break_start" | "break_end";
   full_name: string;

@@ -7,6 +7,7 @@ import type {
   ClockMode,
   ClockSessionInfo,
   KioskDeviceItem,
+  KioskLookup,
   KioskPunchResult,
   AssignmentOverridePayload,
   BillingCheckoutCycle,
@@ -673,7 +674,10 @@ export const api = {
   kioskExit(kioskToken: string, pin: string) {
     return request<{ ok: boolean }>("/kiosk/exit", { method: "POST", body: JSON.stringify({ pin }), headers: { "X-Kiosk-Token": kioskToken } });
   },
-  kioskPunch(kioskToken: string, pin: string, action: "toggle" | "break" = "toggle") {
+  kioskLookup(kioskToken: string, pin: string) {
+    return request<KioskLookup>("/kiosk/lookup", { method: "POST", body: JSON.stringify({ pin }), headers: { "X-Kiosk-Token": kioskToken } });
+  },
+  kioskPunch(kioskToken: string, pin: string, action: "toggle" | "in" | "out" | "break" = "toggle") {
     return request<KioskPunchResult>("/kiosk/punch", { method: "POST", body: JSON.stringify({ pin, action }), headers: { "X-Kiosk-Token": kioskToken } });
   },
   platformStats(token: string) {

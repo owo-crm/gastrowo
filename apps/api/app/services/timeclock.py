@@ -205,6 +205,26 @@ def matching_shift(db: Session, organization_id: UUID, user_id: UUID, now: datet
     return best[1] if best else None
 
 
+def todays_shift(db: Session, organization_id: UUID, user_id: UUID, location: Location) -> Shift | None:
+    """The shift to show on the tablet: the one that matches now, otherwise the person's first shift today here."""
+    now = datetime.now(UTC)
+    shift = matching_shift(db, organization_id, user_id, now, location.id)
+    if shift is not None:
+        return shift
+    today = now.astimezone(_zone(location)).date()
+    return db.scalar(
+        select(Shift)
+        .join(Assignment, Assignment.shift_id == Shift.id)
+        .where(
+            Shift.organization_id == organization_id,
+            Shift.location_id == location.id,
+            Assignment.user_id == user_id,
+            Shift.date == today,
+        )
+        .order_by(Shift.start_time)
+    )
+
+
 def clock_in(
     db: Session,
     organization_id: UUID,
