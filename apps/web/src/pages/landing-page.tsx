@@ -59,7 +59,7 @@ const COPY: Record<Lang, Copy> = {
     featuresTitle: "Everything a shift needs. Nothing more.",
     features: [
       { icon: CalendarCheck2, title: "Schedules build themselves", body: "From availability, positions and priorities. You tweak and publish." },
-      { icon: Scale, title: "Overtime under control", body: "Auto-scheduling stays under 40 hours a week and payroll adds time-and-a-half when someone goes over." },
+      { icon: Scale, title: "Overtime under control", body: "Auto-scheduling keeps everyone under 40 hours a week, and you get a warning before anyone goes over." },
       { icon: Users, title: "One person, many positions", body: "A server who also tends bar gets both, each with its own pay rate." },
       { icon: Repeat2, title: "Swaps without group chats", body: "Staff ask to swap or pick up a shift in the app. You approve with one tap." },
       { icon: Clock3, title: "Time clock: phone or tablet", body: "Staff clock in from their phone or with a PIN on the tablet by the door, breaks included. On-time punches approve themselves." },
@@ -88,7 +88,7 @@ const COPY: Record<Lang, Copy> = {
       { q: "Does my team need to install an app?", a: "No download from an app store. Staff open the invite link, set a password and can add Platofy to their Home Screen to get push notifications." },
       {
         q: "How do you handle overtime?",
-        a: "Auto-scheduling avoids putting anyone over 40 hours in a week. If you assign it by hand you get a warning, and payroll adds the 1.5× premium for hours over 40.",
+        a: "Auto-scheduling avoids putting anyone over 40 hours in a week. If you assign it by hand you get a warning, and you can let auto-scheduling go over the limit in Settings.",
       },
       { q: "Can one person work different positions?", a: "Yes. Give someone several positions, pick the main one and set a rate for each. Auto-scheduling can use them in any of them." },
     ],
@@ -177,7 +177,7 @@ const COPY: Record<Lang, Copy> = {
     featuresTitle: "Всё, что нужно смене. Ничего лишнего.",
     features: [
       { icon: CalendarCheck2, title: "График строится сам", body: "По доступности, позициям и приоритетам. Вы правите и публикуете." },
-      { icon: Scale, title: "Переработки под контролем", body: "Автографик держит неделю в пределах 40 часов, а зарплата учитывает полуторный тариф сверх них." },
+      { icon: Scale, title: "Переработки под контролем", body: "Автографик держит неделю в пределах 40 часов, а перед переработкой вы видите предупреждение." },
       { icon: Users, title: "Один человек, несколько позиций", body: "Официант, который стоит и за баром, получает обе позиции, у каждой своя ставка." },
       { icon: Repeat2, title: "Обмены без чатов", body: "Сотрудники просят обмен или подхват смены в приложении, вы подтверждаете одним нажатием." },
       { icon: Clock3, title: "Отметки с телефона или планшета", body: "Приход и уход с телефона или по PIN на планшете у входа, с перерывами. Отметки по графику подтверждаются сами." },
@@ -206,7 +206,7 @@ const COPY: Record<Lang, Copy> = {
       { q: "Нужно ли сотрудникам ставить приложение?", a: "Не из магазина. Сотрудник открывает ссылку из приглашения, задаёт пароль и может добавить Platofy на экран «Домой», чтобы получать уведомления." },
       {
         q: "Как учитываются переработки?",
-        a: "Автографик не ставит человека больше 40 часов в неделю. При ручном назначении будет предупреждение, а зарплата добавит полуторный тариф за часы сверх 40.",
+        a: "Автографик не ставит человека больше 40 часов в неделю. При ручном назначении будет предупреждение, а в настройках можно разрешить автографику выходить за лимит.",
       },
       { q: "Может ли один человек работать на разных позициях?", a: "Да. Дайте ему несколько позиций, выберите основную и задайте ставку для каждой. Автографик использует любую из них." },
     ],
