@@ -39,7 +39,7 @@ const EN: Copy = {
   meta: {
     title: "How Platofy works — restaurant scheduling, time clock and payroll",
     description:
-      "See the real Platofy app step by step: collect availability, build the week in minutes, clock in by phone or tablet, approve only the exceptions and export payroll with overtime done.",
+      "See the real Platofy app step by step: collect availability, build the week in minutes, clock in by phone or tablet, approve only the exceptions and export payroll hours.",
   },
   nav: { home: "Home", pricing: "Pricing", signIn: "Sign in", start: "Start free" },
   hero: {
@@ -68,7 +68,7 @@ const EN: Copy = {
       title: "The week builds itself — you just adjust",
       body: "Platofy fills every shift from availability, positions and priorities, and keeps each person under 40 hours. The draft is invisible to the team until you publish. Tap any shift to see who's free, who has a conflict and who doesn't work that position.",
       points: ["Filled shifts, open shifts and labor cost update as you edit", "Your pick always wins — even on a day off", "Overnight shifts and several locations handled"],
-      why: "Owners tell us the weekly schedule takes 2–3 hours. Here it's about 15 minutes, and overtime is caught before it costs you time-and-a-half.",
+      why: "Owners tell us the weekly schedule takes 2–3 hours. Here it's about 15 minutes, and overtime is flagged before you publish.",
       shots: [shot("desk-draft", "desktop", "The draft week with filled and open shifts"), shot("desk-shift-editor", "desktop", "Choosing who works a shift")],
     },
     {
@@ -94,10 +94,10 @@ const EN: Copy = {
     },
     {
       title: "Know your labor cost, run payroll",
-      body: "Enter the day's sales and see labor as a share of revenue, per day and per location. Payroll adds overtime at 1.5× after 40 hours and exports a CSV for your accountant. Each person sees their own hours and pay.",
-      points: ["Labor % against a 30% target", "Overtime and position rates calculated for you", "CSV export in US or Polish format"],
+      body: "Enter the day's sales and see labor as a share of revenue, per day and per location. Approved hours turn into payroll with a CSV for your accountant. Each person sees their own hours and pay.",
+      points: ["Labor % against a 30% target", "Position rates calculated for you", "CSV export in US or Polish format"],
       why: "Labor is the biggest cost you control. Seeing it every day — not at the end of the month — is how restaurants keep it under 30%.",
-      shots: [shot("desk-overview", "desktop", "Revenue, labor cost and labor %"), shot("desk-payroll", "desktop", "Payroll with overtime"), shot("phone-pay", "phone", "A worker's own pay")],
+      shots: [shot("desk-overview", "desktop", "Revenue, labor cost and labor %"), shot("desk-payroll", "desktop", "Payroll"), shot("phone-pay", "phone", "A worker's own pay")],
     },
   ],
   final: {
@@ -216,7 +216,7 @@ const RU: Copy = {
       title: "Неделя строится сама — вы только правите",
       body: "Platofy заполняет смены по доступности, позициям и приоритетам и держит каждого в пределах 40 часов. Черновик не видно команде до публикации. Нажмите на смену — видно, кто свободен, у кого конфликт и кто не работает на этой позиции.",
       points: ["Заполненность, открытые смены и затраты обновляются на ходу", "Ваш выбор всегда побеждает — даже в выходной", "Ночные смены и несколько точек"],
-      why: "Владельцы тратят на график 2–3 часа в неделю. Здесь около 15 минут, а переработки видны до того, как обойдутся в полуторный тариф.",
+      why: "Владельцы тратят на график 2–3 часа в неделю. Здесь около 15 минут, а переработки видны ещё до публикации.",
       shots: [shot("desk-draft", "desktop", "Черновик недели"), shot("desk-shift-editor", "desktop", "Выбор человека на смену")],
     },
     {
@@ -242,10 +242,10 @@ const RU: Copy = {
     },
     {
       title: "Затраты на персонал и зарплата",
-      body: "Внесите выручку за день и смотрите долю зарплаты в выручке — по дням и точкам. Зарплата добавляет 1,5× за часы сверх 40 и выгружается в CSV. Каждый сотрудник видит свои часы и заработок.",
+      body: "Внесите выручку за день и смотрите долю зарплаты в выручке — по дням и точкам. Зарплата считается по подтверждённым часам и выгружается в CSV. Каждый сотрудник видит свои часы и заработок.",
       points: ["Доля зарплаты против цели 30%", "Переработки и ставки позиций считаются сами", "CSV в американском или польском формате"],
       why: "Персонал — самая большая статья расходов, которой вы управляете. Видеть её каждый день, а не в конце месяца, — так рестораны держат её ниже 30%.",
-      shots: [shot("desk-overview", "desktop", "Выручка, затраты и доля"), shot("desk-payroll", "desktop", "Зарплата с переработками"), shot("phone-pay", "phone", "Заработок сотрудника")],
+      shots: [shot("desk-overview", "desktop", "Выручка, затраты и доля"), shot("desk-payroll", "desktop", "Зарплата"), shot("phone-pay", "phone", "Заработок сотрудника")],
     },
   ],
   final: {

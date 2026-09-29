@@ -2835,7 +2835,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
   const editorMember = sortedLocationMembers.find((member) => member.id === previewEditorModal?.userId) ?? null;
   const editorPosition = previewEditorModal?.position ?? (editorMember ? positionsByUser[editorMember.id]?.[0] ?? editorMember.staff_position ?? "" : "");
   const editorPositionOptions = Array.from(new Set([...(positionsCatalogQuery.data ?? []).map((item) => item.name), ...(editorPosition ? [editorPosition] : [])])).map((name) => ({ value: name, label: name }));
-  // US rules: flag anyone this shift would push past 40 hours in the week (paid at 1.5×).
+  // US rules: flag anyone this shift would push past 40 hours in the week.
   const usOvertimeRules = me?.organization_settings?.labor_rules !== "PL";
   const editorOriginalEntry = previewEditorModal?.overrideId
     ? Object.values(previewEntriesByDate).flat().find((entry) => entry.overrideId === previewEditorModal.overrideId)
