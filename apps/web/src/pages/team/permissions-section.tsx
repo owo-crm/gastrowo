@@ -84,9 +84,14 @@ export function PermissionsSection() {
   return (
     <div>
       <ListSection header={t("team.filter_staff")}>{STAFF.map(row)}</ListSection>
-      <ListSection header={t("team.filter_managers")} footer={t("team.permissions_footer")}>
-        {MANAGERS.map(row)}
-      </ListSection>
+      {/* Only the owner decides what managers can do. */}
+      {me?.role === "ADMIN" ? (
+        <ListSection header={t("team.filter_managers")} footer={t("team.permissions_footer")}>
+          {MANAGERS.map(row)}
+        </ListSection>
+      ) : (
+        <p className="px-4 pt-2 text-[14px] text-[var(--color-text-muted)] sm:px-6">{t("team.permissions_owner_only")}</p>
+      )}
       <div className="px-4 py-4 sm:px-6">
         <Button size="lg" onClick={() => save.mutate()} disabled={save.isPending}>
           {t("common.save")}

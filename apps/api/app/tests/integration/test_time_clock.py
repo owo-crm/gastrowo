@@ -123,19 +123,10 @@ def test_breaks_are_subtracted_from_hours_and_pay(client, db_session):
     assert abs(float(row["approved_hours"]) - 7.5) < 0.05
 
 
-def test_phone_clock_in_only_near_the_location(client, db_session):
-    admin, staff, location_id, _ = _team(client)
-    # The restaurant is in Brooklyn; the worker tries from Manhattan, then from the door.
-    assert client.put(f"/locations/{location_id}/clock-area", headers=auth_header(admin), json={"latitude": 40.6782, "longitude": -73.9442, "radius_m": 150}).status_code == 200
-    assert client.get("/clock/me", headers=auth_header(staff)).json()["data"]["needs_location"] is True
-    assert client.post("/clock/in", headers=auth_header(staff)).status_code == 428
-    far = client.post("/clock/in", headers=auth_header(staff), json={"latitude": 40.7580, "longitude": -73.9855, "accuracy": 20})
-    assert far.status_code == 403 and " m from " in far.json()["error"]["message"]
-    near = client.post("/clock/in", headers=auth_header(staff), json={"latitude": 40.6786, "longitude": -73.9440, "accuracy": 15})
-    assert near.status_code == 200, near.text
-    # Turning the check off removes the requirement.
-    client.post("/clock/out", headers=auth_header(staff))
-    assert client.put(f"/locations/{location_id}/clock-area", headers=auth_header(admin), json={"latitude": None, "longitude": None}).status_code == 200
+def test_phone_clock_in_needs_no_location(client):
+    _admin, staff, _location_id, _ = _team(client)
+    me = client.get("/clock/me", headers=auth_header(staff)).json()["data"]
+    assert "needs_location" not in me
     assert client.post("/clock/in", headers=auth_header(staff)).status_code == 200
 
 

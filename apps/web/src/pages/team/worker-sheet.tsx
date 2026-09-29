@@ -16,6 +16,7 @@ import { currencyOf, currencySymbol } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import type { MemberPosition, MembershipPermissionOverrides } from "@/lib/types";
+import { UnsavedDialog, useUnsavedChangesBlocker } from "@/lib/unsaved";
 
 type Override = "inherit" | "allow" | "block";
 
@@ -68,7 +69,10 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
   const [locations, setLocations] = useState<Record<string, { priority: string; rate: string }>>({});
   const [overrides, setOverrides] = useState<Partial<Record<keyof MembershipPermissionOverrides, Override>>>({});
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const [newPin, setNewPin] = useState<string | null>(null);
+  const [pinOverride, setPinOverride] = useState<string | null>(null);
+  const [pinDraft, setPinDraft] = useState<string | null>(null);
+  const [role, setRole] = useState<"STAFF" | "MANAGER">("STAFF");
+  const [askClose, setAskClose] = useState(false);
 
   const setup = setupQuery.data;
   useEffect(() => {
@@ -78,11 +82,33 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
     setOverrides(Object.fromEntries(Object.entries(setup.permission_overrides ?? {}).map(([key, value]) => [key, toOverride(value as boolean | null)])));
     setNewPosition("");
     setConfirmRemove(false);
-    setNewPin(null);
+    setPinOverride(null);
+    setPinDraft(null);
+    setRole(setup.role === "MANAGER" ? "MANAGER" : "STAFF");
   }, [setup]);
 
   const canWorkPositions = setup?.role === "STAFF" || setup?.role === "MANAGER";
-  const canEditOverrides = canManageBusinessSettings(me) && hasPlanFeature(me, "permissions") && setup?.role !== "ADMIN";
+  // Managers may adjust staff exceptions only; the owner decides for managers too.
+  const canEditOverrides =
+    canManageBusinessSettings(me) && hasPlanFeature(me, "permissions") && setup?.role !== "ADMIN" && (me?.role === "ADMIN" || setup?.role === "STAFF");
+  const canChangeRole = me?.role === "ADMIN" && setup?.role !== "ADMIN" && setup?.user_id !== me?.id;
+
+  // What the form started with, to tell whether anything changed.
+  const snapshot = (value: { positions: MemberPosition[]; locations: typeof locations; overrides: typeof overrides; role: string }) =>
+    JSON.stringify([value.positions.map((item) => [item.position, item.hourly_rate ?? "", item.is_primary]), Object.entries(value.locations).sort(), Object.entries(value.overrides).sort(), value.role]);
+  const initialSnapshot = useMemo(() => {
+    if (!setup) return "";
+    return snapshot({
+      positions: setup.positions?.length ? setup.positions : setup.staff_position ? [{ position: setup.staff_position, hourly_rate: null, is_primary: true }] : [],
+      locations: Object.fromEntries(setup.locations.map((item) => [item.location_id, { priority: String(item.priority), rate: String(item.hourly_rate_pln ?? "0") }])),
+      overrides: Object.fromEntries(Object.entries(setup.permission_overrides ?? {}).map(([key, value]) => [key, toOverride(value as boolean | null)])),
+      role: setup.role === "MANAGER" ? "MANAGER" : "STAFF",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setup]);
+  const dirty = Boolean(setup) && Boolean(userId) && snapshot({ positions, locations, overrides, role }) !== initialSnapshot;
+  const blocker = useUnsavedChangesBlocker(dirty);
+  const requestClose = () => (dirty ? setAskClose(true) : onClose());
   const catalogOptions = useMemo(() => {
     const taken = new Set(positions.map((item) => item.position.toLowerCase()));
     return (catalogQuery.data ?? []).filter((item) => !taken.has(item.name.toLowerCase())).map((item) => ({ value: item.name, label: item.name }));
@@ -105,6 +131,7 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
   const save = useMutation({
     mutationFn: async () => {
       if (!userId || !setup) return;
+      if (canChangeRole && role !== setup.role) await api.setWorkerRole(token!, userId, role);
       if (canWorkPositions) {
         await api.putWorkerPositions(
           token!,
@@ -139,9 +166,28 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
 
   const resetPin = useMutation({
     mutationFn: () => api.resetClockPin(token!, userId!),
-    onSuccess: (data) => setNewPin(data.pin),
+    onSuccess: (data) => setPinOverride(data.pin),
     onError: (error) => toast.error(t("clock.pin_failed"), error instanceof Error ? error.message : undefined),
   });
+  const setPin = useMutation({
+    mutationFn: (pin: string) => api.setMemberClockPin(token!, userId!, pin),
+    onSuccess: (data) => {
+      setPinOverride(data.pin);
+      setPinDraft(null);
+      toast.success(t("clock.pin_saved"));
+    },
+    onError: (error) => toast.error(t("clock.pin_failed"), error instanceof Error ? error.message : undefined),
+  });
+  const currentPin = pinOverride ?? setup?.clock_pin ?? null;
+
+  const saveThen = async (after: () => void) => {
+    try {
+      await save.mutateAsync();
+      after();
+    } catch {
+      // The error toast is already shown; stay on the form.
+    }
+  };
 
   const remove = useMutation({
     mutationFn: () => api.removeMember(token!, userId!),
@@ -157,9 +203,10 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
   const overrideKeys = setup?.role === "MANAGER" ? MANAGER_KEYS : STAFF_KEYS;
 
   return (
+    <>
     <Sheet
       open={Boolean(userId)}
-      onClose={onClose}
+      onClose={requestClose}
       title={setup?.full_name ?? t("common.loading")}
       subtitle={setup?.role ? t(`shell.role.${setup.role}`) : undefined}
       action={{ label: t("common.save"), onClick: () => save.mutate(), disabled: !setup || save.isPending || (canWorkPositions && positions.length === 0) }}
@@ -176,6 +223,23 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
               <p className="text-[15px] text-[var(--color-text-muted)]">{positions.map((item) => item.position).join(" · ") || t("team.position_none")}</p>
             </div>
           </div>
+
+          {canChangeRole ? (
+            <SheetSection title={t("team.access")} footer={role === "MANAGER" ? t("team.access_manager_footer") : t("team.access_staff_footer")}>
+              <div className="py-2.5">
+                <Segmented
+                  className="w-full"
+                  ariaLabel={t("team.access")}
+                  value={role}
+                  onChange={(value) => setRole(value as "STAFF" | "MANAGER")}
+                  options={[
+                    { value: "STAFF", label: t("shell.role.STAFF") },
+                    { value: "MANAGER", label: t("shell.role.MANAGER") },
+                  ]}
+                />
+              </div>
+            </SheetSection>
+          ) : null}
 
           {canWorkPositions ? (
             <SheetSection title={t("team.positions")} footer={t("team.positions_footer")}>
@@ -294,15 +358,43 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
             </SheetSection>
           ) : null}
 
-          <SheetSection title={t("clock.header")} footer={newPin ? t("clock.new_pin_footer") : t("clock.reset_pin_footer")}>
-            <div className="flex min-h-12 items-center justify-between gap-3 py-2">
+          <SheetSection title={t("clock.header")} footer={t("clock.member_pin_footer")}>
+            <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 py-2">
               <span className="text-[16px] text-black">{t("clock.pin")}</span>
-              {newPin ? (
-                <span className="text-[26px] font-semibold tracking-[0.3em] tabular-nums text-black">{newPin}</span>
+              {pinDraft === null ? (
+                <span className="text-[26px] font-semibold tracking-[0.3em] tabular-nums text-black" data-testid="member-pin">
+                  {currentPin ?? "—"}
+                </span>
               ) : (
-                <Button size="sm" variant="tinted" onClick={() => resetPin.mutate()} disabled={resetPin.isPending}>
-                  {t("clock.new_pin")}
-                </Button>
+                <Input
+                  className="w-[140px] text-center text-[20px] tracking-[0.3em]"
+                  inputMode="numeric"
+                  autoFocus
+                  aria-label={t("clock.pin")}
+                  value={pinDraft}
+                  onChange={(event) => setPinDraft(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                />
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2 pb-3">
+              {pinDraft === null ? (
+                <>
+                  <Button size="sm" variant="tinted" onClick={() => setPinDraft("")}>
+                    {t("clock.change_pin")}
+                  </Button>
+                  <Button size="sm" variant="plain" onClick={() => resetPin.mutate()} disabled={resetPin.isPending}>
+                    {t("clock.new_pin")}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button size="sm" onClick={() => setPin.mutate(pinDraft)} disabled={!/^\d{4,6}$/.test(pinDraft) || setPin.isPending}>
+                    {t("common.save")}
+                  </Button>
+                  <Button size="sm" variant="plain" onClick={() => setPinDraft(null)}>
+                    {t("common.cancel")}
+                  </Button>
+                </>
               )}
             </div>
           </SheetSection>
@@ -339,5 +431,30 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
         </>
       ) : null}
     </Sheet>
+    <UnsavedDialog
+      open={askClose || blocker.state === "blocked"}
+      title={t("unsaved.title")}
+      body={t("unsaved.body")}
+      saveLabel={t("common.save")}
+      discardLabel={t("unsaved.discard")}
+      cancelLabel={t("unsaved.keep_editing")}
+      saving={save.isPending}
+      onSave={() =>
+        void saveThen(() => {
+          setAskClose(false);
+          if (blocker.state === "blocked") blocker.proceed();
+        })
+      }
+      onDiscard={() => {
+        setAskClose(false);
+        if (blocker.state === "blocked") blocker.proceed();
+        else onClose();
+      }}
+      onCancel={() => {
+        setAskClose(false);
+        if (blocker.state === "blocked") blocker.reset();
+      }}
+    />
+    </>
   );
 }

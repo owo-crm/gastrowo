@@ -221,6 +221,8 @@ class OrganizationMembership(Base):
     manager_can_access_inventory_override: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # Keyed digest of the personal time-clock PIN, so a tablet can find the person by PIN alone.
     clock_pin_digest: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    # The same PIN, encrypted with a key derived from SECRET_KEY, so managers can see and hand it out.
+    clock_pin_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     organization: Mapped[Organization] = relationship()
     user: Mapped[User] = relationship()

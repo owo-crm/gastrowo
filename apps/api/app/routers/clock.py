@@ -20,7 +20,7 @@ from app.core.envelope import ok
 from app.core.permissions import can_manage_business_settings, can_manage_team
 from app.db import get_db
 from app.models import ClockSession, KioskDevice, Location, LocationMembership, Organization, OrganizationMembership, RoleEnum, Shift, User
-from app.services.timeclock import _utc, CLOCK_MODES, clock_in, clock_out, end_break, generate_pin, membership_for_pin, mode_allows, open_session, set_pin, start_break
+from app.services.timeclock import _utc, CLOCK_MODES, clock_in, clock_out, end_break, ensure_pin, generate_pin, membership_for_pin, mode_allows, open_session, read_pin, set_pin, start_break
 
 router = APIRouter(tags=["clock"])
 
@@ -31,12 +31,6 @@ class PinIn(BaseModel):
 
 class PunchIn(PinIn):
     action: Literal["toggle", "break"] = "toggle"
-
-
-class ClockInIn(BaseModel):
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    accuracy: float | None = Field(default=None, ge=0)
 
 
 class ClockModeIn(BaseModel):
@@ -80,31 +74,25 @@ def _session_out(db: Session, session: ClockSession | None) -> dict | None:
 @router.get("/clock/me")
 def my_clock(context: OrgContext = Depends(require_org_context()), db: Session = Depends(get_db)):
     organization = get_current_organization(context, db)
+    pin = ensure_pin(db, context.membership)
+    db.commit()
     return ok(
         {
             "mode": organization.clock_mode or "both",
             "phone_allowed": mode_allows(organization, "phone"),
-            "has_pin": bool(context.membership.clock_pin_digest),
-            # Any of this person's locations requires being there to clock in from the phone.
-            "needs_location": bool(
-                db.scalar(
-                    select(Location.id)
-                    .join(LocationMembership, LocationMembership.location_id == Location.id)
-                    .where(LocationMembership.user_id == context.user.id, Location.organization_id == organization.id, Location.latitude.is_not(None))
-                )
-            ),
+            "has_pin": True,
+            "pin": pin,
             "open_session": _session_out(db, open_session(db, organization.id, context.user.id)),
         }
     )
 
 
 @router.post("/clock/in")
-def phone_clock_in(payload: ClockInIn | None = None, context: OrgContext = Depends(require_org_context()), db: Session = Depends(get_db)):
+def phone_clock_in(context: OrgContext = Depends(require_org_context()), db: Session = Depends(get_db)):
     organization = get_current_organization(context, db)
     if not mode_allows(organization, "phone"):
         raise HTTPException(status_code=403, detail="Your business clocks in on the tablet at work")
-    coords = (payload.latitude, payload.longitude, payload.accuracy or 0) if payload and payload.latitude is not None and payload.longitude is not None else None
-    session = clock_in(db, organization.id, context.user, source="phone", coords=coords)
+    session = clock_in(db, organization.id, context.user, source="phone")
     db.commit()
     return ok(_session_out(db, session))
 
@@ -135,7 +123,7 @@ def phone_clock_out(context: OrgContext = Depends(require_org_context()), db: Se
 def set_my_pin(payload: PinIn, context: OrgContext = Depends(require_org_context()), db: Session = Depends(get_db)):
     set_pin(db, context.membership, payload.pin)
     db.commit()
-    return ok({"has_pin": True})
+    return ok({"has_pin": True, "pin": read_pin(context.membership)})
 
 
 # ---- Manager tools ----
@@ -161,16 +149,35 @@ def reset_pin(
     context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
     db: Session = Depends(get_db),
 ):
-    """Give someone a new random PIN. It is shown once; only a keyed digest is stored."""
+    """Give someone a new random PIN."""
+    membership = _team_member(context, db, user_id)
+    pin = generate_pin(db, membership)
+    db.commit()
+    return ok({"pin": pin})
+
+
+@router.put("/clock/pins/{user_id}")
+def set_member_pin(
+    user_id: UUID,
+    payload: PinIn,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    """Set a PIN the manager chose for this person."""
+    membership = _team_member(context, db, user_id)
+    set_pin(db, membership, payload.pin)
+    db.commit()
+    return ok({"pin": read_pin(membership)})
+
+
+def _team_member(context: OrgContext, db: Session, user_id: UUID) -> OrganizationMembership:
     organization = _require_team(context, db)
     membership = db.scalar(
         select(OrganizationMembership).where(OrganizationMembership.organization_id == organization.id, OrganizationMembership.user_id == user_id)
     )
     if membership is None:
         raise HTTPException(status_code=404, detail="Member not found")
-    pin = generate_pin(db, membership)
-    db.commit()
-    return ok({"pin": pin})
+    return membership
 
 
 @router.get("/clock/team")
@@ -255,6 +262,26 @@ def create_kiosk(
     return ok({"id": str(device.id), "token": token, "location_name": location.name})
 
 
+class KioskRenameIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+@router.patch("/clock/kiosks/{device_id}")
+def rename_kiosk(
+    device_id: UUID,
+    payload: KioskRenameIn,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    organization = _require_settings(context, db)
+    device = db.get(KioskDevice, device_id)
+    if device is None or device.organization_id != organization.id:
+        raise HTTPException(status_code=404, detail="Time clock not found")
+    device.name = payload.name.strip()
+    db.commit()
+    return ok({"id": str(device.id), "name": device.name})
+
+
 @router.delete("/clock/kiosks/{device_id}")
 def delete_kiosk(
     device_id: UUID,
@@ -297,6 +324,7 @@ def kiosk_device(x_kiosk_token: str | None = Header(default=None), db: Session =
     db.commit()
     return ok(
         {
+            "id": str(device.id),
             "name": device.name,
             "business_name": organization.name,
             "location_name": location.name,
@@ -306,6 +334,30 @@ def kiosk_device(x_kiosk_token: str | None = Header(default=None), db: Session =
     )
 
 
+def _check_wrong_pin_limit(device: KioskDevice) -> tuple[deque[float], float]:
+    attempts = _wrong_pins[device.id]
+    now = monotonic_time.monotonic()
+    while attempts and now - attempts[0] > _WRONG_PIN_WINDOW_SECONDS:
+        attempts.popleft()
+    if len(attempts) >= _WRONG_PIN_LIMIT:
+        raise HTTPException(status_code=429, detail="Too many wrong PINs. Wait a few minutes.")
+    return attempts, now
+
+
+@router.post("/kiosk/exit")
+def kiosk_exit(payload: PinIn, x_kiosk_token: str | None = Header(default=None), db: Session = Depends(get_db)):
+    """Leave the time clock screen. Only the owner's or a manager's own PIN opens it."""
+    device, organization, _location = _kiosk(db, x_kiosk_token)
+    attempts, now = _check_wrong_pin_limit(device)
+    membership = membership_for_pin(db, organization.id, payload.pin) if payload.pin.strip().isdigit() else None
+    if membership is None or membership.role not in (RoleEnum.ADMIN, RoleEnum.MANAGER):
+        attempts.append(now)
+        db.commit()
+        raise HTTPException(status_code=403, detail="Only a manager's PIN can close the time clock")
+    db.commit()
+    return ok({"ok": True})
+
+
 @router.post("/kiosk/punch")
 def kiosk_punch(payload: PunchIn, x_kiosk_token: str | None = Header(default=None), db: Session = Depends(get_db)):
     """Clock the owner of this PIN in, or out if they are already in."""
@@ -313,12 +365,7 @@ def kiosk_punch(payload: PunchIn, x_kiosk_token: str | None = Header(default=Non
     if not mode_allows(organization, "kiosk"):
         raise HTTPException(status_code=403, detail="The tablet clock is turned off for this business")
 
-    attempts = _wrong_pins[device.id]
-    now = monotonic_time.monotonic()
-    while attempts and now - attempts[0] > _WRONG_PIN_WINDOW_SECONDS:
-        attempts.popleft()
-    if len(attempts) >= _WRONG_PIN_LIMIT:
-        raise HTTPException(status_code=429, detail="Too many wrong PINs. Wait a few minutes.")
+    attempts, now = _check_wrong_pin_limit(device)
 
     membership = membership_for_pin(db, organization.id, payload.pin) if payload.pin.strip().isdigit() else None
     if membership is None:

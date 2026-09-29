@@ -2,7 +2,7 @@ import "@fontsource-variable/nunito";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
+import { RouterProvider, createBrowserRouter } from "react-router-dom";
 
 import { App } from "@/App";
 import { captureTestLoginKey } from "@/components/dev-login-button";
@@ -21,6 +21,9 @@ const queryClient = new QueryClient({
   },
 });
 
+// A data router, so screens with unsaved changes can stop navigation (useBlocker). App keeps its own <Routes>.
+const router = createBrowserRouter([{ path: "*", element: <App /> }]);
+
 captureTestLoginKey();
 registerServiceWorker();
 installErrorReporting();
@@ -32,9 +35,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <LanguageProvider>
         <AuthProvider>
           <ToastProvider>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
+            <RouterProvider router={router} />
           </ToastProvider>
         </AuthProvider>
       </LanguageProvider>

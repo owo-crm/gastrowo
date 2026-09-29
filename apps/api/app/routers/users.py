@@ -112,6 +112,6 @@ def patch_staff_position(
     items = [(next_position, next((row.hourly_rate for row in current if row.position.lower() == next_position.lower()), None), True)]
     items += [(row.position, row.hourly_rate, False) for row in current if row.position.lower() != next_position.lower()]
     replace_member_positions(db, membership, items)
-    membership.role = RoleEnum.MANAGER if next_position == "Manager" else RoleEnum.STAFF
+    # The role (staff or manager access) is set on its own by the owner; a position name never changes it.
     db.commit()
     return ok({"user_id": str(user_id), "staff_position": membership.staff_position, "role": membership.role})

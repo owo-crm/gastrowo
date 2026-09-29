@@ -55,6 +55,7 @@ import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import type { Lang } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
+import { UnsavedDialog, useUnsavedChangesBlocker } from "@/lib/unsaved";
 
 import { formatTime, getMonday, toLocalIso } from "@/lib/date";
 
@@ -1689,6 +1690,10 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
   };
 
 
+  // Edits made in the open draft since it was opened; leaving with any asks to publish first.
+  const [draftEdits, setDraftEdits] = useState(0);
+  const markDraftEdited = () => setDraftEdits((count) => count + 1);
+
   const previewMutation = useMutation({
     mutationFn: async ({
       resetOverrides = false,
@@ -1719,6 +1724,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
         toast.info(t("schedule.edit_mode_enabled"), t("schedule.edit_mode_loaded"));
         return;
       }
+      markDraftEdited();
       toast.success(mode === "regenerate" ? t("schedule.regenerated") : t("schedule.generated"));
     },
     onError: (error) => {
@@ -1780,6 +1786,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
       }),
 
     onSuccess: async () => {
+      markDraftEdited();
       await weeklyOverridesQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: ["weekly-overrides", weekStart] });
       toast.success(t("schedule.preview_updated"));
@@ -1803,6 +1810,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
       return { deletedCount: payloads.length, dayIndex: effectiveDayIndex };
     },
     onSuccess: async (result) => {
+      markDraftEdited();
       const deletedCount = typeof result === "number" ? result : result.deletedCount;
       const clearedDayIndex = typeof result === "number" ? Number(bulkDay) : result.dayIndex;
       await weeklyOverridesQuery.refetch();
@@ -2421,6 +2429,11 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
       position: entry.staff_position ?? null,
     });
   };
+
+  useEffect(() => {
+    if (scheduleStage !== "preview") setDraftEdits(0);
+  }, [scheduleStage]);
+  const draftBlocker = useUnsavedChangesBlocker(scheduleStage === "preview" && draftEdits > 0);
 
   const exitPreviewMode = () => {
     setPreviewEditorModal(null);
@@ -3490,6 +3503,24 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
         ) : null}
       </Sheet>
 
+      <UnsavedDialog
+        open={draftBlocker.state === "blocked"}
+        title={t("schedule.leave_draft_title")}
+        body={t("schedule.leave_draft_body")}
+        saveLabel={t("schedule.publish")}
+        discardLabel={t("schedule.leave_as_draft")}
+        cancelLabel={t("unsaved.keep_editing")}
+        saving={applyMutation.isPending}
+        onSave={() =>
+          applyMutation.mutate(undefined, {
+            onSuccess: () => {
+              if (draftBlocker.state === "blocked") draftBlocker.proceed();
+            },
+          })
+        }
+        onDiscard={() => draftBlocker.state === "blocked" && draftBlocker.proceed()}
+        onCancel={() => draftBlocker.state === "blocked" && draftBlocker.reset()}
+      />
     </AppShell>
 
   );

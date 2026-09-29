@@ -5,6 +5,7 @@ import { CalendarPlus, Copy, ImagePlus, KeyRound, LogOut, Store, Tablet, Trash2 
 
 import { DeviceSection } from "@/components/device-section";
 import { AppShell, LanguageList } from "@/components/layout/app-shell";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListRow, ListSection } from "@/components/ui/list";
@@ -18,7 +19,7 @@ import { imageFileToDataUrl } from "@/lib/file";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import type { ClockMode } from "@/lib/types";
-import { saveKioskToken } from "@/pages/kiosk-page";
+import { readKioskToken, saveKioskToken } from "@/pages/kiosk-page";
 
 export type SettingsSection = "profile" | "business" | "calendar";
 
@@ -115,6 +116,26 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
     },
     onError: (error) => toast.error(t("clock.pin_failed"), error instanceof Error ? error.message : undefined),
   });
+  // A browser that is already a time clock reopens it instead of registering a new device.
+  const localKioskToken = readKioskToken();
+  const thisDeviceQuery = useQuery({
+    queryKey: ["kiosk-device", localKioskToken],
+    queryFn: () => api.kioskDevice(localKioskToken!),
+    enabled: Boolean(localKioskToken) && section === "business" && canManageClock,
+    retry: false,
+  });
+  const thisDeviceId = thisDeviceQuery.data?.id ?? null;
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  const renameKiosk = useMutation({
+    mutationFn: () => api.renameKiosk(token!, renaming!.id, renaming!.name.trim()),
+    onSuccess: () => {
+      toast.success(t("clock.tablet_renamed"));
+      setRenaming(null);
+      void queryClient.invalidateQueries({ queryKey: ["kiosks"] });
+      void queryClient.invalidateQueries({ queryKey: ["kiosk-device"] });
+    },
+    onError: (error) => toast.error(t("clock.save_failed"), error instanceof Error ? error.message : undefined),
+  });
   const createKiosk = useMutation({
     mutationFn: () => api.createKiosk(token!, { location_id: kioskLocation || locationsQuery.data?.[0]?.id || "", name: t("clock.tablet_default_name") }),
     onSuccess: (device) => {
@@ -126,7 +147,12 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
   });
   const removeKiosk = useMutation({
     mutationFn: (id: string) => api.deleteKiosk(token!, id),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["kiosks"] }),
+    onSuccess: (_data, id) => {
+      if (id === thisDeviceId) saveKioskToken(null);
+      setRenaming(null);
+      void queryClient.invalidateQueries({ queryKey: ["kiosks"] });
+      void queryClient.invalidateQueries({ queryKey: ["kiosk-device"] });
+    },
   });
 
   useEffect(() => {
@@ -214,7 +240,7 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
               <ListRow
                 leading={<KeyRound className="size-5 text-[var(--color-primary-strong)]" />}
                 title={t("clock.my_pin")}
-                trailing={clockMeQuery.data?.has_pin ? t("clock.pin_set") : t("clock.pin_not_set")}
+                trailing={<span className="text-[20px] font-semibold tracking-[0.25em] tabular-nums text-black">{clockMeQuery.data?.pin ?? "…"}</span>}
                 chevron
                 onClick={() => setPinSheet(true)}
               />
@@ -325,28 +351,41 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
                       <ListRow
                         key={device.id}
                         leading={<Tablet className="size-5 text-[var(--color-text-muted)]" />}
-                        title={device.name}
-                        subtitle={device.location_name}
-                        trailing={
-                          <button
-                            type="button"
-                            aria-label={t("clock.remove_tablet")}
-                            onClick={() => removeKiosk.mutate(device.id)}
-                            className="grid size-9 place-items-center rounded-full text-[#3c3c43] hover:bg-[var(--color-danger-fill)] hover:text-[var(--color-danger)]"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
+                        title={
+                          <span className="inline-flex items-center gap-2">
+                            {device.name}
+                            {device.id === thisDeviceId ? <Badge tone="blue">{t("clock.this_device")}</Badge> : null}
+                          </span>
                         }
+                        subtitle={device.location_name}
+                        chevron
+                        onClick={() => setRenaming({ id: device.id, name: device.name })}
                       />
                     ))}
                     <ListRow
                       leading={<Tablet className="size-5 text-[var(--color-primary-strong)]" />}
-                      title={<span className="font-semibold text-[var(--color-primary-strong)]">{t("clock.use_this_device")}</span>}
+                      title={<span className="font-semibold text-[var(--color-primary-strong)]">{thisDeviceId ? t("clock.open_kiosk_here") : t("clock.use_this_device")}</span>}
                       chevron
-                      onClick={() => setKioskSheet(true)}
+                      onClick={() => (thisDeviceId ? navigate("/kiosk") : setKioskSheet(true))}
                     />
                   </ListSection>
                 ) : null}
+                <Sheet
+                  open={Boolean(renaming)}
+                  onClose={() => setRenaming(null)}
+                  title={renaming?.name ?? ""}
+                  action={{ label: t("common.save"), onClick: () => renameKiosk.mutate(), disabled: !renaming?.name.trim() || renameKiosk.isPending }}
+                >
+                  <div className="space-y-4">
+                    <label className="block space-y-1.5">
+                      <span className="text-[14px] font-semibold text-[var(--color-text-muted)]">{t("clock.tablet_name")}</span>
+                      <Input value={renaming?.name ?? ""} maxLength={80} onChange={(event) => setRenaming((current) => (current ? { ...current, name: event.target.value } : current))} />
+                    </label>
+                    <Button variant="danger-plain" onClick={() => renaming && removeKiosk.mutate(renaming.id)} disabled={removeKiosk.isPending}>
+                      <Trash2 className="size-4" /> {t("clock.remove_tablet")}
+                    </Button>
+                  </div>
+                </Sheet>
                 <Sheet
                   open={kioskSheet}
                   onClose={() => setKioskSheet(false)}

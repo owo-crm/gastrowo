@@ -7,6 +7,7 @@ approved on the spot, otherwise it waits in Hours like any other report.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import secrets
@@ -14,8 +15,9 @@ from datetime import UTC, date, datetime, time, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+from cryptography.fernet import Fernet, InvalidToken
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -54,31 +56,88 @@ def validate_pin(pin: str) -> str:
     return pin
 
 
-def set_pin(db: Session, membership: OrganizationMembership, pin: str) -> None:
-    digest = pin_digest(membership.organization_id, validate_pin(pin))
-    taken = db.scalar(
-        select(OrganizationMembership.id).where(
-            OrganizationMembership.organization_id == membership.organization_id,
-            OrganizationMembership.clock_pin_digest == digest,
-            OrganizationMembership.id != membership.id,
-        )
+def _fernet() -> Fernet:
+    key = hashlib.sha256(f"clock-pin:{settings.secret_key}".encode()).digest()
+    return Fernet(base64.urlsafe_b64encode(key))
+
+
+def read_pin(membership: OrganizationMembership) -> str | None:
+    """The member's current PIN in clear text, or None when it was never stored readably."""
+    if not membership.clock_pin_encrypted:
+        return None
+    try:
+        return _fernet().decrypt(membership.clock_pin_encrypted.encode()).decode()
+    except (InvalidToken, ValueError):
+        return None
+
+
+def _pin_taken(db: Session, membership: OrganizationMembership, digest: str) -> bool:
+    query = select(OrganizationMembership.id).where(
+        OrganizationMembership.organization_id == membership.organization_id,
+        OrganizationMembership.clock_pin_digest == digest,
     )
-    if taken is not None:
-        raise HTTPException(status_code=409, detail="Someone on the team already uses this PIN. Pick another one.")
+    if membership.id is not None:
+        query = query.where(OrganizationMembership.id != membership.id)
+    with db.no_autoflush:
+        return db.scalar(query) is not None
+
+
+def _store_pin(membership: OrganizationMembership, pin: str, digest: str) -> None:
     membership.clock_pin_digest = digest
+    membership.clock_pin_encrypted = _fernet().encrypt(pin.encode()).decode()
 
 
-def generate_pin(db: Session, membership: OrganizationMembership) -> str:
-    for _ in range(50):
-        pin = f"{secrets.randbelow(10_000):04d}"
-        try:
-            set_pin(db, membership, pin)
+def set_pin(db: Session, membership: OrganizationMembership, pin: str) -> None:
+    pin = validate_pin(pin)
+    digest = pin_digest(membership.organization_id, pin)
+    if _pin_taken(db, membership, digest):
+        raise HTTPException(status_code=409, detail="Someone on the team already uses this PIN. Pick another one.")
+    _store_pin(membership, pin, digest)
+
+
+def generate_pin(db: Session, membership: OrganizationMembership, reserved: set[str] | None = None) -> str:
+    """A random PIN nobody else in the business has. `reserved` holds digests handed out in the same flush."""
+    reserved = reserved if reserved is not None else set()
+    for length, tries in ((4, 50), (6, 50)):
+        for _ in range(tries):
+            pin = f"{secrets.randbelow(10**length):0{length}d}"
+            digest = pin_digest(membership.organization_id, pin)
+            if digest in reserved or _pin_taken(db, membership, digest):
+                continue
+            _store_pin(membership, pin, digest)
+            reserved.add(digest)
             return pin
-        except HTTPException:
-            continue
-    pin = f"{secrets.randbelow(1_000_000):06d}"
-    set_pin(db, membership, pin)
+    raise HTTPException(status_code=500, detail="Could not create a PIN")
+
+
+def ensure_pin(db: Session, membership: OrganizationMembership) -> str:
+    """Every member has a readable PIN; older members with only a digest get a new one."""
+    pin = read_pin(membership)
+    if pin is None:
+        pin = generate_pin(db, membership)
     return pin
+
+
+def install_pin_hooks() -> None:
+    """New team members get a PIN automatically, wherever they are created."""
+    if event.contains(Session, "before_flush", _assign_pins_before_flush):
+        return
+    event.listen(Session, "before_flush", _assign_pins_before_flush)
+
+
+def _assign_pins_before_flush(session: Session, _flush_context, _instances) -> None:
+    reserved: set[str] = set()
+    for obj in list(session.new):
+        if isinstance(obj, OrganizationMembership) and obj.organization_id is not None and not obj.clock_pin_encrypted:
+            generate_pin(session, obj, reserved)
+
+
+def backfill_pins(db: Session) -> int:
+    rows = db.scalars(select(OrganizationMembership).where(OrganizationMembership.clock_pin_encrypted.is_(None))).all()
+    for membership in rows:
+        generate_pin(db, membership)
+    db.commit()
+    return len(rows)
 
 
 def membership_for_pin(db: Session, organization_id: UUID, pin: str) -> OrganizationMembership | None:
@@ -146,28 +205,6 @@ def matching_shift(db: Session, organization_id: UUID, user_id: UUID, now: datet
     return best[1] if best else None
 
 
-def distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Great-circle distance in metres (haversine)."""
-    from math import asin, cos, radians, sin, sqrt
-
-    dlat, dlon = radians(lat2 - lat1), radians(lon2 - lon1)
-    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
-    return 2 * 6_371_000 * asin(sqrt(a))
-
-
-def check_geofence(location: Location | None, coords: tuple[float, float, float] | None) -> None:
-    """Phone clock-ins must happen near a location that has coordinates set. `coords` is (lat, lon, accuracy_m)."""
-    if location is None or location.latitude is None or location.longitude is None:
-        return
-    if coords is None:
-        raise HTTPException(status_code=428, detail="Allow location access to clock in at this location")
-    lat, lon, accuracy = coords
-    distance = distance_m(lat, lon, location.latitude, location.longitude)
-    allowed = (location.clock_radius_m or 150) + min(max(accuracy, 0), 100)
-    if distance > allowed:
-        raise HTTPException(status_code=403, detail=f"You're {int(distance)} m from {location.name}. Clock in when you're there.")
-
-
 def clock_in(
     db: Session,
     organization_id: UUID,
@@ -175,7 +212,6 @@ def clock_in(
     *,
     source: str,
     location_id: UUID | None = None,
-    coords: tuple[float, float, float] | None = None,
 ) -> ClockSession:
     if open_session(db, organization_id, user.id) is not None:
         raise HTTPException(status_code=409, detail="Already clocked in")
@@ -187,8 +223,6 @@ def clock_in(
             .join(Location, Location.id == LocationMembership.location_id)
             .where(Location.organization_id == organization_id, LocationMembership.user_id == user.id)
         )
-    if source == "phone":
-        check_geofence(db.get(Location, location_id) if location_id else None, coords)
     session = ClockSession(
         organization_id=organization_id,
         user_id=user.id,

@@ -623,23 +623,26 @@ export const api = {
   clockMe(token: string) {
     return request<ClockMe>("/clock/me", {}, token);
   },
-  clockIn(token: string, coords?: { latitude: number; longitude: number; accuracy: number }) {
-    return request<ClockSessionInfo>("/clock/in", { method: "POST", body: JSON.stringify(coords ?? {}) }, token);
+  clockIn(token: string) {
+    return request<ClockSessionInfo>("/clock/in", { method: "POST" }, token);
   },
   clockBreak(token: string, phase: "start" | "end") {
     return request<ClockSessionInfo>(`/clock/break/${phase}`, { method: "POST" }, token);
-  },
-  setLocationClockArea(token: string, locationId: string, body: { latitude: number | null; longitude: number | null; radius_m: number }) {
-    return request<{ id: string }>(`/locations/${locationId}/clock-area`, { method: "PUT", body: JSON.stringify(body) }, token);
   },
   clockOut(token: string) {
     return request<{ session: ClockSessionInfo; timesheet_status: string }>("/clock/out", { method: "POST" }, token);
   },
   setMyClockPin(token: string, pin: string) {
-    return request<{ has_pin: boolean }>("/clock/pin", { method: "PUT", body: JSON.stringify({ pin }) }, token);
+    return request<{ has_pin: boolean; pin: string }>("/clock/pin", { method: "PUT", body: JSON.stringify({ pin }) }, token);
   },
   resetClockPin(token: string, userId: string) {
     return request<{ pin: string }>(`/clock/pins/${userId}`, { method: "POST" }, token);
+  },
+  setMemberClockPin(token: string, userId: string, pin: string) {
+    return request<{ pin: string }>(`/clock/pins/${userId}`, { method: "PUT", body: JSON.stringify({ pin }) }, token);
+  },
+  setWorkerRole(token: string, userId: string, role: "STAFF" | "MANAGER") {
+    return request<{ user_id: string; role: string }>(`/workers/${userId}/role`, { method: "PATCH", body: JSON.stringify({ role }) }, token);
   },
   clockTeam(token: string) {
     return request<Array<ClockSessionInfo & { user_id: string; full_name: string }>>("/clock/team", {}, token);
@@ -656,13 +659,19 @@ export const api = {
   createKiosk(token: string, body: { location_id: string; name?: string }) {
     return request<{ id: string; token: string; location_name: string }>("/clock/kiosks", { method: "POST", body: JSON.stringify(body) }, token);
   },
+  renameKiosk(token: string, id: string, name: string) {
+    return request<{ id: string; name: string }>(`/clock/kiosks/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }, token);
+  },
   deleteKiosk(token: string, id: string) {
     return request<{ deleted: boolean }>(`/clock/kiosks/${id}`, { method: "DELETE" }, token);
   },
   kioskDevice(kioskToken: string) {
-    return request<{ name: string; business_name: string; location_name: string; timezone: string; enabled: boolean }>("/kiosk/device", {
+    return request<{ id: string; name: string; business_name: string; location_name: string; timezone: string; enabled: boolean }>("/kiosk/device", {
       headers: { "X-Kiosk-Token": kioskToken },
     });
+  },
+  kioskExit(kioskToken: string, pin: string) {
+    return request<{ ok: boolean }>("/kiosk/exit", { method: "POST", body: JSON.stringify({ pin }), headers: { "X-Kiosk-Token": kioskToken } });
   },
   kioskPunch(kioskToken: string, pin: string, action: "toggle" | "break" = "toggle") {
     return request<KioskPunchResult>("/kiosk/punch", { method: "POST", body: JSON.stringify({ pin, action }), headers: { "X-Kiosk-Token": kioskToken } });

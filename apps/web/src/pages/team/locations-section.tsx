@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Crosshair, MapPin, Plus, Trash2 } from "lucide-react";
+import { MapPin, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -81,35 +81,6 @@ export function LocationsSection() {
     onError: handleError(t("team.location_delete_failed")),
   });
 
-  const [radius, setRadius] = useState("150");
-  useEffect(() => {
-    if (editing && editing !== "new") setRadius(String(editing.clock_radius_m ?? 150));
-  }, [editing]);
-  const clockArea = useMutation({
-    mutationFn: async ({ mode, radiusValue = radius }: { mode: "here" | "off" | "radius"; radiusValue?: string }) => {
-      if (!editing || editing === "new") return;
-      if (mode === "off") return api.setLocationClockArea(token!, editing.id, { latitude: null, longitude: null, radius_m: Number(radiusValue) });
-      // A new radius keeps the saved spot; it only applies once a spot exists.
-      if (mode === "radius") {
-        if (editing.latitude == null || editing.longitude == null) return;
-        return api.setLocationClockArea(token!, editing.id, { latitude: editing.latitude, longitude: editing.longitude, radius_m: Number(radiusValue) });
-      }
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        if (!("geolocation" in navigator)) reject(new Error(t("clock.no_geolocation")));
-        else navigator.geolocation.getCurrentPosition(resolve, () => reject(new Error(t("team.area_location_denied"))), { enableHighAccuracy: true, timeout: 15000 });
-      });
-      return api.setLocationClockArea(token!, editing.id, { latitude: position.coords.latitude, longitude: position.coords.longitude, radius_m: Number(radiusValue) });
-    },
-    onSuccess: async (_data, { mode, radiusValue = radius }) => {
-      if (mode === "radius" && editing && editing !== "new" && editing.latitude == null) return;
-      toast.success(mode === "here" ? t("team.area_saved") : mode === "radius" ? t("team.area_radius_saved", { radius: radiusValue }) : t("team.area_off"));
-      await queryClient.invalidateQueries({ queryKey: ["locations"] });
-      const fresh = (queryClient.getQueryData<Location[]>(["locations"]) ?? []).find((item) => editing && editing !== "new" && item.id === editing.id);
-      if (fresh) setEditing(fresh);
-    },
-    onError: handleError(t("team.area_failed")),
-  });
-
   const timezoneOptions = Array.from(new Set([...TIMEZONES, draft.timezone])).map((zone) => ({ value: zone, label: zone.replace("_", " ") }));
 
   return (
@@ -129,7 +100,6 @@ export function LocationsSection() {
             subtitle={[
               location.timezone,
               location.manager_names?.length ? location.manager_names.join(", ") : t("team.no_manager"),
-              location.latitude != null ? t("team.area_on_short", { radius: location.clock_radius_m ?? 150 }) : null,
             ]
               .filter(Boolean)
               .join(" · ")}
@@ -181,55 +151,9 @@ export function LocationsSection() {
                   </div>
                 );
               })}
-              {!managers.length ? <p className="py-3 text-[15px] text-[var(--color-text-muted)]">{t("team.no_managers_yet")}</p> : null}
+              <p className="py-3 text-[14px] text-[var(--color-text-muted)]">{managers.length ? t("team.managers_hint") : t("team.no_managers_yet")}</p>
             </div>
           </div>
-          {editing && editing !== "new" ? (
-            <div>
-              <h3 className="ios-section-header pb-2">{t("team.area_title")}</h3>
-              <p className="pb-3 text-[14px] leading-5 text-[var(--color-text-muted)]">
-                {editing.latitude != null ? t("team.area_on", { radius: editing.clock_radius_m ?? 150 }) : t("team.area_explain")}
-              </p>
-              <Segmented
-                className="w-full"
-                ariaLabel={t("team.area_radius")}
-                value={radius}
-                onChange={(value) => {
-                  setRadius(value);
-                  if (editing.latitude != null) clockArea.mutate({ mode: "radius", radiusValue: value });
-                }}
-                options={[
-                  { value: "100", label: "100 m" },
-                  { value: "150", label: "150 m" },
-                  { value: "300", label: "300 m" },
-                  { value: "500", label: "500 m" },
-                ]}
-              />
-              {editing.latitude != null && editing.longitude != null ? (
-                <p className="pt-3 text-[14px] text-[var(--color-text-muted)]">
-                  {t("team.area_spot")}{" "}
-                  <a
-                    className="font-semibold text-[var(--color-primary-strong)]"
-                    href={`https://www.google.com/maps?q=${editing.latitude},${editing.longitude}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {editing.latitude.toFixed(5)}, {editing.longitude.toFixed(5)}
-                  </a>
-                </p>
-              ) : null}
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button variant="tinted" onClick={() => clockArea.mutate({ mode: "here" })} disabled={clockArea.isPending}>
-                  <Crosshair className="size-4" /> {editing.latitude != null ? t("team.area_update_here") : t("team.area_set_here")}
-                </Button>
-                {editing.latitude != null ? (
-                  <Button variant="plain" onClick={() => clockArea.mutate({ mode: "off" })} disabled={clockArea.isPending}>
-                    {t("team.area_turn_off")}
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
           {editing && editing !== "new" ? (
             <div className="border-t border-[var(--color-separator)] pt-4">
               {confirmDelete ? (

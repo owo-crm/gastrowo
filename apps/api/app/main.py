@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.envelope import error_payload, ok
-from app.db import init_db
+from app.db import SessionLocal, init_db
 from app.routers import (
     auth,
     availability,
@@ -37,9 +37,11 @@ from app.routers import (
 )
 
 from app.services.push import install_push_hooks
+from app.services.timeclock import backfill_pins, install_pin_hooks
 
 logging.basicConfig(level=logging.INFO)
 install_push_hooks()
+install_pin_hooks()
 
 if settings.sentry_dsn:
     import sentry_sdk
@@ -61,6 +63,9 @@ app.add_middleware(
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    # Members from before PINs were stored readably get a fresh one, so every card can show it.
+    with SessionLocal() as db:
+        backfill_pins(db)
 
 
 @app.exception_handler(HTTPException)

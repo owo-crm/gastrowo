@@ -251,6 +251,11 @@ def patch_current_organization_settings(
     _require_business_settings_access(context, organization)
     organization.staff_can_submit_revenue_reports = payload.staff_can_submit_revenue_reports
     organization.staff_can_delete_revenue_reports = payload.staff_can_delete_revenue_reports
+    # Managers may tune what staff can do; only the owner decides what managers can do.
+    if context.membership.role != RoleEnum.ADMIN:
+        db.commit()
+        db.refresh(organization)
+        return ok(_serialize_settings(organization))
     organization.manager_can_submit_revenue_reports = payload.manager_can_submit_revenue_reports
     organization.manager_can_delete_revenue_reports = payload.manager_can_delete_revenue_reports
     organization.manager_can_view_full_dashboard = payload.manager_can_view_full_dashboard
