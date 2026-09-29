@@ -113,7 +113,7 @@ function shiftWeek(weekStart: string, offsetDays: number): string {
 
 
 
-function getWeekDays(weekStart: string): Array<{ iso: string; title: string; caption: string }> {
+function getWeekDays(weekStart: string, lang: Lang): Array<{ iso: string; title: string; caption: string; dayOfMonth: number }> {
 
   const start = parseIsoDate(weekStart);
 
@@ -129,7 +129,9 @@ function getWeekDays(weekStart: string): Array<{ iso: string; title: string; cap
 
       title: dayNames[index],
 
-      caption: `${date.getDate()}.${date.getMonth() + 1}`,
+      caption: formatDate(date, lang, { month: "numeric", day: "numeric" }),
+
+      dayOfMonth: date.getDate(),
 
     };
 
@@ -137,11 +139,9 @@ function getWeekDays(weekStart: string): Array<{ iso: string; title: string; cap
 
 }
 
-function formatWeekRangeCompact(weekStart: string): string {
-  const start = parseIsoDate(weekStart);
-  const end = parseIsoDate(shiftWeek(weekStart, 6));
-  const formatPart = (value: Date) => `${`${value.getDate()}`.padStart(2, "0")}/${`${value.getMonth() + 1}`.padStart(2, "0")}`;
-  return `${formatPart(start)} - ${formatPart(end)}`;
+function formatWeekRangeCompact(weekStart: string, lang: Lang): string {
+  const formatPart = (value: string) => formatDate(value, lang, { month: "2-digit", day: "2-digit" });
+  return `${formatPart(weekStart)} - ${formatPart(shiftWeek(weekStart, 6))}`;
 }
 
 
@@ -257,7 +257,7 @@ type ShiftBlockProps = {
 };
 
 type MobileDaySelectorProps = {
-  weekDays: Array<{ iso: string; title: string; caption: string }>;
+  weekDays: Array<{ iso: string; title: string; caption: string; dayOfMonth: number }>;
   selectedDayIndex: number;
   onSelect: (index: number) => void;
   warningEntriesByDate?: Record<string, DayWarningEntry[]>;
@@ -479,7 +479,7 @@ function MobileDaySelector({ weekDays, selectedDayIndex, onSelect, warningEntrie
                   className={`w-full min-w-0 rounded-lg px-0.5 py-2 text-center transition ${isActive ? "bg-[var(--color-accent)] text-[var(--color-primary-strong)] " : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-heading)]"}`}
                 >
                   <p className="text-[11px] font-semibold uppercase">{day.title.slice(0, 3)}</p>
-                  <p className="mt-0.5 text-sm font-semibold">{day.caption.split(".")[0]}</p>
+                  <p className="mt-0.5 text-sm font-semibold">{day.dayOfMonth}</p>
                 </button>
                 {warningEntries.length && t ? (
                   <div className="absolute -right-1 -top-1">
@@ -814,7 +814,7 @@ function findConflictingShiftIds(shifts: Shift[]): Set<string> {
 }
 
 type AppliedTimetableBoardProps = {
-  weekDays: Array<{ iso: string; title: string; caption: string }>;
+  weekDays: Array<{ iso: string; title: string; caption: string; dayOfMonth: number }>;
   entriesByDate: Record<string, AppliedTimetableLayoutEntry[]>;
   warningEntriesByDate: Record<string, DayWarningEntry[]>;
   timeSlots: number[];
@@ -932,7 +932,7 @@ function PreviewCardsBoard({
   onEdit,
   onDelete,
 }: {
-  weekDays: Array<{ iso: string; title: string; caption: string }>;
+  weekDays: Array<{ iso: string; title: string; caption: string; dayOfMonth: number }>;
   entriesByDate: Record<string, PreviewEditableEntry[]>;
   warningEntriesByDate: Record<string, DayWarningEntry[]>;
   todayIso: string;
@@ -1015,7 +1015,7 @@ function AppliedCardsBoard({
   todayIso,
   t,
 }: {
-  weekDays: Array<{ iso: string; title: string; caption: string }>;
+  weekDays: Array<{ iso: string; title: string; caption: string; dayOfMonth: number }>;
   entriesByDate: Record<string, AppliedTimetableEntry[]>;
   warningEntriesByDate: Record<string, DayWarningEntry[]>;
   todayIso: string;
@@ -1130,7 +1130,7 @@ function AppliedTimetableBoard({
                 />
               </div>
               <p className={`mt-1 font-semibold tracking-[-0.01em] text-[var(--color-heading)] ${compact ? "text-lg" : "text-2xl"}`}>
-                {compact ? day.caption.replace(".", "/") : day.caption.split(".")[0]}
+                {compact ? day.caption : day.dayOfMonth}
               </p>
             </div>
           )})}
@@ -1327,9 +1327,8 @@ function timesheetStatusClass(status: TimesheetEntry["status"]) {
   return "bg-amber-50 text-amber-700";
 }
 
-function workDateLabel(value: string): string {
-  const [year, month, day] = value.split("-");
-  return `${day}.${month}.${year}`;
+function workDateLabel(value: string, lang: Lang): string {
+  return formatDate(value, lang, { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
 function latestTimesheet(entries: TimesheetEntry[]): TimesheetEntry | undefined {
@@ -1584,13 +1583,13 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
 
   const weekDays = useMemo(
     () =>
-      getWeekDays(weekStart).map((day, index) => ({
+      getWeekDays(weekStart, lang).map((day, index) => ({
         ...day,
         title: dayShortNames[index] ?? day.title,
       })),
-    [dayShortNames, weekStart],
+    [dayShortNames, lang, weekStart],
   );
-  const weekRangeCompactLabel = useMemo(() => formatWeekRangeCompact(weekStart), [weekStart]);
+  const weekRangeCompactLabel = useMemo(() => formatWeekRangeCompact(weekStart, lang), [lang, weekStart]);
   const todayIso = toLocalIso(new Date());
   const selectedDay = weekDays[selectedDayIndex] ?? weekDays[0];
   const mobileAppliedViewStorageKey = useMemo(
@@ -2817,7 +2816,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
           {(myTimesheetsQuery.data ?? []).map((entry) => (
             <ListRow
               key={entry.id}
-              title={`${workDateLabel(entry.work_date)} · ${formatTime(entry.arrived_at)}–${formatTime(entry.left_at)}`}
+              title={`${workDateLabel(entry.work_date, lang)} · ${formatTime(entry.arrived_at)}–${formatTime(entry.left_at)}`}
               subtitle={entry.is_restricted_entry ? t("schedule.extra_entry") : t("schedule.planned_entry")}
               trailing={<Badge tone={entry.status === "approved" || entry.status === "corrected" ? "green" : entry.status === "rejected" ? "red" : "orange"}>{statusText(entry.status)}</Badge>}
             />
@@ -3358,8 +3357,8 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
         subtitle={
           timesheetModal
             ? timesheetModal.mode === "shift"
-              ? `${workDateLabel(timesheetModal.workDate)} · ${timesheetModal.shift.location_name}`
-              : `${t("schedule.restricted_entry_for")} ${workDateLabel(timesheetModal.workDate)}`
+              ? `${workDateLabel(timesheetModal.workDate, lang)} · ${timesheetModal.shift.location_name}`
+              : `${t("schedule.restricted_entry_for")} ${workDateLabel(timesheetModal.workDate, lang)}`
             : undefined
         }
         action={{
@@ -3422,7 +3421,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
         open={Boolean(reviewModal)}
         onClose={() => setReviewModal(null)}
         title={t("schedule.correct_timesheet")}
-        subtitle={reviewModal ? `${timesheetUserNameById[reviewModal.entry.user_id] ?? reviewModal.entry.user_id.slice(0, 8)} · ${workDateLabel(reviewModal.entry.work_date)}` : undefined}
+        subtitle={reviewModal ? `${timesheetUserNameById[reviewModal.entry.user_id] ?? reviewModal.entry.user_id.slice(0, 8)} · ${workDateLabel(reviewModal.entry.work_date, lang)}` : undefined}
         action={{
           label: t("schedule.save_correction"),
           onClick: () =>
