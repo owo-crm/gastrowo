@@ -40,15 +40,7 @@ export function ClockCard() {
     void queryClient.invalidateQueries({ queryKey: ["myTimesheets"] });
   };
   const start = useMutation({
-    mutationFn: async () => {
-      if (!clockQuery.data?.needs_location) return api.clockIn(token!);
-      // The business asks people to clock in at the restaurant: send where we are, once.
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        if (!("geolocation" in navigator)) reject(new Error(t("clock.no_geolocation")));
-        else navigator.geolocation.getCurrentPosition(resolve, () => reject(new Error(t("clock.location_denied"))), { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
-      });
-      return api.clockIn(token!, { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy });
-    },
+    mutationFn: () => api.clockIn(token!),
     onSuccess: () => {
       setNow(Date.now());
       toast.success(t("clock.started"));

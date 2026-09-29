@@ -11,9 +11,11 @@ from app.core.envelope import ok
 from app.core.permissions import can_manage_business_settings, can_manage_team, membership_permission_overrides
 from app.db import get_db
 from app.models import Location, LocationMembership, OrganizationMembership, RoleEnum, User
-from app.schemas import MemberPositionOut, MemberPositionsPut, WorkerSetupOut, WorkerSetupPatch
+from app.schemas import WorkerRolePatch, MemberPositionOut, MemberPositionsPut, WorkerSetupOut, WorkerSetupPatch
 from app.services.billing import require_feature
 from app.services.positions import positions_by_user, replace_member_positions
+
+from app.services.timeclock import ensure_pin
 
 router = APIRouter(prefix="/workers", tags=["workers"])
 
@@ -49,6 +51,8 @@ def get_worker_setup(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+    clock_pin = ensure_pin(db, membership)
+    db.commit()
 
     locations = db.scalars(
         select(Location)
@@ -82,6 +86,7 @@ def get_worker_setup(
             positions=_positions_out(db, membership),
             locations=items,
             permission_overrides=membership_permission_overrides(membership),
+            clock_pin=clock_pin,
         ).model_dump(mode="json")
     )
 
@@ -138,12 +143,31 @@ def patch_worker_setup(
         require_feature(db, context.membership.organization_id, "permissions")
         if not can_manage_business_settings(context.membership, organization):
             raise HTTPException(status_code=403, detail="Business permission overrides are disabled for this account")
+        # Only the owner decides what managers may do; managers can adjust staff members only.
+        if context.membership.role != RoleEnum.ADMIN and membership.role != RoleEnum.STAFF:
+            raise HTTPException(status_code=403, detail="Only the owner can change a manager's permissions")
         overrides = payload.permission_overrides.model_dump()
         for key, value in overrides.items():
             setattr(membership, key, value)
 
     db.commit()
     return ok({"updated": True, "user_id": str(user_id), "count": len(incoming_by_location)})
+
+
+@router.patch("/{user_id}/role")
+def patch_worker_role(
+    user_id: UUID,
+    payload: WorkerRolePatch,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """The owner makes someone a manager or back to staff. Positions are separate and stay as they are."""
+    membership = _get_worker_membership_or_404(db, context, user_id)
+    if membership.role == RoleEnum.ADMIN or membership.user_id == context.user.id:
+        raise HTTPException(status_code=422, detail="The owner's role can't be changed")
+    membership.role = RoleEnum(payload.role)
+    db.commit()
+    return ok({"user_id": str(user_id), "role": membership.role.value})
 
 
 def _positions_out(db: Session, membership: OrganizationMembership) -> list[MemberPositionOut]:

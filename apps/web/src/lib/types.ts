@@ -238,6 +238,7 @@ export type WorkerSetup = {
   positions?: MemberPosition[];
   locations: WorkerSetupLocation[];
   permission_overrides: MembershipPermissionOverrides;
+  clock_pin?: string | null;
 };
 
 export type Assignment = {
@@ -623,7 +624,7 @@ export type ClockSessionInfo = {
   shift: { id: string; date: string; start_time: string; end_time: string; staff_position: string | null } | null;
 };
 
-export type ClockMe = { mode: ClockMode; phone_allowed: boolean; has_pin: boolean; needs_location: boolean; open_session: ClockSessionInfo | null };
+export type ClockMe = { mode: ClockMode; phone_allowed: boolean; has_pin: boolean; pin: string | null; open_session: ClockSessionInfo | null };
 
 export type KioskDeviceItem = { id: string; name: string; location_id: string; location_name: string; created_at: string; last_seen_at: string | null };
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Coffee, Delete, LogIn, LogOut } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Coffee, Delete, LogIn, LogOut, X } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 import { api } from "@/lib/api";
 import { useLanguage } from "@/lib/i18n";
@@ -38,6 +38,10 @@ export function KioskPage() {
   const [result, setResult] = useState<KioskPunchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [clock, setClock] = useState(() => new Date());
+  const [punchedAt, setPunchedAt] = useState<Date | null>(null);
+  // "exit": the keypad takes a manager's PIN to leave the time clock.
+  const [mode, setMode] = useState<"punch" | "exit">("punch");
+  const navigate = useNavigate();
 
   const deviceQuery = useQuery({
     queryKey: ["kiosk-device", token],
@@ -58,15 +62,28 @@ export function KioskPage() {
     const timer = window.setTimeout(() => {
       setResult(null);
       setError(null);
-    }, result ? 4000 : 2500);
+    }, 1500);
     return () => window.clearTimeout(timer);
   }, [result, error]);
 
   const submit = async (value: string, action: "toggle" | "break" = "toggle") => {
     if (!token || busy) return;
     setBusy(true);
+    if (mode === "exit") {
+      try {
+        await api.kioskExit(token, value);
+        navigate("/overview");
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : t("kiosk.wrong_pin"));
+      } finally {
+        setPin("");
+        setBusy(false);
+      }
+      return;
+    }
     try {
       setResult(await api.kioskPunch(token, value, action));
+      setPunchedAt(new Date());
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error && caught.message !== "Unknown PIN" ? caught.message : t("kiosk.wrong_pin"));
@@ -111,13 +128,32 @@ export function KioskPage() {
   const dots = Array.from({ length: Math.max(4, pin.length) }, (_, index) => index < pin.length);
 
   return (
-    <main className="flex min-h-dvh flex-col bg-[var(--color-bg)] px-6 py-8">
+    <main className="relative flex min-h-dvh flex-col bg-[var(--color-bg)] px-6 py-8">
+      <button
+        type="button"
+        onClick={() => {
+          setMode(mode === "exit" ? "punch" : "exit");
+          setPin("");
+          setError(null);
+        }}
+        className="absolute right-4 top-4 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-white px-4 text-[15px] font-semibold text-[#3c3c43] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+      >
+        {mode === "exit" ? (
+          <>
+            <X className="size-4" /> {t("common.cancel")}
+          </>
+        ) : (
+          <>
+            <LogOut className="size-4" /> {t("kiosk.exit")}
+          </>
+        )}
+      </button>
       <header className="text-center">
         <p className="text-[15px] font-semibold text-[var(--color-text-muted)]">
           {device ? `${device.business_name} · ${device.location_name}` : " "}
         </p>
         <p className="mt-1 text-[64px] font-semibold leading-none tracking-tight tabular-nums text-black">
-          {clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          {clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
         </p>
         <p className="mt-1 text-[17px] text-[var(--color-text-muted)]">{clock.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" })}</p>
       </header>
@@ -146,6 +182,11 @@ export function KioskPage() {
             <p className="mt-5 text-[28px] font-semibold text-black">
               {t(`kiosk.title_${result.action}`, { name: result.full_name.split(" ")[0] })}
             </p>
+            {punchedAt ? (
+              <p className="mt-1 text-[34px] font-semibold tabular-nums text-black">
+                {punchedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </p>
+            ) : null}
             <p className="mt-1 text-[18px] text-[var(--color-text-muted)]">
               {result.action === "in"
                 ? result.session.shift
@@ -160,7 +201,9 @@ export function KioskPage() {
           </div>
         ) : (
           <>
-            <p className="text-[20px] font-semibold text-black">{device?.enabled === false ? t("kiosk.disabled") : t("kiosk.enter_pin")}</p>
+            <p className="text-[20px] font-semibold text-black">
+              {mode === "exit" ? t("kiosk.manager_pin") : device?.enabled === false ? t("kiosk.disabled") : t("kiosk.enter_pin")}
+            </p>
             <div className="mt-4 flex h-6 items-center gap-3" aria-label={t("kiosk.enter_pin")}>
               {dots.map((filled, index) => (
                 <span key={index} className={cn("size-4 rounded-full border-2 border-black", filled && "bg-black")} />
@@ -187,6 +230,7 @@ export function KioskPage() {
               )}
             </div>
             <div className="mt-6 flex w-full gap-3">
+              {mode === "exit" ? null : (
               <button
                 type="button"
                 onClick={() => void submit(pin, "break")}
@@ -195,13 +239,14 @@ export function KioskPage() {
               >
                 <Coffee className="size-5" /> {t("kiosk.break")}
               </button>
+              )}
               <button
                 type="button"
                 onClick={() => void submit(pin)}
-                disabled={pin.length < 4 || busy || device?.enabled === false}
+                disabled={pin.length < 4 || busy || (mode === "punch" && device?.enabled === false)}
                 className="min-h-14 flex-[2] rounded-full bg-[var(--color-primary-strong)] text-[18px] font-semibold text-white disabled:opacity-40"
               >
-                {t("kiosk.go")}
+                {mode === "exit" ? t("kiosk.open_panel") : t("kiosk.go")}
               </button>
             </div>
           </>

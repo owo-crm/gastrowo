@@ -292,6 +292,8 @@ def _ensure_runtime_schema_compat() -> None:
                 connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN staff_position VARCHAR(80)"))
             if "clock_pin_digest" not in membership_columns:
                 connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN clock_pin_digest VARCHAR(64)"))
+            if "clock_pin_encrypted" not in membership_columns:
+                connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN clock_pin_encrypted TEXT"))
             if "staff_can_submit_revenue_reports_override" not in membership_columns:
                 connection.execute(text("ALTER TABLE organization_memberships ADD COLUMN staff_can_submit_revenue_reports_override BOOLEAN"))
             if "staff_can_delete_revenue_reports_override" not in membership_columns:

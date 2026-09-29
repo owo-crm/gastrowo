@@ -341,12 +341,6 @@ class LocationOut(APIModel):
     clock_radius_m: int = 150
 
 
-class LocationClockAreaPut(BaseModel):
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    radius_m: int = Field(default=150, ge=50, le=2000)
-
-
 class UserOut(APIModel):
     id: UUID
     email: EmailStr
@@ -431,6 +425,11 @@ class WorkerSetupOut(APIModel):
     positions: list[MemberPositionOut] = []
     locations: list[WorkerSetupLocationItem]
     permission_overrides: MembershipPermissionOverridesOut
+    clock_pin: str | None = None
+
+
+class WorkerRolePatch(BaseModel):
+    role: Literal["STAFF", "MANAGER"]
 
 
 class WorkerSetupPatchItem(BaseModel):
