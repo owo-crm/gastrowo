@@ -258,6 +258,8 @@ def _ensure_runtime_schema_compat() -> None:
                 connection.execute(text("ALTER TABLE organizations ADD COLUMN country VARCHAR(2) NOT NULL DEFAULT 'PL'"))
             if "clock_mode" not in organization_columns:
                 connection.execute(text("ALTER TABLE organizations ADD COLUMN clock_mode VARCHAR(16) NOT NULL DEFAULT 'both'"))
+            if "schedule_respect_hour_limits" not in organization_columns:
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN schedule_respect_hour_limits BOOLEAN NOT NULL DEFAULT TRUE"))
 
         for table, column, ddl in (
             ("timesheets", "break_minutes", "INTEGER NOT NULL DEFAULT 0"),

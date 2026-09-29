@@ -16,6 +16,7 @@ export type OrganizationSettings = {
   currency?: "USD" | "PLN";
   labor_rules?: "US" | "PL";
   clock_mode?: ClockMode;
+  schedule_respect_hour_limits?: boolean;
 };
 
 export type MembershipPermissionOverrides = {

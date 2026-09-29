@@ -644,6 +644,9 @@ export const api = {
   clockTeam(token: string) {
     return request<Array<ClockSessionInfo & { user_id: string; full_name: string }>>("/clock/team", {}, token);
   },
+  setScheduleHourLimits(token: string, respectHourLimits: boolean) {
+    return request<{ respect_hour_limits: boolean }>("/organizations/current/scheduling", { method: "PATCH", body: JSON.stringify({ respect_hour_limits: respectHourLimits }) }, token);
+  },
   setClockMode(token: string, mode: ClockMode) {
     return request<{ mode: ClockMode }>("/clock/settings", { method: "PATCH", body: JSON.stringify({ mode }) }, token);
   },

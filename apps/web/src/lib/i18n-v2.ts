@@ -555,6 +555,15 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "login.mode.join_description": "Your team is already on Platofy — this takes a minute.",
     "schedule.hours_per_week_short": "h a week",
     "plan.pro_extra": "+{{price}} for each location after 3",
+    "schedule.overtime_warning": "Overtime: {{hours}} h this week, over 40 is paid 1.5×",
+    "schedule.overtime_short": "{{hours}} h, overtime",
+    "team.area_radius_saved": "Radius set to {{radius}} m",
+    "team.area_spot": "Saved spot:",
+    "settings.scheduling": "Scheduling",
+    "settings.hour_limits": "Auto-schedule keeps hour limits",
+    "settings.hour_limits_on": "Auto-schedule won't give anyone more than their desired hours or over 40 h a week (overtime). You can still assign anyone by hand — you'll just see a warning.",
+    "settings.hour_limits_off": "Auto-schedule fills every shift, even if someone goes over their hours or 40 h a week. People under their limit go first; the rest shows as a warning.",
+    "settings.hour_limits_failed": "Couldn't save the setting",
     // @end-en
   },
   pl: {
@@ -1107,6 +1116,15 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "login.mode.join_description": "Twój zespół już korzysta z Platofy — to zajmie minutę.",
     "schedule.hours_per_week_short": "h tygodniowo",
     "plan.pro_extra": "+{{price}} za każdy kolejny lokal po 3",
+    "schedule.overtime_warning": "Nadgodziny: {{hours}} h w tym tygodniu, ponad 40 płatne 1,5×",
+    "schedule.overtime_short": "{{hours}} h, nadgodziny",
+    "team.area_radius_saved": "Promień ustawiony na {{radius}} m",
+    "team.area_spot": "Zapisane miejsce:",
+    "settings.scheduling": "Grafik",
+    "settings.hour_limits": "Automatyczny grafik pilnuje limitów godzin",
+    "settings.hour_limits_on": "Automatyczny grafik nie da nikomu więcej niż chciane godziny ani ponad 40 h tygodniowo. Ręcznie możesz przypisać każdego — zobaczysz tylko ostrzeżenie.",
+    "settings.hour_limits_off": "Automatyczny grafik obsadzi każdą zmianę, nawet ponad limit godzin lub 40 h. Najpierw osoby w limicie; reszta jako ostrzeżenie.",
+    "settings.hour_limits_failed": "Nie udało się zapisać ustawienia",
     // @end-pl
   },
   ru: {
@@ -1659,6 +1677,15 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "login.mode.join_description": "Ваша команда уже в Platofy — это займёт минуту.",
     "schedule.hours_per_week_short": "ч в неделю",
     "plan.pro_extra": "+{{price}} за каждую точку сверх 3",
+    "schedule.overtime_warning": "Переработка: {{hours}} ч за неделю, сверх 40 — ×1,5",
+    "schedule.overtime_short": "{{hours}} ч, переработка",
+    "team.area_radius_saved": "Радиус: {{radius}} м",
+    "team.area_spot": "Сохранённая точка:",
+    "settings.scheduling": "График",
+    "settings.hour_limits": "Автографик соблюдает лимит часов",
+    "settings.hour_limits_on": "Автографик не даст никому больше желаемых часов и больше 40 ч в неделю (переработка). Вручную можно поставить кого угодно — будет только предупреждение.",
+    "settings.hour_limits_off": "Автографик заполнит все смены, даже если кто-то выйдет за свои часы или 40 ч. Сначала ставятся те, кто в лимите; остальное — предупреждением.",
+    "settings.hour_limits_failed": "Не удалось сохранить настройку",
     // @end-ru
   },
 };
