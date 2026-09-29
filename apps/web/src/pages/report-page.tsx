@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PhotoThumb } from "@/components/photo-viewer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListRow, ListSection } from "@/components/ui/list";
@@ -114,7 +115,7 @@ export function ReportPage() {
                 }}
               />
             </label>
-            {photo ? <img src={photo} alt="" className="size-11 rounded-[8px] object-cover" /> : null}
+            {photo ? <PhotoThumb src={photo} name={`revenue-${date}`} className="size-11 rounded-[8px]" /> : null}
             <Button size="lg" className="ml-auto" onClick={() => save.mutate()} disabled={!valid || save.isPending}>
               {t("revenue.save")}
             </Button>
@@ -127,7 +128,11 @@ export function ReportPage() {
           {(historyQuery.data ?? []).map((report) => (
             <ListRow
               key={report.id}
-              leading={report.photo_url ? <img src={report.photo_url} alt="" className="size-10 rounded-[8px] object-cover" /> : undefined}
+              leading={
+                report.photo_url ? (
+                  <PhotoThumb src={report.photo_url} name={`revenue-${report.report_date}-${locationName(report.location_id)}`} className="size-10 rounded-[8px]" />
+                ) : undefined
+              }
               title={<span className="font-semibold tabular-nums">{formatMoney(report.revenue, currency, lang)}</span>}
               subtitle={`${formatDate(report.report_date, lang)} · ${locationName(report.location_id)}`}
               trailing={

@@ -20,7 +20,22 @@ from app.core.envelope import ok
 from app.core.permissions import can_manage_business_settings, can_manage_team
 from app.db import get_db
 from app.models import ClockSession, KioskDevice, Location, LocationMembership, Organization, OrganizationMembership, RoleEnum, Shift, User
-from app.services.timeclock import _utc, CLOCK_MODES, clock_in, clock_out, end_break, ensure_pin, generate_pin, membership_for_pin, mode_allows, open_session, read_pin, set_pin, start_break
+from app.services.timeclock import (
+    _utc,
+    CLOCK_MODES,
+    clock_in,
+    clock_out,
+    end_break,
+    ensure_pin,
+    generate_pin,
+    membership_for_pin,
+    mode_allows,
+    open_session,
+    read_pin,
+    set_pin,
+    start_break,
+    todays_shift,
+)
 
 router = APIRouter(tags=["clock"])
 
@@ -30,7 +45,8 @@ class PinIn(BaseModel):
 
 
 class PunchIn(PinIn):
-    action: Literal["toggle", "break"] = "toggle"
+    # "in"/"out" come from the tablet's own screen and never flip a shift the other way on a double tap.
+    action: Literal["toggle", "in", "out", "break"] = "toggle"
 
 
 class ClockModeIn(BaseModel):
@@ -358,6 +374,44 @@ def kiosk_exit(payload: PinIn, x_kiosk_token: str | None = Header(default=None),
     return ok({"ok": True})
 
 
+def _kiosk_person(db: Session, organization: Organization, pin: str, attempts: deque[float], now: float) -> User:
+    membership = membership_for_pin(db, organization.id, pin) if pin.strip().isdigit() else None
+    if membership is None:
+        attempts.append(now)
+        db.commit()
+        raise HTTPException(status_code=404, detail="Unknown PIN")
+    user = db.get(User, membership.user_id)
+    assert user is not None
+    return user
+
+
+@router.post("/kiosk/lookup")
+def kiosk_lookup(payload: PinIn, x_kiosk_token: str | None = Header(default=None), db: Session = Depends(get_db)):
+    """Who owns this PIN and where their shift stands. Changes nothing; the tablet shows it before any punch."""
+    device, organization, location = _kiosk(db, x_kiosk_token)
+    if not mode_allows(organization, "kiosk"):
+        raise HTTPException(status_code=403, detail="The tablet clock is turned off for this business")
+    attempts, now = _check_wrong_pin_limit(device)
+    user = _kiosk_person(db, organization, payload.pin, attempts, now)
+    current = open_session(db, organization.id, user.id)
+    shift = db.get(Shift, current.shift_id) if current and current.shift_id else todays_shift(db, organization.id, user.id, location)
+    db.commit()
+    return ok(
+        {
+            "full_name": user.full_name,
+            "open_session": _session_out(db, current),
+            "shift": {
+                "start_time": shift.start_time.isoformat(timespec="minutes"),
+                "end_time": shift.end_time.isoformat(timespec="minutes"),
+                "staff_position": shift.staff_position,
+            }
+            if shift
+            else None,
+            "server_now": datetime.now(UTC).isoformat(),
+        }
+    )
+
+
 @router.post("/kiosk/punch")
 def kiosk_punch(payload: PunchIn, x_kiosk_token: str | None = Header(default=None), db: Session = Depends(get_db)):
     """Clock the owner of this PIN in, or out if they are already in."""
@@ -367,15 +421,13 @@ def kiosk_punch(payload: PunchIn, x_kiosk_token: str | None = Header(default=Non
 
     attempts, now = _check_wrong_pin_limit(device)
 
-    membership = membership_for_pin(db, organization.id, payload.pin) if payload.pin.strip().isdigit() else None
-    if membership is None:
-        attempts.append(now)
-        db.commit()
-        raise HTTPException(status_code=404, detail="Unknown PIN")
-    user = db.get(User, membership.user_id)
-    assert user is not None
+    user = _kiosk_person(db, organization, payload.pin, attempts, now)
 
     current = open_session(db, organization.id, user.id)
+    if payload.action == "in" and current is not None:
+        raise HTTPException(status_code=409, detail="Already clocked in")
+    if payload.action == "out" and current is None:
+        raise HTTPException(status_code=409, detail="Not clocked in")
     if payload.action == "break":
         if current is None:
             raise HTTPException(status_code=409, detail="Clock in first")

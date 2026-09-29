@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Check, Plus, Trash2 } from "lucide-react";
 
 import { AppShell, useNotifications } from "@/components/layout/app-shell";
+import { PhotoThumb } from "@/components/photo-viewer";
 import { WorkerAvatar } from "@/components/worker-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -185,10 +186,8 @@ export function TasksPage() {
                   </div>
                   {task.photos.length ? (
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {task.photos.map((photo) => (
-                        <a key={photo.id} href={photo.photo_url} target="_blank" rel="noreferrer">
-                          <img src={photo.photo_url} alt="" className="size-16 rounded-[10px] object-cover" />
-                        </a>
+                      {task.photos.map((photo, index) => (
+                        <PhotoThumb key={photo.id} src={photo.photo_url} name={`task-${task.title.slice(0, 40)}-${index + 1}`} className="size-16 rounded-[10px]" />
                       ))}
                     </div>
                   ) : null}
