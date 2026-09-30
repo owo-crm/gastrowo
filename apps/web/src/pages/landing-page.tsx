@@ -373,8 +373,8 @@ export function LandingPage() {
         <Container className="flex flex-col gap-6 text-[14px] text-[var(--color-text-muted)] md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <BrandLogo kind="wordmark" className="text-[1.5rem]" />
-            <a href="mailto:support@gastrostuff.pl" className="hover:text-black">
-              support@gastrostuff.pl
+            <a href="mailto:support@platofy.app" className="hover:text-black">
+              support@platofy.app
             </a>
             <div className="flex items-center gap-3">
               <a href="https://www.instagram.com/gastrostuff.pl/" target="_blank" rel="noreferrer" aria-label="Instagram" className="hover:text-black">

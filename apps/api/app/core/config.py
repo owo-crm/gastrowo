@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
     frontend_url: str = "http://localhost:5173"
     # Contact the push services see in our VAPID claims; they use it if our pushes misbehave.
-    push_contact_email: str = "support@gastrostuff.pl"
+    push_contact_email: str = "support@platofy.app"
     # Error monitoring: set SENTRY_DSN to send server errors (and client errors we receive) to Sentry.
     sentry_dsn: str = ""
     resend_api_key: str = ""

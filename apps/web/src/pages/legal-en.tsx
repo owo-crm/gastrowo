@@ -10,7 +10,7 @@ import { BrandLogo } from "@/components/brand-logo";
 type Section = { title: string; paragraphs?: string[]; bullets?: string[] };
 
 const EFFECTIVE = "October 1, 2026";
-const SUPPORT = "support@gastrostuff.pl";
+const SUPPORT = "support@platofy.app";
 const SERVICE = "Platofy";
 
 function LegalPage({ title, intro, sections }: { title: string; intro: string; sections: Section[] }) {
