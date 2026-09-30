@@ -19,7 +19,7 @@ from app.models import Location, LocationMembership, OrganizationMembership, Rol
 
 from app.services.worktime import worked_hours as timesheet_hours
 from app.services.billing import require_feature
-from app.services.labor_rules import US_OVERTIME_MULTIPLIER, US_WEEKLY_OVERTIME_HOURS, currency_for, labor_rules_for, organization_country
+from app.services.labor_rules import US_OVERTIME_MULTIPLIER, US_WEEKLY_OVERTIME_HOURS, currency_for, labor_rules_for, local_today, organization_country
 from app.services.positions import positions_by_user, rate_for
 
 router = APIRouter(prefix="/payroll", tags=["payroll"])
@@ -175,7 +175,7 @@ def payroll_summary(
     organization = get_current_organization(context, db)
 
     if end_date is None:
-        end_date = date.today()
+        end_date = local_today(db, context.membership.organization_id)
     if start_date is None:
         start_date = end_date - timedelta(days=6)
 

@@ -4,8 +4,9 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from app.models import (
     AssignmentStatusEnum,
@@ -105,6 +106,8 @@ Country = Literal["US", "PL"]
 class OrganizationCreate(BaseModel):
     name: str = Field(min_length=2, max_length=160)
     country: Country = "US"
+    # The owner's device time zone (IANA, e.g. America/Chicago); the country's default when missing or unknown.
+    timezone: str | None = Field(default=None, max_length=64)
 
 
 class OrganizationPatch(BaseModel):
@@ -231,6 +234,7 @@ class OwnerOnboardingCompleteRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     source: str = Field(min_length=2, max_length=80)
     country: Country = "US"
+    timezone: str | None = Field(default=None, max_length=64)
 
 
 class InviteAcceptRequest(BaseModel):
@@ -325,15 +329,28 @@ class MemberRemovalResultOut(MemberRemovalImpactOut):
     removed: bool
 
 
+def _known_zone(value: str) -> str:
+    """Only real IANA zones: an unknown one would silently fall back to UTC on the time clock."""
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError("Unknown time zone") from exc
+    return value
+
+
 class LocationCreate(BaseModel):
     name: str = Field(min_length=2, max_length=160)
     timezone: str = Field(default="Europe/Warsaw", min_length=2, max_length=64)
+
+    _zone = field_validator("timezone")(_known_zone)
 
 
 class LocationPatch(BaseModel):
     name: str = Field(min_length=2, max_length=160)
     timezone: str = Field(min_length=2, max_length=64)
     manager_user_ids: list[UUID] = []
+
+    _zone = field_validator("timezone")(_known_zone)
 
 
 class LocationOut(APIModel):

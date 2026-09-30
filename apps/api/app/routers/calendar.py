@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.services.demo_restaurant import display_name
+from app.services.labor_rules import local_today
 from app.core.config import settings
 from app.core.deps import OrgContext, require_org_context
 from app.core.envelope import ok
@@ -94,7 +95,7 @@ def calendar_feed_ics(token: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Calendar not found")
 
     organization = db.get(Organization, organization_id)
-    today = date.today()
+    today = local_today(db, organization_id)
     rows = db.execute(
         select(Assignment, Shift, Location)
         .join(Shift, Shift.id == Assignment.shift_id)

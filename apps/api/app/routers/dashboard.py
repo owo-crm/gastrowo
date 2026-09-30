@@ -15,7 +15,7 @@ from app.db import get_db
 from app.models import Assignment, Location, LocationMembership, OrganizationMembership, RevenueReport, RoleEnum, Shift, User
 from app.models import Timesheet, TimesheetStatusEnum
 from app.services.billing import require_feature
-from app.services.labor_rules import currency_for, organization_country
+from app.services.labor_rules import currency_for, local_today, organization_country
 from app.services.positions import positions_by_user, rate_for
 from app.services.scheduler import shift_duration_hours
 
@@ -40,7 +40,7 @@ def owner_dashboard(
         raise HTTPException(status_code=403, detail="Manager dashboard access is disabled in this workspace")
 
     if end_date is None:
-        end_date = date.today()
+        end_date = local_today(db, context.membership.organization_id)
     if start_date is None:
         start_date = end_date - timedelta(days=6)
 

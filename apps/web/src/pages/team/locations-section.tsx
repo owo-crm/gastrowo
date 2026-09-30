@@ -12,6 +12,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { deviceTimezone } from "@/lib/date";
 import { useLanguage } from "@/lib/i18n";
 import { UPGRADE_ROUTE } from "@/lib/navigation";
 import { useToast } from "@/lib/toast";
@@ -20,13 +21,30 @@ import { TIMEZONES } from "@/pages/team/shared";
 
 type Draft = { name: string; timezone: string; manager_user_ids: string[] };
 
+const dismissKey = (organizationId?: string | null) => `platofy.zone-hint-dismissed.${organizationId ?? ""}`;
+
+function readDismissed(organizationId?: string | null): boolean {
+  try {
+    return localStorage.getItem(dismissKey(organizationId)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** "America/Los_Angeles" → "Los Angeles". */
+const zoneLabel = (zone: string) => (zone.split("/").pop() ?? zone).replace(/_/g, " ");
+
 export function LocationsSection() {
   const { token, me } = useAuth();
   const { t } = useLanguage();
   const toast = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const defaultTimezone = me?.organization_settings?.country === "PL" ? "Europe/Warsaw" : "America/New_York";
+  const countryTimezone = me?.organization_settings?.country === "PL" ? "Europe/Warsaw" : "America/New_York";
+  const deviceZone = deviceTimezone();
+  // A new location starts in this device's zone: whoever adds it is usually there.
+  const defaultTimezone = deviceZone ?? countryTimezone;
+  const [zoneHintDismissed, setZoneHintDismissed] = useState(() => readDismissed(me?.active_organization_id));
 
   const locationsQuery = useQuery({ queryKey: ["locations"], queryFn: () => api.listLocations(token!), enabled: Boolean(token) });
   const usersQuery = useQuery({ queryKey: ["users"], queryFn: () => api.listUsers(token!), enabled: Boolean(token) });
@@ -83,8 +101,52 @@ export function LocationsSection() {
 
   const timezoneOptions = Array.from(new Set([...TIMEZONES, draft.timezone])).map((zone) => ({ value: zone, label: zone.replace("_", " ") }));
 
+  // Locations made before the zone was detected still sit on the country's default. When this device is
+  // somewhere else, offer to switch them; never change it silently (the owner may be travelling).
+  const onCountryDefault = (locationsQuery.data ?? []).filter((location) => location.timezone === countryTimezone);
+  const showZoneHint =
+    me?.role === "ADMIN" && !me.is_sandbox && !zoneHintDismissed && Boolean(deviceZone) && deviceZone !== countryTimezone && onCountryDefault.length > 0;
+  const switchZone = useMutation({
+    mutationFn: () =>
+      Promise.all(
+        onCountryDefault.map((location) =>
+          api.patchLocation(token!, location.id, { name: location.name, timezone: deviceZone!, manager_user_ids: location.manager_user_ids ?? [] }),
+        ),
+      ),
+    onSuccess: () => {
+      toast.success(t("team.location_saved"));
+      refresh();
+    },
+    onError: handleError(t("team.location_save_failed")),
+  });
+  const dismissZoneHint = () => {
+    setZoneHintDismissed(true);
+    try {
+      localStorage.setItem(dismissKey(me?.active_organization_id), "1");
+    } catch {
+      // Private mode: the hint just comes back next time.
+    }
+  };
+
   return (
     <div>
+      {showZoneHint ? (
+        <ListSection header={t("team.timezone")}>
+          <li className="space-y-3 px-4 py-4 sm:px-6">
+            <p className="text-[15px] text-black">
+              {t("team.zone_hint", { current: zoneLabel(countryTimezone), device: zoneLabel(deviceZone!) })}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => switchZone.mutate()} disabled={switchZone.isPending}>
+                {t("team.zone_hint_switch", { device: zoneLabel(deviceZone!) })}
+              </Button>
+              <Button variant="ghost" onClick={dismissZoneHint}>
+                {t("team.zone_hint_keep")}
+              </Button>
+            </div>
+          </li>
+        </ListSection>
+      ) : null}
       <ListSection header={t("sub.locations")} footer={t("team.locations_footer")}>
         {(locationsQuery.data ?? []).map((location) => (
           <ListRow

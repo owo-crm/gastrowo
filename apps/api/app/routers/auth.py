@@ -51,7 +51,7 @@ from app.schemas import (
     SessionBootstrapResponse,
 )
 from app.services.auth_email import send_otp_email
-from app.services.labor_rules import default_timezone_for, locale_settings
+from app.services.labor_rules import locale_settings, timezone_or_default
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, grant_comp_pro
 from app.services import sandbox as sandbox_service
 from app.services.demo_access import dev_login_user, is_demo_account
@@ -363,7 +363,7 @@ def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, response:
         max_hours_per_week=60,
         staff_position=None,
     )
-    location = Location(organization_id=org.id, name="Main Location", timezone=default_timezone_for(payload.country))
+    location = Location(organization_id=org.id, name="Main Location", timezone=timezone_or_default(payload.timezone, payload.country))
     db.add_all([membership, location])
     db.flush()
     db.add(LocationMembership(location_id=location.id, user_id=user.id))

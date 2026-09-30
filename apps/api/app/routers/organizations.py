@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 import uuid
 from uuid import UUID
 
@@ -47,7 +47,7 @@ from app.services.positions import ensure_catalog
 from app.services.demo_access import is_demo_account
 from app.services.demo_restaurant import display_name
 from app.services.demo_restaurant import seed_demo_restaurant
-from app.services.labor_rules import default_timezone_for, locale_settings
+from app.services.labor_rules import default_timezone_for, local_today, locale_settings, timezone_or_default
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, require_feature
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
@@ -86,11 +86,12 @@ def _member_removal_impact(db: Session, organization_id: UUID, user_id: UUID) ->
     if membership is None or user is None:
         raise HTTPException(status_code=404, detail="Member not found")
 
+    today = local_today(db, organization_id)
     future_assignments_count = db.scalar(
         select(func.count())
         .select_from(Assignment)
         .join(Shift, Shift.id == Assignment.shift_id)
-        .where(Assignment.user_id == user_id, Shift.organization_id == organization_id, Shift.date >= date.today())
+        .where(Assignment.user_id == user_id, Shift.organization_id == organization_id, Shift.date >= today)
     ) or 0
     pending_shift_requests_count = db.scalar(
         select(func.count())
@@ -98,7 +99,7 @@ def _member_removal_impact(db: Session, organization_id: UUID, user_id: UUID) ->
         .join(Shift, Shift.id == ShiftRequest.shift_id)
         .where(
             Shift.organization_id == organization_id,
-            Shift.date >= date.today(),
+            Shift.date >= today,
             ShiftRequest.status == ShiftRequestStatusEnum.PENDING,
             (
                 (ShiftRequest.requester_user_id == user_id)
@@ -178,7 +179,7 @@ def create_organization(
         max_hours_per_week=60,
         staff_position=None,
     )
-    location = Location(organization_id=org.id, name="Main Location", timezone=default_timezone_for(payload.country))
+    location = Location(organization_id=org.id, name="Main Location", timezone=timezone_or_default(payload.timezone, payload.country))
 
     db.add_all([membership, location])
     db.flush()
@@ -479,7 +480,11 @@ def remove_member(
     future_assignment_ids = db.scalars(
         select(Assignment.id)
         .join(Shift, Shift.id == Assignment.shift_id)
-        .where(Assignment.user_id == user_id, Shift.organization_id == context.membership.organization_id, Shift.date >= date.today())
+        .where(
+            Assignment.user_id == user_id,
+            Shift.organization_id == context.membership.organization_id,
+            Shift.date >= local_today(db, context.membership.organization_id),
+        )
     ).all()
     if future_assignment_ids:
         pending_requests = db.scalars(
