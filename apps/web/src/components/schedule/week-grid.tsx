@@ -33,11 +33,12 @@ function hours(start: string, end: string): number {
 const hhmm = (value: string) => value.slice(0, 5);
 const fmtHours = (value: number) => (value % 1 ? value.toFixed(1) : String(value));
 
+/** One shift filling its day cell: time on top, position under it, centered vertically. */
 function ShiftChip({ shift, color, showPosition, t }: { shift: GridShift; color: string; showPosition: boolean; t: Translate }) {
   const open = Boolean(shift.missing);
   const body = (
     <>
-      <span className="block whitespace-nowrap text-[13px] font-semibold tabular-nums leading-4 tracking-[-0.02em] text-black">
+      <span className="block whitespace-nowrap text-[15px] font-semibold tabular-nums leading-5 tracking-[-0.02em] text-black">
         {hhmm(shift.start)}–{hhmm(shift.end)}
       </span>
       {showPosition || open ? (
@@ -49,9 +50,14 @@ function ShiftChip({ shift, color, showPosition, t }: { shift: GridShift; color:
     </>
   );
   const style = open
-    ? { backgroundColor: "#fff", boxShadow: `inset 0 0 0 1.5px ${color}` }
+    ? { backgroundColor: "#fff", border: `1.5px dashed ${color}` }
     : { backgroundColor: tint(color, shift.mine ? 0.28 : 0.14), boxShadow: `inset 3px 0 0 ${color}` };
-  const className = cn("block w-full min-w-0 rounded-[7px] px-1.5 py-1.5 text-left", open && "border-dashed", shift.onClick && "hover:brightness-95 active:opacity-70");
+  const className = cn(
+    // A person's shift fills the day cell; open shifts keep their size (a row can hold several).
+    "flex min-h-[48px] w-full min-w-0 flex-col justify-center rounded-[10px] px-2.5 py-1 text-left",
+    !open && "flex-1",
+    shift.onClick && "transition hover:brightness-95 active:opacity-70",
+  );
   return shift.onClick ? (
     <button type="button" onClick={shift.onClick} className={className} style={style}>
       {body}
@@ -138,7 +144,7 @@ export function WeekGrid({
               <span className="text-[14px] font-semibold text-[var(--color-danger)]">{t("schedule.grid_open")}</span>
             </div>
             {days.map((day, index) => (
-              <div key={day.iso} className="space-y-1 border-r border-[var(--color-separator)] p-1.5 last:border-r-0" role="gridcell">
+              <div key={day.iso} className="flex min-h-[64px] flex-col justify-center gap-1 border-r border-[var(--color-separator)] p-1 last:border-r-0" role="gridcell">
                 {cellShifts(open, index).map((shift) => (
                   <ShiftChip key={`open-${shift.key}`} shift={shift} color={positionColor(shift.position, positionOrder)} showPosition t={t} />
                 ))}
@@ -175,7 +181,10 @@ export function WeekGrid({
                           <div
                             key={day.iso}
                             role="gridcell"
-                            className={cn("group relative min-h-[52px] space-y-1 border-r border-[var(--color-separator)] p-1.5 last:border-r-0", day.isToday && "bg-[var(--color-accent)]/40")}
+                            className={cn(
+                              "group relative flex min-h-[64px] flex-col gap-1 border-r border-[var(--color-separator)] p-1 last:border-r-0",
+                              day.isToday && "bg-[var(--color-accent)]/40",
+                            )}
                           >
                             {cell.map((shift) => (
                               <ShiftChip key={shift.key} shift={shift} color={positionColor(shift.position, positionOrder)} showPosition={(shift.position ?? "").toLowerCase() !== position.toLowerCase()} t={t} />
@@ -185,7 +194,7 @@ export function WeekGrid({
                                 type="button"
                                 aria-label={t("schedule.grid_add_for", { name: person.name, day: `${day.weekday} ${day.dayNumber}` })}
                                 onClick={() => onAdd(index, person.id)}
-                                className="absolute inset-1.5 grid place-items-center rounded-[7px] text-[var(--color-primary-strong)] opacity-0 transition hover:bg-[var(--color-accent)] focus-visible:opacity-100 group-hover:opacity-100"
+                                className="absolute inset-1 grid place-items-center rounded-[10px] text-[var(--color-primary-strong)] opacity-0 transition hover:bg-[var(--color-accent)] focus-visible:opacity-100 group-hover:opacity-100"
                               >
                                 <Plus className="size-5" />
                               </button>
