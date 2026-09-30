@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { BrandLogo } from "@/components/brand-logo";
 import { type Lang, useLanguage } from "@/lib/i18n";
 import { legalLinks } from "@/lib/legal-links";
+import { MarketingHeader, useScrollToHash } from "@/components/marketing-shell";
 import { cn } from "@/lib/utils";
 
 /**
@@ -169,6 +170,7 @@ function StepShots({ shots }: { shots: Shot[] }) {
 
 export function HowItWorksPage() {
   const { lang } = useLanguage();
+  useScrollToHash();
   const copy = COPY[lang] ?? EN;
   const links = legalLinks(lang);
 
@@ -193,21 +195,7 @@ export function HowItWorksPage() {
 
   return (
     <div className="min-h-dvh overflow-x-clip bg-white text-black">
-      <header className="ios-bar sticky top-0 z-30 border-b border-[var(--color-separator)]">
-        <Container className="flex h-14 items-center justify-between gap-3">
-          <Link to="/" aria-label="Platofy">
-            <BrandLogo kind="wordmark" className="text-[1.8rem]" />
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link to="/login?mode=signin" className="px-1 text-[15px] font-semibold text-[var(--color-primary-strong)]">
-              {copy.nav.signIn}
-            </Link>
-            <Link to="/login?mode=onboarding" className="inline-flex min-h-9 items-center rounded-full bg-[var(--color-primary-strong)] px-4 text-[15px] font-semibold text-white">
-              {copy.nav.start}
-            </Link>
-          </div>
-        </Container>
-      </header>
+      <MarketingHeader />
 
       <main>
         <section className="pb-10 pt-14 sm:pt-20">
