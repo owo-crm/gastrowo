@@ -396,6 +396,12 @@ export function LandingPage() {
             <Link to="/tools/labor-cost-calculator" className="hover:text-black">
               Labor cost calculator
             </Link>
+            <Link to="/compare/7shifts" className="hover:text-black">
+              7shifts alternative
+            </Link>
+            <Link to="/switch" className="hover:text-black">
+              Free switch-over
+            </Link>
             <Link to={legalLinks(lang).terms} className="hover:text-black">
               {copy.legal.terms}
             </Link>
