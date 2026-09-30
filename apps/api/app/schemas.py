@@ -272,8 +272,8 @@ class BillingCheckoutSessionRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_plan(self):
-        if self.plan not in {SubscriptionPlanEnum.PRO, SubscriptionPlanEnum.BUSINESS}:
-            raise ValueError("Checkout is only available for Pro or Business plans")
+        if self.plan not in {SubscriptionPlanEnum.STANDARD, SubscriptionPlanEnum.PRO}:
+            raise ValueError("Checkout is only available for the Starter and Pro plans")
         return self
 
 

@@ -177,3 +177,36 @@ def test_staff_sees_coworkers_without_private_fields(client, db_session):
     assert len(users.json()["data"]) == 3
     assert all("email" not in row and "hourly_rate_pln" not in row for row in users.json()["data"])
     assert client.get("/locations", headers=headers).status_code == 200
+
+
+def test_checkout_sells_starter_and_pro_in_dollars(client, db_session, monkeypatch):
+    """Starter was refused by the request schema (only Pro/Business passed); every business pays USD."""
+    import types
+
+    from app.core.config import settings
+    from app.routers import billing as billing_router
+
+    monkeypatch.setattr(settings, "stripe_secret_key", "sk_test_x")
+    monkeypatch.setattr(settings, "stripe_price_starter_usd_monthly", "price_starter_m")
+    monkeypatch.setattr(settings, "stripe_price_pro_usd_annual", "price_pro_y")
+    sessions: list[dict] = []
+
+    def create(**kwargs):
+        sessions.append(kwargs)
+        return types.SimpleNamespace(id="cs_1", url="https://checkout.stripe.com/c/cs_1")
+
+    fake = types.SimpleNamespace(checkout=types.SimpleNamespace(Session=types.SimpleNamespace(create=create)))
+    monkeypatch.setattr(billing_router, "_get_stripe", lambda: fake)
+
+    headers = _workspace(db_session, members=2, plan=SubscriptionPlanEnum.PRO, status=SubscriptionStatusEnum.TRIALING, trial_ends_at=datetime.now(UTC) + timedelta(days=20))
+    # An older Polish business still checks out in dollars.
+    org = db_session.query(Organization).filter(Organization.name == "Billing pro 2").one()
+    org.country = "PL"
+    db_session.commit()
+
+    starter = client.post("/billing/checkout-session", headers=headers, json={"plan": "standard", "billing_cycle": "monthly"})
+    assert starter.status_code == 200, starter.text
+    assert sessions[-1]["line_items"] == [{"price": "price_starter_m", "quantity": 1}]
+    pro = client.post("/billing/checkout-session", headers=headers, json={"plan": "pro", "billing_cycle": "annual"})
+    assert pro.status_code == 200 and sessions[-1]["line_items"][0]["price"] == "price_pro_y"
+    assert client.post("/billing/checkout-session", headers=headers, json={"plan": "business"}).status_code == 422

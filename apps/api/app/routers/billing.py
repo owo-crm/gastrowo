@@ -24,7 +24,6 @@ from app.services.billing import (
     plan_price_table,
     sync_stripe_locations,
 )
-from app.services.labor_rules import currency_for
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -168,7 +167,8 @@ def create_checkout_session(
         raise HTTPException(status_code=422, detail="Only the Starter and Pro plans can be purchased")
     if subscription.stripe_subscription_id:
         raise HTTPException(status_code=409, detail="This workspace already has a subscription; manage it in the billing portal")
-    currency = currency_for(organization.country or "US")
+    # Platofy sells in dollars only (US market); older Polish businesses pay the same USD prices.
+    currency = "USD"
     price_id = _price_id_for(payload.plan, payload.billing_cycle, currency)
     locations = count_locations(db, context.membership.organization_id)
     if payload.plan == SubscriptionPlanEnum.STANDARD and locations > STARTER_LOCATION_LIMIT:
