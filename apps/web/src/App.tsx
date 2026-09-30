@@ -26,6 +26,11 @@ const PlatformPage = lazy(() => import("@/pages/platform-page").then((module) =>
 const StartPage = lazy(() => import("@/pages/start-page").then((module) => ({ default: module.StartPage })));
 const TasksPage = lazy(() => import("@/pages/tasks-page").then((module) => ({ default: module.TasksPage })));
 const TeamPage = lazy(() => import("@/pages/team/team-page").then((module) => ({ default: module.TeamPage })));
+const ToolsHubPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.ToolsHubPage })));
+const ScheduleTemplatePage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.ScheduleTemplatePage })));
+const LaborCostPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.LaborCostPage })));
+const OvertimePage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.OvertimePage })));
+const TipPoolPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.TipPoolPage })));
 const HowItWorksPage = lazy(() => import("@/pages/how-it-works-page").then((module) => ({ default: module.HowItWorksPage })));
 const TermsPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.TermsPageEn })));
 const PrivacyPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.PrivacyPageEn })));
@@ -175,6 +180,11 @@ export function App() {
       <Route path="/demo" element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : <DemoPage />} />
       <Route path="/kiosk" element={<KioskPage />} />
       <Route path="/how-it-works" element={<HowItWorksPage />} />
+      <Route path="/tools" element={<ToolsHubPage />} />
+      <Route path="/tools/restaurant-schedule-template" element={<ScheduleTemplatePage />} />
+      <Route path="/tools/labor-cost-calculator" element={<LaborCostPage />} />
+      <Route path="/tools/overtime-calculator" element={<OvertimePage />} />
+      <Route path="/tools/tip-pool-calculator" element={<TipPoolPage />} />
       <Route path="/terms" element={<TermsPageEn />} />
       <Route path="/privacy" element={<PrivacyPageEn />} />
       <Route path="/cookies" element={<CookiesPageEn />} />
