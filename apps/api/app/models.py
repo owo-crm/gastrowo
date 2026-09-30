@@ -162,6 +162,11 @@ class Organization(Base):
     signup_previous_tool: Mapped[str | None] = mapped_column(String(40), nullable=True)
     # The owner hid the "Get started" roadmap for good.
     roadmap_hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Referral program: this business's code, who invited it, and free months it has earned.
+    referral_code: Mapped[str | None] = mapped_column(String(16), nullable=True, unique=True, index=True)
+    referred_by_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+    referral_rewarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    referral_free_months: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 

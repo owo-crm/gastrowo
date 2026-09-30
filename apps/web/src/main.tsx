@@ -11,6 +11,7 @@ import { LanguageProvider } from "@/lib/i18n";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { RouteError } from "@/components/route-error";
 import { installStaleBuildRecovery } from "@/lib/stale-build";
+import { captureReferral } from "@/lib/referral";
 import { installErrorReporting } from "@/lib/error-reporting";
 import { registerServiceWorker } from "@/lib/pwa";
 import { ToastProvider } from "@/lib/toast";
@@ -30,6 +31,7 @@ captureTestLoginKey();
 registerServiceWorker();
 installErrorReporting();
 installStaleBuildRecovery();
+captureReferral();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

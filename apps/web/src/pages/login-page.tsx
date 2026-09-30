@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Lock, Mail } from "lucide-react";
 import { legalLinks } from "@/lib/legal-links";
+import { clearReferral, storedReferral } from "@/lib/referral";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand-logo";
@@ -271,7 +272,9 @@ export function LoginPage() {
         business_type: businessType || undefined,
         team_size: teamSize || undefined,
         previous_tool: previousTool || undefined,
+        referral_code: storedReferral(),
       });
+      clearReferral();
       toast.success(t("login.business_created"));
     } catch (error) {
       toast.error(t("login.verify_failed"), error instanceof Error ? error.message : undefined);
@@ -464,6 +467,11 @@ export function LoginPage() {
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.onboarding.step1.title")}</h2>
             <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step1.body")}</p>
+            {storedReferral() ? (
+              <p className="mt-3 rounded-[12px] bg-[var(--color-accent)] px-3 py-2 text-[14px] font-semibold text-[var(--color-primary-strong)]" data-testid="referral-note">
+                {t("referral.signup_note")}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.full_name")}</label>

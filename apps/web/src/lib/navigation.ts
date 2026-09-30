@@ -99,6 +99,8 @@ export function getNavSections(me?: MeResponse | null): NavSection[] {
   if (canManageBusinessSettings(me)) settingsSubs.push(sub("/settings/business", "business"));
   settingsSubs.push(sub("/settings/calendar", "calendar_sync"));
   if (isAdmin) settingsSubs.push(sub("/settings/billing", "billing"));
+  // Hidden from the public demo: its link would invite people into nothing.
+  if (isAdmin && !me?.is_sandbox) settingsSubs.push(sub("/settings/referrals", "referrals"));
   // Platofy-internal analytics.
   if (me?.is_platform_admin) {
     settingsSubs.push(sub("/platform", "platform", { end: true }));

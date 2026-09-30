@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import OrgContext, get_current_organization, require_org_context
+from app.services import referrals as referrals_service
 from app.core.envelope import ok
 from app.core.permissions import can_manage_business_settings
 from app.db import get_db
@@ -185,6 +186,7 @@ def create_checkout_session(
     locations = count_locations(db, context.membership.organization_id)
     if payload.plan == SubscriptionPlanEnum.STANDARD and locations > STARTER_LOCATION_LIMIT:
         raise HTTPException(status_code=409, detail="Starter covers one location. Choose Pro or remove the other locations first.")
+    referral_credit = (organization.referral_free_months or 0) > 0 and not subscription.stripe_coupon_id
     # Flat plan price; Pro adds one add-on unit per location beyond the included three (kept in step by sync_stripe_locations).
     line_items = [{"price": price_id, "quantity": 1}]
     extra = extra_locations_for(payload.plan, locations)
@@ -199,8 +201,15 @@ def create_checkout_session(
         line_items=line_items,
         success_url=settings.billing_success_url,
         cancel_url=settings.billing_cancel_url,
-        # A discount set in the platform admin panel rides along; otherwise customers may enter promo codes.
-        **({"discounts": [{"coupon": subscription.stripe_coupon_id}]} if subscription.stripe_coupon_id else {"allow_promotion_codes": True}),
+        # A discount set in the platform admin panel rides along; then a free month earned by referrals;
+        # otherwise customers may enter promo codes.
+        **(
+            {"discounts": [{"coupon": subscription.stripe_coupon_id}]}
+            if subscription.stripe_coupon_id
+            else {"discounts": [{"coupon": referrals_service.free_month_coupon(stripe)}]}
+            if referral_credit
+            else {"allow_promotion_codes": True}
+        ),
         client_reference_id=str(context.membership.organization_id),
         customer=subscription.stripe_customer_id or None,
         customer_email=None if subscription.stripe_customer_id else context.user.email,
@@ -214,6 +223,8 @@ def create_checkout_session(
                 "organization_id": str(context.membership.organization_id),
                 "plan": payload.plan.value,
                 "billing_cycle": payload.billing_cycle,
+                # Tells the webhook to use up one referral free month once the subscription exists.
+                **({"referral_credit": "1"} if referral_credit else {}),
             }
         },
     )
@@ -282,6 +293,15 @@ async def handle_stripe_webhook(
         # A plan switch in the customer portal leaves the Pro add-on as it was; bring it in line.
         if updated is not None and event_type != "customer.subscription.deleted":
             sync_stripe_locations(db, updated.organization_id)
+        if updated is not None:
+            organization = db.get(Organization, updated.organization_id)
+            if organization is not None:
+                metadata = data_object.get("metadata") or {}
+                if event_type == "customer.subscription.created" and metadata.get("referral_credit") == "1" and organization.referral_free_months:
+                    organization.referral_free_months -= 1
+                # A paying business rewards whoever invited it (once).
+                if updated.status == SubscriptionStatusEnum.ACTIVE and updated.stripe_subscription_id:
+                    referrals_service.reward_if_due(db, organization)
 
     if event_type == "invoice.payment_failed" and data_object:
         # Newer API versions moved the subscription id under parent.subscription_details.

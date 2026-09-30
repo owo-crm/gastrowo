@@ -142,6 +142,13 @@ export const api = {
   submitLead(body: { email: string; kind: "template" | "calculator" | "migration" | "compare"; source?: string; name?: string; business?: string; current_tool?: string; team_size?: string; message?: string; website?: string }) {
     return request<{ received: boolean }>("/marketing/leads", { method: "POST", body: JSON.stringify(body) });
   },
+  referrals(token: string) {
+    return request<{ code: string; path: string; joined: number; paying: number; free_months_waiting: number; bonus_trial_days: number; businesses: Array<{ name: string; paying: boolean }> }>(
+      "/organizations/current/referrals",
+      {},
+      token,
+    );
+  },
   platformLeads(token: string) {
     return request<Array<{ id: string; email: string; kind: string; source: string | null; name: string | null; business: string | null; current_tool: string | null; team_size: string | null; message: string | null; created_at: string | null }>>("/platform/leads", {}, token);
   },
@@ -166,7 +173,7 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
-  completeOwnerOnboarding(input: { verification_token: string; full_name: string; organization_name: string; password: string; source: string; country?: "US" | "PL"; business_type?: string; team_size?: string; previous_tool?: string }) {
+  completeOwnerOnboarding(input: { verification_token: string; full_name: string; organization_name: string; password: string; source: string; country?: "US" | "PL"; business_type?: string; team_size?: string; previous_tool?: string; referral_code?: string }) {
     // The first location starts in the owner's own time zone instead of the country's default.
     return request<AuthLoginResponse>("/auth/onboarding/owner/complete", {
       method: "POST",

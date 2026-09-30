@@ -33,6 +33,7 @@ const OvertimePage = lazy(() => import("@/pages/tools-pages").then((module) => (
 const TipPoolPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.TipPoolPage })));
 const ComparePage = lazy(() => import("@/pages/compare-pages").then((module) => ({ default: module.ComparePage })));
 const SwitchPage = lazy(() => import("@/pages/compare-pages").then((module) => ({ default: module.SwitchPage })));
+const ReferralsPage = lazy(() => import("@/pages/referrals-page").then((module) => ({ default: module.ReferralsPage })));
 const HowItWorksPage = lazy(() => import("@/pages/how-it-works-page").then((module) => ({ default: module.HowItWorksPage })));
 const TermsPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.TermsPageEn })));
 const PrivacyPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.PrivacyPageEn })));
@@ -239,6 +240,7 @@ export function App() {
       <Route path="/settings/business" element={<ProtectedRoute><SettingsPage section="business" /></ProtectedRoute>} />
       <Route path="/settings/calendar" element={<ProtectedRoute><SettingsPage section="calendar" /></ProtectedRoute>} />
       <Route path="/settings/billing" element={<ProtectedRoute><ADMINRoute><BillingPage /></ADMINRoute></ProtectedRoute>} />
+      <Route path="/settings/referrals" element={<ProtectedRoute><ADMINRoute><ReferralsPage /></ADMINRoute></ProtectedRoute>} />
       <Route path="/profile" element={<Navigate to="/settings" replace />} />
       <Route path="/billing" element={<Navigate to="/settings/billing" replace />} />
 
