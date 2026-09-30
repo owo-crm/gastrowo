@@ -186,9 +186,8 @@ def review_timesheet(
     if item is None or item.organization_id != context.membership.organization_id:
         raise HTTPException(status_code=404, detail="Timesheet not found")
 
-    if item.status != TimesheetStatusEnum.PENDING:
-        raise HTTPException(status_code=422, detail="Only pending timesheets can be reviewed")
-
+    # Reviewed hours stay editable: a manager can fix an approved entry later (a forgotten clock-out,
+    # a wrong break) or reverse a decision. Payroll always reads the current values.
     now = datetime.now(UTC)
 
     if payload.action == "approve":

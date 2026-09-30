@@ -5,6 +5,8 @@ import { Coffee, Play, Square, Tablet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { formatTime, toLocalIso } from "@/lib/date";
+import { formatDate, localeFor } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import type { ClockSessionInfo } from "@/lib/types";
@@ -20,7 +22,14 @@ function elapsed(session: ClockSessionInfo, now: number) {
 /** Start / end shift from the worker's own phone, like a punch clock in the pocket. */
 export function ClockCard() {
   const { token } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const dayLabel = (iso: string) => {
+    const today = toLocalIso(new Date());
+    const tomorrow = toLocalIso(new Date(Date.now() + 86_400_000));
+    if (iso === today) return t("home.today");
+    if (iso === tomorrow) return t("home.tomorrow");
+    return formatDate(iso, lang);
+  };
   const toast = useToast();
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => Date.now());
@@ -67,23 +76,44 @@ export function ClockCard() {
 
   const data = clockQuery.data;
   if (!data) return null;
+  const next = data.next_shift ?? null;
+  // Already started (by this device's clock): it's the current shift, not the next one.
+  const todayIso = toLocalIso(new Date(now));
+  const running = Boolean(
+    next && (next.date < todayIso || (next.date === todayIso && formatTime(next.start_time) <= new Date(now).toTimeString().slice(0, 5))),
+  );
+
+  /** "Today" / "Tomorrow" / "Fri, Oct 3", then the times, position and place. */
+  const nextShiftLines = next ? (
+    <>
+      <p className="text-[13px] font-semibold text-[var(--color-primary-strong)]">{running ? t("home.current_shift") : t("home.next_shift")}</p>
+      <p className="text-[20px] font-semibold leading-tight tabular-nums text-black">
+        {dayLabel(next.date)} · {formatTime(next.start_time)}–{formatTime(next.end_time)}
+      </p>
+      <p className="truncate text-[14px] text-[var(--color-text-muted)]">{[next.staff_position, next.location_name].filter(Boolean).join(" · ")}</p>
+    </>
+  ) : (
+    <>
+      <p className="text-[17px] font-semibold text-black">{t("home.no_next_shift")}</p>
+      <p className="text-[14px] text-[var(--color-text-muted)]">{t("home.no_next_shift_body")}</p>
+    </>
+  );
 
   if (!data.phone_allowed) {
     return (
-      <div className="ios-island mx-4 mb-4 flex items-center gap-3 px-4 py-3.5 sm:mx-6">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--color-accent)] text-[var(--color-primary-strong)]">
-          <Tablet className="size-5" />
-        </span>
+      <div className="ios-island mx-4 mb-4 flex items-center gap-3 px-4 py-3.5 sm:mx-6" data-testid="home-card">
         <div className="min-w-0 flex-1">
-          <p className="text-[16px] font-semibold text-black">{t("clock.use_tablet")}</p>
-          <p className="text-[14px] text-[var(--color-text-muted)]">{data.has_pin ? t("clock.use_tablet_body") : t("clock.no_pin_body")}</p>
+          {nextShiftLines}
+          <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-[var(--color-text-muted)]">
+            <Tablet className="size-4 shrink-0" /> {data.has_pin ? t("clock.use_tablet_body") : t("clock.no_pin_body")}
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="ios-island mx-4 mb-4 flex items-center gap-3 px-4 py-3.5 sm:mx-6">
+    <div className="ios-island mx-4 mb-4 flex items-center gap-3 px-4 py-3.5 sm:mx-6" data-testid="home-card">
       <div className="min-w-0 flex-1">
         {session ? (
           <>
@@ -92,15 +122,12 @@ export function ClockCard() {
             </p>
             <p className="text-[28px] font-semibold leading-tight tabular-nums text-black">{elapsed(session, now)}</p>
             <p className="truncate text-[14px] text-[var(--color-text-muted)]">
-              {t("clock.since", { time: new Date(session.clock_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })}
-              {session.shift ? ` · ${session.shift.start_time}–${session.shift.end_time}` : ` · ${t("clock.no_shift")}`}
+              {t("clock.since", { time: new Date(session.clock_in_at).toLocaleTimeString(localeFor(lang), { hour: "2-digit", minute: "2-digit" }) })}
+              {session.shift ? ` · ${formatTime(session.shift.start_time)}–${formatTime(session.shift.end_time)}` : ` · ${t("clock.no_shift")}`}
             </p>
           </>
         ) : (
-          <>
-            <p className="text-[17px] font-semibold text-black">{t("clock.ready")}</p>
-            <p className="text-[14px] text-[var(--color-text-muted)]">{t("clock.ready_body")}</p>
-          </>
+          nextShiftLines
         )}
       </div>
       {session ? (

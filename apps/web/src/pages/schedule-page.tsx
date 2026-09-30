@@ -19,6 +19,7 @@ import {
 
   Sparkles,
   Trash2,
+  Wallet,
   XCircle,
 
   X,
@@ -3112,7 +3113,8 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
     </div>
   );
 
-  const pageTitle = section === "calendar" ? (isStaff ? t("sub.my_week") : t("schedule.title")) : t(`sub.${section}`);
+  const pageTitle =
+    section === "calendar" ? (isStaff ? t("sub.home") : t("schedule.title")) : isStaff && section === "hours" ? t("sub.my_hours") : t(`sub.${section}`);
 
   return (
     <AppShell
@@ -3132,6 +3134,13 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
       ) : isStaff ? (
         <>
         <ClockCard />
+        {hasPlanFeature(me, "payroll") ? (
+          <div className="mb-4 px-4 sm:px-6">
+            <Button variant="tinted" className="w-full sm:w-auto" onClick={() => navigate("/payroll")}>
+              <Wallet className="size-4" /> {t("home.check_payments")}
+            </Button>
+          </div>
+        ) : null}
         <StaffWeek
           token={token!}
           meId={me?.id}

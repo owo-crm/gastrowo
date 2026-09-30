@@ -1,4 +1,4 @@
-import { Briefcase, CalendarDays, ListTodo, Settings, Users, Wallet, type LucideIcon } from "lucide-react";
+import { Briefcase, CalendarDays, House, ListTodo, Settings, Users, type LucideIcon } from "lucide-react";
 
 import { canAccessReport, canManageBusinessSettings, canManageTeam, canViewOverview, canViewPayroll, hasPlanFeature } from "@/lib/access";
 import type { MeResponse } from "@/lib/types";
@@ -13,16 +13,41 @@ export type NavSub = {
   locked?: boolean;
   /** Match only this exact path (section roots), not everything below it. */
   end?: boolean;
+  /** Belongs to the section (keeps its tab highlighted) but is opened from a list, not shown as a sub-tab. */
+  hidden?: boolean;
 };
 
 export type NavSection = {
-  key: "schedule" | "team" | "business" | "earnings" | "tasks" | "settings";
+  key: "home" | "schedule" | "team" | "business" | "earnings" | "tasks" | "settings";
   icon: LucideIcon;
   subs: NavSub[];
 };
 
-function sub(to: string, key: string, options: { locked?: boolean; end?: boolean } = {}): NavSub {
-  return options.locked ? { to: UPGRADE_ROUTE, key, locked: true } : { to, key, end: options.end };
+function sub(to: string, key: string, options: { locked?: boolean; end?: boolean; hidden?: boolean } = {}): NavSub {
+  return options.locked ? { to: UPGRADE_ROUTE, key, locked: true } : { to, key, end: options.end, hidden: options.hidden };
+}
+
+/** Sub-tabs that are shown in the menu (hidden ones are reached from a page, e.g. Settings rows). */
+export function visibleSubs(section: NavSection): NavSub[] {
+  return section.subs.filter((item) => !item.hidden);
+}
+
+/**
+ * A worker's app is three tabs: Home (next shift, clock, the week), Tasks and Settings.
+ * Payments, hours, calendar sync and revenue are rows in Settings.
+ */
+function staffSections(me?: MeResponse | null): NavSection[] {
+  const homeSubs = [sub("/schedule", "home", { end: true }), sub("/schedule/availability", "availability"), sub("/schedule/requests", "requests")];
+  const settingsSubs = [sub("/settings", "settings", { end: true })];
+  if (hasPlanFeature(me, "payroll")) settingsSubs.push(sub("/payroll", "payments", { hidden: true }));
+  if (hasPlanFeature(me, "timesheets")) settingsSubs.push(sub("/schedule/hours", "my_hours", { hidden: true }));
+  if (canAccessReport(me)) settingsSubs.push(sub("/overview/revenue", "revenue", { hidden: true }));
+  settingsSubs.push(sub("/settings/calendar", "calendar_sync", { hidden: true }));
+  return [
+    { key: "home", icon: House, subs: homeSubs },
+    { key: "tasks", icon: ListTodo, subs: [sub("/tasks", "tasks")] },
+    { key: "settings", icon: Settings, subs: settingsSubs },
+  ];
 }
 
 /**
@@ -33,10 +58,11 @@ export function getNavSections(me?: MeResponse | null): NavSection[] {
   const role = me?.role;
   const isAdmin = role === "ADMIN";
   const isStaff = role === "STAFF";
+  if (isStaff) return staffSections(me);
   const sections: NavSection[] = [];
 
   const scheduleSubs = [
-    sub("/schedule", isStaff ? "my_week" : "calendar", { end: true }),
+    sub("/schedule", "calendar", { end: true }),
     sub("/schedule/availability", "availability"),
     sub("/schedule/requests", "requests"),
   ];
@@ -44,7 +70,7 @@ export function getNavSections(me?: MeResponse | null): NavSection[] {
   else if (isAdmin) scheduleSubs.push(sub("/schedule/hours", "hours", { locked: true }));
   sections.push({ key: "schedule", icon: CalendarDays, subs: scheduleSubs });
 
-  if (!isStaff && canManageTeam(me)) {
+  if (canManageTeam(me)) {
     const teamSubs = [
       sub("/team", "people", { end: true }),
       sub("/team/invites", "invites"),
@@ -56,21 +82,14 @@ export function getNavSections(me?: MeResponse | null): NavSection[] {
     sections.push({ key: "team", icon: Users, subs: teamSubs });
   }
 
-  if (isStaff) {
-    const subs: NavSub[] = [];
-    if (hasPlanFeature(me, "payroll")) subs.push(sub("/payroll", "payroll"));
-    if (canAccessReport(me)) subs.push(sub("/overview/revenue", "revenue"));
-    if (subs.length) sections.push({ key: "earnings", icon: Wallet, subs });
-  } else {
-    const subs: NavSub[] = [];
-    if (canViewOverview(me)) subs.push(sub("/overview", "overview", { end: true }));
-    else if (isAdmin) subs.push(sub("/overview", "overview", { locked: true }));
-    if (canAccessReport(me)) subs.push(sub("/overview/revenue", "revenue"));
-    else if (isAdmin) subs.push(sub("/overview/revenue", "revenue", { locked: true }));
-    if (canViewPayroll(me)) subs.push(sub("/payroll", "payroll"));
-    else if (isAdmin) subs.push(sub("/payroll", "payroll", { locked: true }));
-    if (subs.length) sections.push({ key: "business", icon: Briefcase, subs });
-  }
+  const businessSubs: NavSub[] = [];
+  if (canViewOverview(me)) businessSubs.push(sub("/overview", "overview", { end: true }));
+  else if (isAdmin) businessSubs.push(sub("/overview", "overview", { locked: true }));
+  if (canAccessReport(me)) businessSubs.push(sub("/overview/revenue", "revenue"));
+  else if (isAdmin) businessSubs.push(sub("/overview/revenue", "revenue", { locked: true }));
+  if (canViewPayroll(me)) businessSubs.push(sub("/payroll", "payroll"));
+  else if (isAdmin) businessSubs.push(sub("/payroll", "payroll", { locked: true }));
+  if (businessSubs.length) sections.push({ key: "business", icon: Briefcase, subs: businessSubs });
 
   sections.push({ key: "tasks", icon: ListTodo, subs: [sub("/tasks", "tasks")] });
 
