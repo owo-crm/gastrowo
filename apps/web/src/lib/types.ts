@@ -133,18 +133,6 @@ export type BillingPortalSession = {
   url: string;
 };
 
-export type WaitlistSignupResponse = {
-  email: string;
-  created: boolean;
-  created_at: string;
-};
-
-export type WaitlistLead = {
-  id: string;
-  email: string;
-  created_at: string;
-};
-
 export type LinkMemberByEmailResponse =
   | {
       status: "linked";

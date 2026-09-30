@@ -72,6 +72,9 @@ def _ensure_runtime_schema_compat() -> None:
             safe_execute("UPDATE shifts SET required_role = 'ADMIN' WHERE required_role = 'OWNER'")
         if "schedule_weekly_overrides" in tables:
             safe_execute("UPDATE schedule_weekly_overrides SET required_role = 'ADMIN' WHERE required_role = 'OWNER'")
+        # The landing waitlist is gone: drop its table and the emails in it.
+        if "marketing_waitlist_leads" in tables:
+            safe_execute("DROP TABLE marketing_waitlist_leads")
 
         if "shift_templates" in tables:
             template_columns = {column["name"] for column in inspector.get_columns("shift_templates")}

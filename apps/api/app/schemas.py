@@ -214,20 +214,6 @@ class SessionBootstrapResponse(APIModel):
     role: RoleEnum | None = None
 
 
-class MarketingWaitlistSignupRequest(BaseModel):
-    email: EmailStr
-
-
-class MarketingWaitlistLeadOut(APIModel):
-    id: UUID
-    email: EmailStr
-    created_at: datetime
-
-
-class MarketingWaitlistSignupOut(APIModel):
-    email: EmailStr
-    created: bool
-    created_at: datetime
 class OwnerOnboardingCompleteRequest(BaseModel):
     verification_token: str
     full_name: str = Field(min_length=2, max_length=120)

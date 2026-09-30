@@ -4,8 +4,8 @@
 Решение: лиды храним внутри Platofy, письма отправляем через Resend, аналитика — PostHog. Shopify не подходит, потому что он для интернет-магазинов, а у нас подписка через Stripe.
 
 ### Лиды
-- **Модель.** Расширить `marketing_waitlist_leads`:
-  - `kind`: waitlist / pilot / contact / signup;
+- **Модель.** Новая таблица `leads` (старый waitlist удалён):
+  - `kind`: pilot / contact / signup;
   - `status`: new / contacted / pilot / customer / lost;
   - имя, заведение, телефон, число точек, размер команды, сообщение;
   - UTM-метки, referrer, заметки, `organization_id`.
@@ -18,8 +18,7 @@
 - **Страница `/pilot`** с формой заявки (EN/PL/RU), кнопка «Join the pilot» на лендинге. UTM и referrer сохраняются при первом визите.
 - **«Платформа → Лиды»:**
   - фильтры, поиск, статус, заметки, mailto, экспорт CSV;
-  - запись действий в `PlatformAuditLog`;
-  - заменяет страницу `/waitlist`.
+  - запись действий в `PlatformAuditLog`.
 
 ### PostHog
 - `posthog-js` грузится только при заданном `VITE_POSTHOG_KEY` и после согласия с cookie. Запись сессий с маскировкой полей ввода.

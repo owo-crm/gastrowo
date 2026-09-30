@@ -99,11 +99,8 @@ export function getNavSections(me?: MeResponse | null): NavSection[] {
   if (canManageBusinessSettings(me)) settingsSubs.push(sub("/settings/business", "business"));
   settingsSubs.push(sub("/settings/calendar", "calendar_sync"));
   if (isAdmin) settingsSubs.push(sub("/settings/billing", "billing"));
-  // Platofy-internal: waitlist leads from the landing page.
-  if (me?.is_platform_admin) {
-    settingsSubs.push(sub("/platform", "platform"));
-    settingsSubs.push(sub("/waitlist", "waitlist"));
-  }
+  // Platofy-internal analytics.
+  if (me?.is_platform_admin) settingsSubs.push(sub("/platform", "platform"));
   sections.push({ key: "settings", icon: Settings, subs: settingsSubs });
 
   return sections;
