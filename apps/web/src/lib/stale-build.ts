@@ -4,6 +4,7 @@
  * Loading the page again picks up the new build. Once per minute at most, so a real outage can't loop.
  */
 const KEY = "platofy.stale-build-reload";
+const BUST = "_v";
 
 export function isStaleBuildError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -19,11 +20,23 @@ export function reloadForNewBuild(): boolean {
   } catch {
     // No storage: still reload once; the page load resets this function anyway.
   }
-  window.location.reload();
+  // A plain reload can come back with the old page from the browser cache; a new query string can't.
+  const url = new URL(window.location.href);
+  url.searchParams.set(BUST, String(Date.now()));
+  window.location.replace(url.toString());
   return true;
 }
 
+/** Drop the cache-busting parameter again once the new page has loaded. */
+export function cleanBuildParam() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(BUST)) return;
+  url.searchParams.delete(BUST);
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 export function installStaleBuildRecovery() {
+  cleanBuildParam();
   // Vite fires this when a lazy chunk or its CSS can't be preloaded.
   window.addEventListener("vite:preloadError", (event) => {
     if (reloadForNewBuild()) event.preventDefault();

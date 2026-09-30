@@ -59,6 +59,9 @@ export function BillingPage() {
   const locations = subscription?.billable_locations ?? Math.max(subscription?.active_locations_count ?? 1, 1);
   const currentPlan = subscription ? normalizePlan(subscription.plan) : null;
   const isTrial = subscription?.status === "trialing";
+  // While the free Pro trial runs, plans can't be bought: paying changed nothing and cut the trial short.
+  const trialEnds = isTrial && subscription?.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
+  const trialActive = Boolean(trialEnds && trialEnds.getTime() > Date.now());
   const hasPaidSubscription = Boolean(subscription?.has_payment_method);
   const atLimit = Boolean(subscription?.member_cap && subscription.active_members_count >= subscription.member_cap);
   const badge = subscription ? statusBadge(subscription, t, lang) : null;
@@ -120,6 +123,12 @@ export function BillingPage() {
           />
         </div>
 
+        {trialActive && trialEnds && !hasPaidSubscription ? (
+          <div className="mx-4 mb-3 rounded-2xl bg-[var(--color-accent)] px-4 py-3 text-[15px] text-[var(--color-primary-strong)] sm:mx-6" data-testid="trial-note">
+            {t("billing.trial_no_checkout", { date: formatDate(trialEnds.toISOString(), lang, { month: "long", day: "numeric" }) })}
+          </div>
+        ) : null}
+
         <div className="grid gap-3 px-4 sm:px-6 md:grid-cols-3">
           {plans.map((plan) => {
             const isCurrent = currentPlan === plan.key;
@@ -157,7 +166,7 @@ export function BillingPage() {
                     </li>
                   ))}
                 </ul>
-                {paid && !hasPaidSubscription ? (
+                {paid && !hasPaidSubscription && !trialActive ? (
                   <Button
                     size="lg"
                     className="mt-6 w-full"

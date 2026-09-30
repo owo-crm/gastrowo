@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import json
 from importlib import import_module
 from typing import Any
 from uuid import UUID
@@ -108,11 +109,18 @@ def _plan_from_price_id(price_id: str | None) -> tuple[SubscriptionPlanEnum, str
     return reverse_mapping.get(price_id)
 
 
-def _upsert_subscription_from_stripe(db: Session, subscription_payload: Any) -> OrganizationSubscription | None:
-    metadata = getattr(subscription_payload, "metadata", None) or {}
+def _subscription_period_end(payload: dict) -> datetime | None:
+    """Newer Stripe API versions keep the billing period on each item, older ones on the subscription."""
+    ends = [item.get("current_period_end") for item in (payload.get("items") or {}).get("data") or [] if item.get("current_period_end")]
+    return _datetime_from_unix(payload.get("current_period_end") or (max(ends) if ends else None))
+
+
+def _upsert_subscription_from_stripe(db: Session, payload: dict) -> OrganizationSubscription | None:
+    """`payload` is the subscription as plain JSON from the webhook body (not an SDK object)."""
+    metadata = payload.get("metadata") or {}
     org_id_raw = metadata.get("organization_id")
-    stripe_subscription_id = getattr(subscription_payload, "id", None)
-    stripe_customer_id = getattr(subscription_payload, "customer", None)
+    stripe_subscription_id = payload.get("id")
+    stripe_customer_id = payload.get("customer")
 
     subscription = None
     if org_id_raw:
@@ -133,22 +141,22 @@ def _upsert_subscription_from_stripe(db: Session, subscription_payload: Any) -> 
     if subscription is None:
         return None
 
-    items = getattr(getattr(subscription_payload, "items", None), "data", []) or []
+    items = (payload.get("items") or {}).get("data") or []
     # The Pro add-on item carries no plan; take the first item whose price names one.
     resolved_plan = None
     for item in items:
-        resolved_plan = _plan_from_price_id(getattr(getattr(item, "price", None), "id", None))
+        resolved_plan = _plan_from_price_id((item.get("price") or {}).get("id"))
         if resolved_plan is not None:
             break
     if resolved_plan is not None:
         subscription.plan = resolved_plan[0]
         subscription.billing_cycle = resolved_plan[1]
 
-    subscription.status = _status_from_stripe(getattr(subscription_payload, "status", None))
+    subscription.status = _status_from_stripe(payload.get("status"))
     subscription.stripe_customer_id = stripe_customer_id or subscription.stripe_customer_id
     subscription.stripe_subscription_id = stripe_subscription_id or subscription.stripe_subscription_id
-    subscription.trial_ends_at = _datetime_from_unix(getattr(subscription_payload, "trial_end", None))
-    subscription.current_period_ends_at = _datetime_from_unix(getattr(subscription_payload, "current_period_end", None))
+    subscription.trial_ends_at = _datetime_from_unix(payload.get("trial_end"))
+    subscription.current_period_ends_at = _subscription_period_end(payload)
     db.add(subscription)
     return subscription
 
@@ -167,6 +175,10 @@ def create_checkout_session(
         raise HTTPException(status_code=422, detail="Only the Starter and Pro plans can be purchased")
     if subscription.stripe_subscription_id:
         raise HTTPException(status_code=409, detail="This workspace already has a subscription; manage it in the billing portal")
+    # Buying during the free Pro trial changed nothing visible and cut the trial short: plans open when it ends.
+    trial_end = subscription.trial_ends_at.replace(tzinfo=UTC) if subscription.trial_ends_at and subscription.trial_ends_at.tzinfo is None else subscription.trial_ends_at
+    if subscription.status == SubscriptionStatusEnum.TRIALING and trial_end is not None and trial_end > datetime.now(UTC):
+        raise HTTPException(status_code=409, detail=f"Your free Pro trial runs until {trial_end:%B %-d}. You can choose a plan when it ends.")
     # Platofy sells in dollars only (US market); older Polish businesses pay the same USD prices.
     currency = "USD"
     price_id = _price_id_for(payload.plan, payload.billing_cycle, currency)
@@ -242,15 +254,18 @@ async def handle_stripe_webhook(
         raise HTTPException(status_code=400, detail="Missing Stripe-Signature header")
 
     try:
-        event = stripe.Webhook.construct_event(payload, signature, settings.stripe_webhook_secret)
+        stripe.Webhook.construct_event(payload, signature, settings.stripe_webhook_secret)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Invalid Stripe webhook signature: {exc}") from exc
 
-    event_type = getattr(event, "type", "")
-    data_object = getattr(getattr(event, "data", None), "object", None)
+    # The signature is checked; read the event as plain JSON. SDK objects changed shape between
+    # stripe-python versions (no dict methods), which made every subscription event fail with 500.
+    event = json.loads(payload)
+    event_type = event.get("type", "")
+    data_object = (event.get("data") or {}).get("object")
 
-    if event_type == "checkout.session.completed" and data_object is not None:
-        org_id_raw = getattr(data_object, "client_reference_id", None) or (getattr(data_object, "metadata", None) or {}).get("organization_id")
+    if event_type == "checkout.session.completed" and data_object:
+        org_id_raw = data_object.get("client_reference_id") or (data_object.get("metadata") or {}).get("organization_id")
         if org_id_raw:
             try:
                 organization_id = UUID(org_id_raw)
@@ -258,18 +273,20 @@ async def handle_stripe_webhook(
                 organization_id = None
             if organization_id is not None:
                 subscription = _get_subscription(db, organization_id)
-                subscription.stripe_customer_id = getattr(data_object, "customer", None) or subscription.stripe_customer_id
-                subscription.stripe_subscription_id = getattr(data_object, "subscription", None) or subscription.stripe_subscription_id
+                subscription.stripe_customer_id = data_object.get("customer") or subscription.stripe_customer_id
+                subscription.stripe_subscription_id = data_object.get("subscription") or subscription.stripe_subscription_id
                 db.add(subscription)
 
-    if event_type in {"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"} and data_object is not None:
+    if event_type in {"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"} and data_object:
         updated = _upsert_subscription_from_stripe(db, data_object)
         # A plan switch in the customer portal leaves the Pro add-on as it was; bring it in line.
         if updated is not None and event_type != "customer.subscription.deleted":
             sync_stripe_locations(db, updated.organization_id)
 
-    if event_type == "invoice.payment_failed" and data_object is not None:
-        stripe_subscription_id = getattr(data_object, "subscription", None)
+    if event_type == "invoice.payment_failed" and data_object:
+        # Newer API versions moved the subscription id under parent.subscription_details.
+        parent = (data_object.get("parent") or {}).get("subscription_details") or {}
+        stripe_subscription_id = data_object.get("subscription") or parent.get("subscription")
         if stripe_subscription_id:
             subscription = db.scalar(
                 select(OrganizationSubscription).where(OrganizationSubscription.stripe_subscription_id == stripe_subscription_id)
