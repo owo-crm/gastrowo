@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from uuid import UUID
 
 from sqlalchemy import exists, select
@@ -42,6 +44,20 @@ STEPS: tuple[tuple[str, str], ...] = (
 )
 
 
+# The "Get started" tab is temporary: it goes away by itself two weeks after the business was created.
+ROADMAP_DAYS = 14
+
+
+def roadmap_is_hidden(organization: Organization) -> bool:
+    if organization.roadmap_hidden_at is not None:
+        return True
+    created = organization.created_at
+    if created is None:
+        return False
+    created = created if created.tzinfo else created.replace(tzinfo=UTC)
+    return created < datetime.now(UTC) - timedelta(days=ROADMAP_DAYS)
+
+
 def roadmap(db: Session, organization: Organization, user: User) -> dict:
     org_id: UUID = organization.id
 
@@ -67,7 +83,7 @@ def roadmap(db: Session, organization: Organization, user: User) -> dict:
     }
     steps = [{"key": key, "to": to, "done": done[key]} for key, to in STEPS]
     return {
-        "hidden": organization.roadmap_hidden_at is not None,
+        "hidden": roadmap_is_hidden(organization),
         "done_count": sum(1 for step in steps if step["done"]),
         "total": len(steps),
         "steps": steps,

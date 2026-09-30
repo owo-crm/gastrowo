@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import { findActive, getNavSections } from "@/lib/navigation";
@@ -100,7 +101,7 @@ function visibleElement(selector: string): HTMLElement | null {
 }
 
 export function ProductTour() {
-  const { me } = useAuth();
+  const { me, token } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -115,12 +116,13 @@ export function ProductTour() {
     !location.pathname.startsWith("/tools") &&
     !location.pathname.startsWith("/compare");
 
-  // First sign-in: start once the app has rendered. Replays come from Settings.
+  // First sign-in of a new account: start once the app has rendered. The server remembers a finished
+  // tour, so a new device or domain doesn't replay it. Replays come from Settings.
   useEffect(() => {
-    if (!me?.id || !me.is_linked || !inApp || index !== null || readDone(me.id)) return;
+    if (!me?.id || !me.is_linked || !me.show_tour || !inApp || index !== null || readDone(me.id)) return;
     const timer = window.setTimeout(() => setIndex(0), 900);
     return () => window.clearTimeout(timer);
-  }, [me?.id, me?.is_linked, inApp, index]);
+  }, [me?.id, me?.is_linked, me?.show_tour, inApp, index]);
   useEffect(() => {
     const start = () => setIndex(0);
     window.addEventListener(START_EVENT, start);
@@ -129,9 +131,10 @@ export function ProductTour() {
 
   const close = useCallback(() => {
     if (me?.id) markDone(me.id);
+    if (token && me?.show_tour) void api.tourDone(token).catch(() => undefined);
     setIndex(null);
     setRect(null);
-  }, [me?.id]);
+  }, [me?.id, me?.show_tour, token]);
 
   // Open the step's page, then find, scroll to and measure what it points at.
   useLayoutEffect(() => {

@@ -129,6 +129,8 @@ class User(Base):
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), default="")
     onboarding_source: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    # The guided tour was finished or skipped (kept on the server so a new device or domain doesn't replay it).
+    tour_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 

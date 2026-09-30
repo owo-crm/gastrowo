@@ -96,6 +96,8 @@ class MeOut(APIModel):
     organization_settings: OrganizationSettingsOut | None = None
     subscription: "SubscriptionSummaryOut | None" = None
     is_platform_admin: bool = False
+    # Show the guided tour: a new account that hasn't finished or skipped it.
+    show_tour: bool = False
     is_demo_account: bool = False
     is_sandbox: bool = False
     sandbox_expires_at: datetime | None = None
