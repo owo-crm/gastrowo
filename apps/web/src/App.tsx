@@ -2,6 +2,7 @@ import { Suspense, lazy, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { canAccessNotes, canAccessReport, canManageTeam, canViewOverview, canViewPayroll, hasPlanFeature } from "@/lib/access";
+import { ProductTour } from "@/components/product-tour";
 import { LandingPage } from "@/pages/landing-page";
 import { LoginPage } from "@/pages/login-page";
 import { PendingLinkPage } from "@/pages/pending-link-page";
@@ -235,6 +236,7 @@ export function App() {
       <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
       <Route path="*" element={<Navigate to={effectiveToken ? linkedDefaultRoute : "/"} replace />} />
     </Routes>
+    {effectiveToken && effectiveMe ? <ProductTour /> : null}
     </Suspense>
   );
 }

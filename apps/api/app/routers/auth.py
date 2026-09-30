@@ -353,7 +353,13 @@ def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, response:
         password_hash=hash_password(payload.password),
         onboarding_source=payload.source.strip(),
     )
-    org = Organization(name=payload.organization_name.strip(), country=payload.country)
+    org = Organization(
+        name=payload.organization_name.strip(),
+        country=payload.country,
+        signup_business_type=(payload.business_type or "").strip() or None,
+        signup_team_size=(payload.team_size or "").strip() or None,
+        signup_previous_tool=(payload.previous_tool or "").strip() or None,
+    )
     db.add_all([user, org])
     db.flush()
     membership = OrganizationMembership(

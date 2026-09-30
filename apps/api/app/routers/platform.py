@@ -98,6 +98,22 @@ def _owners(db: Session, organization_id: UUID) -> list[str]:
     )
 
 
+def _survey(db: Session, organization: Organization) -> dict:
+    """What the owner told us at sign-up."""
+    source = db.scalar(
+        select(User.onboarding_source)
+        .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+        .where(OrganizationMembership.organization_id == organization.id, OrganizationMembership.role == RoleEnum.ADMIN)
+        .order_by(User.created_at)
+    )
+    return {
+        "business_type": organization.signup_business_type,
+        "team_size": organization.signup_team_size,
+        "previous_tool": organization.signup_previous_tool,
+        "source": source,
+    }
+
+
 def _row(db: Session, organization: Organization, members: int, locations: int) -> dict:
     subscription = get_or_create_subscription(db, organization.id)
     plan, status = effective_plan(subscription)
@@ -107,6 +123,7 @@ def _row(db: Session, organization: Organization, members: int, locations: int) 
         "country": organization.country,
         "created_at": organization.created_at.isoformat() if organization.created_at else None,
         "owners": _owners(db, organization.id),
+        "survey": _survey(db, organization),
         "members": members,
         "locations": locations,
         "plan": plan.value,

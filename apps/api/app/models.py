@@ -164,6 +164,10 @@ class Organization(Base):
     # Public "demo look" business: one per visitor, some features off, deleted when it expires.
     is_sandbox: Mapped[bool] = mapped_column(Boolean, default=False)
     sandbox_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Sign-up survey answers (what kind of place, how big, what they used before).
+    signup_business_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    signup_team_size: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    signup_previous_tool: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 

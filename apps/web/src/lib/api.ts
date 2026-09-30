@@ -143,7 +143,7 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
-  completeOwnerOnboarding(input: { verification_token: string; full_name: string; organization_name: string; password: string; source: string; country?: "US" | "PL" }) {
+  completeOwnerOnboarding(input: { verification_token: string; full_name: string; organization_name: string; password: string; source: string; country?: "US" | "PL"; business_type?: string; team_size?: string; previous_tool?: string }) {
     // The first location starts in the owner's own time zone instead of the country's default.
     return request<AuthLoginResponse>("/auth/onboarding/owner/complete", {
       method: "POST",

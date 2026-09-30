@@ -31,6 +31,7 @@ export function ReportPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const currency = currencyOf(me);
+  const symbol = currencySymbol(currency, lang);
   const canSeeHistory = me?.role === "ADMIN" || me?.role === "MANAGER";
 
   const locationsQuery = useQuery({ queryKey: ["locations"], queryFn: () => api.listLocations(token!), enabled: Boolean(token) });
@@ -94,8 +95,16 @@ export function ReportPage() {
           <label className="block">
             <span className="mb-1.5 block text-[13px] font-semibold text-[var(--color-text-muted)]">{t("revenue.amount")}</span>
             <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[16px] font-semibold text-black">{currencySymbol(currency, lang)}</span>
-              <Input inputMode="decimal" className="pl-9 text-[17px] font-semibold" placeholder="0.00" value={amount} onChange={(event) => setAmount(event.target.value)} />
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[16px] font-semibold text-black">{symbol}</span>
+              {/* The symbol can be "$", "zł" or "PLN": leave room for all of it. */}
+              <Input
+                inputMode="decimal"
+                className="text-[17px] font-semibold"
+                style={{ paddingLeft: `calc(${symbol.length * 1.2}ch + 22px)` }}
+                placeholder="0.00"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+              />
             </div>
           </label>
           <div className="flex flex-wrap items-center gap-3 sm:col-span-2">

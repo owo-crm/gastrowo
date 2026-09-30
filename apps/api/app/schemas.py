@@ -235,6 +235,10 @@ class OwnerOnboardingCompleteRequest(BaseModel):
     source: str = Field(min_length=2, max_length=80)
     country: Country = "US"
     timezone: str | None = Field(default=None, max_length=64)
+    # Optional sign-up survey.
+    business_type: str | None = Field(default=None, max_length=40)
+    team_size: str | None = Field(default=None, max_length=20)
+    previous_tool: str | None = Field(default=None, max_length=40)
 
 
 class InviteAcceptRequest(BaseModel):

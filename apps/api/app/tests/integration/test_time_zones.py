@@ -60,3 +60,21 @@ def test_today_is_the_restaurants_day_not_the_servers(client, db_session, monkey
 
     monkeypatch.setattr(labor_rules, "datetime", Frozen)
     assert labor_rules.local_today(db_session, org_id) == date(2026, 9, 30)
+
+
+def test_signup_survey_is_stored_and_shown_to_platform_staff(client, db_session, monkeypatch: pytest.MonkeyPatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "platform_admin_emails", "owner@survey-diner.com")
+    token = _owner(
+        client,
+        "owner@survey-diner.com",
+        "Survey Diner",
+        source="Facebook",
+        business_type="cafe",
+        team_size="11-25",
+        previous_tool="excel",
+    )
+    rows = client.get("/platform/organizations", headers=auth_header(token)).json()["data"]
+    row = next(item for item in (rows["items"] if isinstance(rows, dict) else rows) if item["name"] == "Survey Diner")
+    assert row["survey"] == {"business_type": "cafe", "team_size": "11-25", "previous_tool": "excel", "source": "Facebook"}

@@ -516,7 +516,9 @@ export function AppShell({
               {subtitle ? <p className="hidden truncate text-[15px] text-[#3c3c43] md:block">{subtitle}</p> : null}
             </div>
             {action ? <div className="hidden shrink-0 md:block">{action}</div> : null}
-            <NotificationsButton />
+            <span data-tour="bell" className="shrink-0">
+              <NotificationsButton />
+            </span>
           </div>
           {active ? <MobileSubTabs section={active.section} /> : null}
         </header>
