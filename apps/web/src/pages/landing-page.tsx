@@ -6,7 +6,6 @@ import { Link } from "react-router-dom";
 import { BrandLogo } from "@/components/brand-logo";
 import { CookieConsent } from "@/components/cookie-consent";
 import { DevLoginButton } from "@/components/dev-login-button";
-import { Segmented } from "@/components/ui/segmented";
 import { type Currency, formatMoney } from "@/lib/format";
 import { type Lang, useLanguage } from "@/lib/i18n";
 import { trackMarketingEvent } from "@/lib/marketing-analytics";
@@ -96,124 +95,6 @@ const COPY: Record<Lang, Copy> = {
     finalBody: "30 days of Pro, free. No card, no contract.",
     legal: { terms: "Terms", privacy: "Privacy", cookies: "Cookies" },
   },
-  pl: {
-    nav: { features: "Funkcje", pricing: "Cennik", faq: "FAQ", signIn: "Zaloguj", start: "Zacznij za darmo" },
-    hero: {
-      title: "Grafik dla restauracji",
-      highlight: "w 10 minut",
-      body: "Dostępność zespołu, Kodeks pracy i koszt pracy liczą się same. Ty tylko publikujesz.",
-      primary: "Zacznij za darmo",
-      secondary: "Zobacz, jak działa",
-      note: (price) => `30 dni Pro gratis · bez karty · od ${price} miesięcznie`,
-    },
-    preview: {
-      title: "Grafik · 20–26 maja",
-      published: "Opublikowany",
-      roles: ["Kuchnia", "Sala", "Bar", "Manager"],
-      laborCost: "Koszt pracy 28,6%",
-      hours: "186 h",
-      rules: "Kodeks pracy OK",
-      days: ["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nd"],
-    },
-    featuresTitle: "Wszystko, czego potrzebuje zmiana. Nic więcej.",
-    features: [
-      { icon: CalendarCheck2, title: "Grafik układa się sam", body: "Na podstawie dostępności, stanowisk i priorytetów. Ty tylko poprawiasz i publikujesz." },
-      { icon: Scale, title: "Zgodny z Kodeksem pracy", body: "Pilnuje 11 h odpoczynku dobowego i 35 h tygodniowego, zanim ktoś to zauważy." },
-      { icon: Users, title: "Jedna osoba, kilka stanowisk", body: "Kelner, który stoi też za barem, ma oba stanowiska i osobną stawkę dla każdego." },
-      { icon: Repeat2, title: "Zamiany bez czatu", body: "Pracownicy proszą o zamianę lub przejęcie zmiany w aplikacji, a Ty akceptujesz jednym kliknięciem." },
-      { icon: Clock3, title: "Odbicia z telefonu lub tabletu", body: "Wejście i wyjście z telefonu albo PIN-em na tablecie przy wejściu, z przerwami. Punktualne odbicia zatwierdzają się same." },
-      { icon: Bell, title: "Aplikacja na każdym telefonie", body: "Dodaj do ekranu początkowego i dostawaj powiadomienia o grafiku, zamianach i zadaniach." },
-      { icon: PieChart, title: "Koszt pracy na bieżąco", body: "Wpisz utarg dnia i od razu widzisz, jaki procent zjadają wypłaty." },
-      { icon: FileSpreadsheet, title: "Eksport i kalendarz", body: "Plik CSV dla księgowej, a grafik w kalendarzu Google lub iPhone każdego pracownika." },
-    ],
-    stepsTitle: "Pierwszy grafik jeszcze dziś",
-    steps: [
-      { title: "Załóż konto", body: "Nazwa lokalu i email. Bez karty płatniczej." },
-      { title: "Zaproś zespół", body: "Wklej zespół z arkusza. Każdy dołącza z linku i podaje dostępność." },
-      { title: "Opublikuj grafik", body: "Wygeneruj tydzień, popraw i wyślij zespołowi." },
-    ],
-    pricingTitle: "Jedna cena za cały zespół",
-    pricingBody: "Nigdy za osobę. Jeden mały lokal za darmo na zawsze, Pro obejmuje do trzech lokali. Każde nowe konto zaczyna od 30 dni planu Pro.",
-    pricingCta: { free: "Zacznij za darmo", paid: "Wypróbuj 30 dni gratis" },
-    mostPopular: "Najczęściej wybierany",
-    compare: (percent) => `${percent}% taniej niż 7shifts`,
-    faqTitle: "Najczęstsze pytania",
-    faq: [
-      {
-        q: "Ile kosztuje Platofy?",
-        a: "Free obejmuje jeden lokal i do 15 osób, bez limitu czasu. Starter to 99 zł miesięcznie za jeden lokal i do 30 osób. Pro to 219 zł miesięcznie za maksymalnie trzy lokale bez limitu osób, a każdy kolejny lokal kosztuje 59 zł. Rocznie 2 miesiące gratis.",
-      },
-      { q: "Czy potrzebuję karty płatniczej?", a: "Nie. Przez 30 dni korzystasz z pełnego planu Pro, potem wybierasz płatny plan albo zostajesz na Free." },
-      { q: "Czy pracownicy muszą instalować aplikację?", a: "Nie ze sklepu. Pracownik otwiera link z zaproszenia, ustawia hasło i może dodać Platofy do ekranu początkowego, aby dostawać powiadomienia." },
-      {
-        q: "Czy grafik uwzględnia przepisy o czasie pracy?",
-        a: "Tak. Automatyczny grafik nie przydzieli zmiany, która łamie 11 godzin odpoczynku dobowego lub 35 godzin tygodniowego. Przy ręcznej zmianie dostaniesz ostrzeżenie.",
-      },
-      { q: "Czy jedna osoba może pracować na kilku stanowiskach?", a: "Tak. Nadaj kilka stanowisk, wybierz główne i ustaw stawkę dla każdego. Automatyczny grafik wykorzysta każde z nich." },
-    ],
-    finalTitle: "Pierwszy grafik ułożysz jeszcze dziś",
-    finalBody: "30 dni planu Pro za darmo. Bez karty, bez umowy.",
-    legal: { terms: "Regulamin", privacy: "Prywatność", cookies: "Cookies" },
-  },
-  ru: {
-    nav: { features: "Возможности", pricing: "Цены", faq: "Вопросы", signIn: "Войти", start: "Начать бесплатно" },
-    hero: {
-      title: "График для ресторана",
-      highlight: "за 10 минут",
-      body: "Доступность команды, переработки и затраты на персонал считаются сами. Вы только публикуете.",
-      primary: "Начать бесплатно",
-      secondary: "Как это работает",
-      note: (price) => `30 дней Pro бесплатно · без карты · от ${price} в месяц`,
-    },
-    preview: {
-      title: "График · 20–26 мая",
-      published: "Опубликован",
-      roles: ["Кухня", "Зал", "Бар", "Менеджер"],
-      laborCost: "Затраты на персонал 28,6%",
-      hours: "186 ч",
-      rules: "Без переработок",
-      days: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"],
-    },
-    featuresTitle: "Всё, что нужно смене. Ничего лишнего.",
-    features: [
-      { icon: CalendarCheck2, title: "График строится сам", body: "По доступности, позициям и приоритетам. Вы правите и публикуете." },
-      { icon: Scale, title: "Переработки под контролем", body: "Автографик держит неделю в пределах 40 часов, а перед переработкой вы видите предупреждение." },
-      { icon: Users, title: "Один человек, несколько позиций", body: "Официант, который стоит и за баром, получает обе позиции, у каждой своя ставка." },
-      { icon: Repeat2, title: "Обмены без чатов", body: "Сотрудники просят обмен или подхват смены в приложении, вы подтверждаете одним нажатием." },
-      { icon: Clock3, title: "Отметки с телефона или планшета", body: "Приход и уход с телефона или по PIN на планшете у входа, с перерывами. Отметки по графику подтверждаются сами." },
-      { icon: Bell, title: "Приложение на каждом телефоне", body: "Добавьте на экран «Домой» и получайте пуши о графике, обменах и задачах." },
-      { icon: PieChart, title: "Затраты на персонал", body: "Внесите выручку за день и сразу видно, какую долю съедает зарплата." },
-      { icon: FileSpreadsheet, title: "Выгрузка и календарь", body: "CSV для бухгалтера и смены в Google или Apple календаре каждого сотрудника." },
-    ],
-    stepsTitle: "Первый график уже сегодня",
-    steps: [
-      { title: "Создайте аккаунт", body: "Название заведения и email. Без карты." },
-      { title: "Пригласите команду", body: "Вставьте команду из таблицы. Каждый заходит по ссылке и указывает доступность." },
-      { title: "Опубликуйте график", body: "Сгенерируйте неделю, поправьте и отправьте команде." },
-    ],
-    pricingTitle: "Одна цена за всю команду",
-    pricingBody: "Никогда не за человека. Одна небольшая точка бесплатно навсегда, в Pro входят до трёх точек. Каждый новый аккаунт начинает с 30 дней Pro.",
-    pricingCta: { free: "Начать бесплатно", paid: "30 дней бесплатно" },
-    mostPopular: "Чаще всего выбирают",
-    compare: (percent) => `На ${percent}% дешевле 7shifts`,
-    faqTitle: "Частые вопросы",
-    faq: [
-      {
-        q: "Сколько это стоит?",
-        a: "Free: одна точка и до 15 человек, без ограничения по времени. Starter — $26 в месяц за одну точку и до 30 человек. Pro — $58 в месяц до трёх точек без лимита людей, каждая следующая точка $15. При оплате за год два месяца бесплатно.",
-      },
-      { q: "Нужна ли карта, чтобы начать?", a: "Нет. 30 дней вы пользуетесь полным Pro, потом выбираете тариф или остаётесь на Free." },
-      { q: "Нужно ли сотрудникам ставить приложение?", a: "Не из магазина. Сотрудник открывает ссылку из приглашения, задаёт пароль и может добавить Platofy на экран «Домой», чтобы получать уведомления." },
-      {
-        q: "Как учитываются переработки?",
-        a: "Автографик не ставит человека больше 40 часов в неделю. При ручном назначении будет предупреждение, а в настройках можно разрешить автографику выходить за лимит.",
-      },
-      { q: "Может ли один человек работать на разных позициях?", a: "Да. Дайте ему несколько позиций, выберите основную и задайте ставку для каждой. Автографик использует любую из них." },
-    ],
-    finalTitle: "Составьте первый график уже сегодня",
-    finalBody: "30 дней Pro бесплатно. Без карты и договора.",
-    legal: { terms: "Условия", privacy: "Конфиденциальность", cookies: "Cookies" },
-  },
 };
 
 const ROLE_COLORS = ["#b25000", "#1f5bd6", "#8e44ad", "#248a3d"];
@@ -227,8 +108,8 @@ const PREVIEW: Array<Array<{ name: string; time: string; role: number }>> = [
   [{ name: "Jake", time: "12–8", role: 0 }, { name: "Leo", time: "12–8", role: 1 }],
 ];
 
-function currencyForLang(lang: Lang): Currency {
-  return lang === "pl" ? "PLN" : "USD";
+function currencyForLang(_lang: Lang): Currency {
+  return "USD";
 }
 
 function Container({ children, className }: { children: ReactNode; className?: string }) {
@@ -303,7 +184,7 @@ function WeekPreview({ copy }: { copy: Copy["preview"] }) {
 }
 
 export function LandingPage() {
-  const { lang, setLang, t } = useLanguage();
+  const { lang, t } = useLanguage();
   const copy = COPY[lang] ?? COPY.en;
   const currency = currencyForLang(lang);
   const fromPrice = formatMoney(PLAN_PRICE[currency].standard.monthly, currency, lang);
@@ -332,17 +213,6 @@ export function LandingPage() {
             </ul>
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
-            <Segmented
-              className="max-sm:hidden"
-              ariaLabel={t("shell.language")}
-              value={lang}
-              onChange={setLang}
-              options={[
-                { value: "en", label: "EN" },
-                { value: "pl", label: "PL" },
-                { value: "ru", label: "RU" },
-              ]}
-            />
             <Link to={SIGNIN_URL} className="px-1 text-[15px] font-semibold text-[var(--color-primary-strong)]">
               {copy.nav.signIn}
             </Link>
@@ -381,18 +251,6 @@ export function LandingPage() {
               </div>
               <p className="mt-3 text-[14px] text-[var(--color-text-muted)]">{t("demo.cta_note")}</p>
               <p className="mt-5 text-[15px] text-[var(--color-text-muted)]">{copy.hero.note(fromPrice)}</p>
-              <div className="mt-4 flex justify-center sm:hidden">
-                <Segmented
-                  ariaLabel={t("shell.language")}
-                  value={lang}
-                  onChange={setLang}
-                  options={[
-                    { value: "en", label: "English" },
-                    { value: "pl", label: "Polski" },
-                    { value: "ru", label: "Русский" },
-                  ]}
-                />
-              </div>
             </div>
             <div className="mx-auto mt-12 max-w-5xl sm:mt-16">
               <WeekPreview copy={copy.preview} />

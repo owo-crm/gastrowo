@@ -20,7 +20,7 @@ export function DemoPage() {
   const run = async () => {
     setError(null);
     try {
-      await startDemo(lang === "pl" ? "PL" : "US");
+      await startDemo("US");
       navigate("/overview", { replace: true });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : t("demo.failed"));

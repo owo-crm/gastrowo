@@ -203,33 +203,6 @@ function NotificationsButton() {
   );
 }
 
-const LANGS: Array<{ value: Lang; label: string }> = [
-  { value: "en", label: "English" },
-  { value: "pl", label: "Polski" },
-  { value: "ru", label: "Русский" },
-];
-
-/** Language choice as an iOS checkmark list. */
-export function LanguageList({ className }: { className?: string }) {
-  const { lang, setLang, t } = useLanguage();
-  return (
-    <div className={className} role="group" aria-label={t("shell.language")}>
-      {LANGS.map((item) => (
-        <button
-          key={item.value}
-          type="button"
-          aria-pressed={lang === item.value}
-          onClick={() => setLang(item.value)}
-          className="flex min-h-11 w-full items-center justify-between rounded-[8px] px-3 text-left text-[15px] text-black hover:bg-[var(--color-fill)]"
-        >
-          {item.label}
-          {lang === item.value ? <Check className="size-4 text-[var(--color-primary-strong)]" strokeWidth={3} /> : null}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function UserRow() {
   const { me, logout } = useAuth();
   const { t } = useLanguage();
@@ -240,9 +213,6 @@ function UserRow() {
     <div className="relative" ref={ref}>
       {open ? (
         <div className="absolute bottom-[calc(100%+6px)] left-0 right-0 z-50 rounded-[20px] bg-white p-1.5 shadow-[var(--shadow-float)]">
-          <p className="ios-section-header px-3 pb-1 pt-1.5">{t("shell.language")}</p>
-          <LanguageList />
-          <div className="my-1 border-t border-[var(--color-separator)]" />
           <button
             type="button"
             onClick={() => {

@@ -72,7 +72,7 @@ function LegalAuthNotice() {
 export function LoginPage() {
   const { sendOtp, verifyOtp, loginWithPassword, completeOwnerOnboarding, acceptInvite } = useAuth();
   const toast = useToast();
-  const { lang, setLang, t } = useLanguage();
+  const { lang, t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const inviteToken = searchParams.get("token")?.trim() || "";
@@ -95,8 +95,8 @@ export function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [organizationName, setOrganizationName] = useState("");
   const [source, setSource] = useState<SourceOption | "">("");
-  // US first; Polish browsers start on Poland. The owner can change it here or later in Settings.
-  const [country, setCountry] = useState<"US" | "PL">(() => (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("pl") ? "PL" : "US"));
+  // Platofy is US-only: every new business is a US business (dollars, US overtime rules).
+  const country = "US" as const;
   const [passwordLogin, setPasswordLogin] = useState(true);
   const [loginPassword, setLoginPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -650,20 +650,6 @@ export function LoginPage() {
           <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.business_name")}</label>
           <Input value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} placeholder={t("login.business_name_placeholder")} />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-[var(--color-heading)]">{t("settings.country")}</label>
-          <Segmented
-            className="w-full"
-            ariaLabel={t("settings.country")}
-            value={country}
-            onChange={setCountry}
-            options={[
-              { value: "US", label: t("settings.country_us") },
-              { value: "PL", label: t("settings.country_pl") },
-            ]}
-          />
-          <p className="text-[13px] text-[var(--color-text-muted)]">{country === "PL" ? t("login.country_hint_pl") : t("login.country_hint_us")}</p>
-        </div>
         <Button type="button" className="w-full" onClick={() => setStep(5)} disabled={!organizationName.trim()}>
           {t("common.continue")} <ArrowRight className="size-4" />
         </Button>
@@ -678,16 +664,6 @@ export function LoginPage() {
           <Link to="/" className="shrink-0" aria-label="Platofy">
             <BrandLogo kind="wordmark" className="text-[1.8rem]" />
           </Link>
-          <Segmented
-            ariaLabel={t("shell.language")}
-            value={lang}
-            onChange={setLang}
-            options={[
-              { value: "en", label: "EN" },
-              { value: "pl", label: "PL" },
-              { value: "ru", label: "RU" },
-            ]}
-          />
         </div>
       </header>
       <div className="mx-auto max-w-[1180px] px-4">

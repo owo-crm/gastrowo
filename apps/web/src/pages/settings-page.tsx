@@ -6,7 +6,7 @@ import { CalendarPlus, Compass, Copy, FileClock, ImagePlus, KeyRound, LogOut, Re
 import { DemoOffNote } from "@/components/demo-off";
 import { startProductTour } from "@/components/product-tour";
 import { DeviceSection } from "@/components/device-section";
-import { AppShell, LanguageList } from "@/components/layout/app-shell";
+import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,7 +78,7 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
   const [fullName, setFullName] = useState(me?.full_name ?? "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(me?.avatar_url ?? null);
   const [businessName, setBusinessName] = useState(me?.active_organization_name ?? "");
-  const [country, setCountry] = useState<"US" | "PL">(me?.organization_settings?.country ?? "US");
+  const country = me?.organization_settings?.country ?? "US";
   const [businessLogo, setBusinessLogo] = useState<string | null>(null);
   const [calendarUrl, setCalendarUrl] = useState<string | null>(null);
   const [confirmDemo, setConfirmDemo] = useState(false);
@@ -164,9 +164,8 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
     setFullName(me?.full_name ?? "");
     setAvatarUrl(me?.avatar_url ?? null);
     setBusinessName(me?.active_organization_name ?? "");
-    setCountry(me?.organization_settings?.country ?? "US");
     setBusinessLogo(loadBusinessLogo(me?.active_organization_id));
-  }, [me?.full_name, me?.avatar_url, me?.active_organization_name, me?.organization_settings?.country, me?.active_organization_id]);
+  }, [me?.full_name, me?.avatar_url, me?.active_organization_name, me?.active_organization_id]);
 
   const saveProfile = useMutation({
     mutationFn: () => api.patchMe(token!, { full_name: fullName.trim(), avatar_url: avatarUrl }),
@@ -180,7 +179,7 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
 
   const saveBusiness = useMutation({
     mutationFn: async () => {
-      await api.patchCurrentOrganization(token!, { name: businessName.trim(), country });
+      await api.patchCurrentOrganization(token!, { name: businessName.trim() });
       saveBusinessLogo(me?.active_organization_id, businessLogo);
     },
     onSuccess: async () => {
@@ -303,11 +302,6 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
                 onClick={() => startProductTour()}
               />
             </ListSection>
-            <ListSection header={t("shell.language")}>
-              <li className="px-2 py-1 sm:px-4">
-                <LanguageList />
-              </li>
-            </ListSection>
             <ListSection>
               <ListRow
                 title={
@@ -333,19 +327,7 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
                 </Field>
               </li>
             </ListSection>
-            <ListSection header={t("settings.country")} footer={t("settings.country_footer")}>
-              <li className="px-4 py-3 sm:px-6">
-                <Segmented
-                  className="w-full"
-                  ariaLabel={t("settings.country")}
-                  value={country}
-                  onChange={setCountry}
-                  options={[
-                    { value: "US", label: t("settings.country_us") },
-                    { value: "PL", label: t("settings.country_pl") },
-                  ]}
-                />
-              </li>
+            <ListSection>
               <ListRow title={t("settings.currency")} trailing={country === "PL" ? "PLN (zł)" : "USD ($)"} />
               <ListRow title={t("settings.labor_rules")} trailing={country === "PL" ? t("settings.rules_pl") : t("settings.rules_us")} />
             </ListSection>

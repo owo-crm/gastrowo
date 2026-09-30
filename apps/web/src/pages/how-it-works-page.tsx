@@ -3,7 +3,6 @@ import { ArrowRight, Check, Lightbulb } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand-logo";
-import { Segmented } from "@/components/ui/segmented";
 import { type Lang, useLanguage } from "@/lib/i18n";
 import { legalLinks } from "@/lib/legal-links";
 import { cn } from "@/lib/utils";
@@ -109,155 +108,8 @@ const EN: Copy = {
   legal: { terms: "Terms", privacy: "Privacy", cookies: "Cookies" },
 };
 
-const PL: Copy = {
-  meta: {
-    title: "Jak działa Platofy — grafik, rejestracja czasu i wypłaty dla restauracji",
-    description:
-      "Zobacz prawdziwą aplikację Platofy krok po kroku: dostępność zespołu, grafik w kilka minut, odbicia z telefonu lub tabletu, zatwierdzanie tylko wyjątków i eksport wypłat.",
-  },
-  nav: { home: "Strona główna", pricing: "Cennik", signIn: "Zaloguj", start: "Zacznij za darmo" },
-  hero: {
-    eyebrow: "Jak to działa",
-    title: "Od dostępności do wypłat — w jednym obiegu",
-    body: "To prawdziwa aplikacja, nie makieta. Tak wygląda tydzień właściciela, managera i zespołu — i dlaczego każdy krok oszczędza czas albo pieniądze.",
-  },
-  loop: ["Start", "Dostępność", "Grafik", "Telefony zespołu", "Odbicia", "Godziny", "Koszty i wypłaty"],
-  whyLabel: "Dlaczego to ważne",
-  steps: [
-    {
-      title: "Konfiguracja za jednym posiedzeniem",
-      body: "Dodaj stanowiska i stawki, potem wklej zespół z arkusza. Każdy dostaje zaproszenie e-mailem, ustawia hasło i trafia do Twojej restauracji z właściwym stanowiskiem i stawką.",
-      points: ["Jedna osoba może mieć kilka stanowisk, każde z własną stawką", "Import z Excela lub Arkuszy Google — dowolna kolejność kolumn", "Za darmo dla jednego lokalu i do 15 osób"],
-      why: "Większość aplikacji do grafików porzuca się już przy konfiguracji. Tu cały zespół jest w środku, zanim wystygnie kawa.",
-      shots: [shot("desk-positions", "desktop", "Stanowiska i stawki"), shot("desk-import", "desktop", "Import zespołu z arkusza")],
-    },
-    {
-      title: "Zespół podaje, kiedy może pracować",
-      body: "Każdy zaznacza w telefonie dni i godziny na dany tydzień. Widzisz cały zespół naraz — zielony dzień to dzień wolny do pracy — i zatwierdzasz jednym dotknięciem.",
-      points: ["Dni wolne są respektowane automatycznie", "Chciana liczba godzin tygodniowo", "Koniec gonienia ludzi na czatach"],
-      why: "Znikają wiadomości „możesz w piątek?”. Grafik startuje od prawdziwej dostępności, więc mniej zmian jest potem zamienianych.",
-      shots: [shot("phone-availability", "phone", "Dostępność pracownika w telefonie"), shot("desk-availability", "desktop", "Dostępność zespołu na tydzień")],
-    },
-    {
-      title: "Tydzień układa się sam — Ty tylko poprawiasz",
-      body: "Platofy obsadza zmiany na podstawie dostępności, stanowisk i priorytetów, pilnując przepisów o odpoczynku. Szkic jest niewidoczny dla zespołu do publikacji. Stuknij zmianę, by zobaczyć, kto jest wolny, kto ma konflikt, a kto nie pracuje na tym stanowisku.",
-      points: ["Obsada, wolne zmiany i koszt pracy aktualizują się na bieżąco", "Twój wybór zawsze wygrywa — nawet w dzień wolny", "Zmiany nocne i kilka lokali"],
-      why: "Właściciele mówią, że grafik zajmuje im 2–3 godziny tygodniowo. Tu to ok. 15 minut, a nadgodziny widać, zanim zaczną kosztować.",
-      shots: [shot("desk-draft", "desktop", "Szkic tygodnia z obsadzonymi i wolnymi zmianami"), shot("desk-shift-editor", "desktop", "Wybór osoby na zmianę")],
-    },
-    {
-      title: "Każdy ma grafik w telefonie",
-      body: "Po publikacji zespół dostaje powiadomienie. Każdy widzi swój tydzień, z kim pracuje, i może poprosić o zamianę lub przejęcie zmiany. Ty akceptujesz jednym dotknięciem.",
-      points: ["Instalacja na ekranie początkowym — bez sklepu", "Powiadomienia o grafiku, zamianach i zadaniach", "Zadania ze zdjęciem jako dowodem"],
-      why: "Koniec zrzutów ekranu z arkusza na czacie i „nie wiedziałem, że pracuję”. Zamiany zostają w systemie, więc grafik jest zawsze aktualny.",
-      shots: [shot("phone-my-week", "phone", "Tydzień pracownika w telefonie"), shot("phone-requests", "phone", "Akceptacja zamiany i przejęcia")],
-    },
-    {
-      title: "Odbicia z telefonu lub tabletu",
-      body: "Pracownik naciska „Zacznij zmianę” w telefonie albo wpisuje 4-cyfrowy PIN na tablecie przy wejściu. Przerwa to też jedno dotknięcie. Możesz wymagać, by odbicia z telefonu były w restauracji.",
-      points: ["Telefon, tablet albo oba", "Przerwy odejmowane od płatnych godzin", "Punktualne odbicia zatwierdzają się same"],
-      why: "Godziny pochodzą z prawdziwych odbić, a nie z pamięci na koniec tygodnia. Mniej sporów, uczciwsze wypłaty i ewidencja, której można ufać.",
-      shots: [shot("phone-on-the-clock", "phone", "W pracy, z przyciskiem przerwy"), shot("tablet-kiosk", "tablet", "Klawiatura PIN na tablecie")],
-    },
-    {
-      title: "Zatwierdzasz tylko wyjątki",
-      body: "Wszystko, co zgadza się z grafikiem, jest już zatwierdzone. Reszta — ktoś został dłużej, przyszedł bez zmiany — czeka w Godzinach, pogrupowana po dniach.",
-      points: ["Poprawka godzin jednym dotknięciem", "„Zatwierdź wszystkie”, gdy wszystko się zgadza", "Każda zmiana zapisana z autorem"],
-      why: "Poniedziałkowe sprawdzanie godzin skraca się z godziny do kilku minut, a nic nie trafia do wypłat bez wiedzy managera.",
-      shots: [shot("phone-hours", "phone", "Godziny do zatwierdzenia"), shot("desk-hours", "desktop", "Godziny po dniach na komputerze")],
-    },
-    {
-      title: "Koszt pracy i wypłaty",
-      body: "Wpisz utarg dnia i zobacz koszt pracy jako procent przychodu — dziennie i dla każdego lokalu. Eksport CSV dla księgowej. Każdy pracownik widzi swoje godziny i wypłatę.",
-      points: ["Koszt pracy względem celu 30%", "Stawki za stanowiska liczone automatycznie", "CSV w formacie polskim lub amerykańskim"],
-      why: "Praca to największy koszt, na który masz wpływ. Widząc go codziennie — a nie na koniec miesiąca — łatwiej utrzymać go poniżej 30%.",
-      shots: [shot("desk-overview", "desktop", "Utarg, koszt pracy i procent"), shot("desk-payroll", "desktop", "Wypłaty"), shot("phone-pay", "phone", "Wypłata pracownika")],
-    },
-  ],
-  final: {
-    title: "Wypróbuj z własnym zespołem w tym tygodniu",
-    body: "Za darmo dla jednego lokalu i do 15 osób. Płatne plany od 99 zł miesięcznie, a Pro obejmuje do trzech lokali — nigdy za osobę.",
-    cta: "Zacznij za darmo",
-    note: "30 dni Pro gratis · bez karty",
-  },
-  legal: { terms: "Regulamin", privacy: "Prywatność", cookies: "Cookies" },
-};
 
-const RU: Copy = {
-  meta: {
-    title: "Как работает Platofy — график, учёт времени и зарплата для ресторанов",
-    description:
-      "Настоящее приложение Platofy по шагам: доступность команды, график за минуты, отметки с телефона или планшета, подтверждение только исключений и выгрузка зарплаты.",
-  },
-  nav: { home: "Главная", pricing: "Цены", signIn: "Войти", start: "Начать бесплатно" },
-  hero: {
-    eyebrow: "Как это работает",
-    title: "От доступности до зарплаты — один цикл",
-    body: "Это настоящее приложение, а не макет. Так выглядит неделя владельца, менеджера и команды — и почему каждый шаг экономит время или деньги.",
-  },
-  loop: ["Настройка", "Доступность", "График", "Телефоны команды", "Отметки", "Часы", "Затраты и зарплата"],
-  whyLabel: "Почему это важно",
-  steps: [
-    {
-      title: "Настройка за один присест",
-      body: "Добавьте позиции и ставки, вставьте команду из таблицы. Каждый получает приглашение, задаёт пароль и попадает в ваш ресторан с нужной позицией и ставкой.",
-      points: ["У одного человека может быть несколько позиций со своими ставками", "Импорт из Excel или Google Таблиц — колонки в любом порядке", "Бесплатно для одной точки и до 15 человек"],
-      why: "Большинство сервисов бросают ещё на настройке. Здесь вся команда внутри быстрее, чем остынет кофе.",
-      shots: [shot("desk-positions", "desktop", "Позиции и ставки"), shot("desk-import", "desktop", "Импорт команды из таблицы")],
-    },
-    {
-      title: "Команда сама говорит, когда может работать",
-      body: "Каждый отмечает в телефоне дни и часы на неделю. Вы видите всю команду сразу — зелёный день значит свободен — и подтверждаете одним нажатием.",
-      points: ["Выходные учитываются автоматически", "Желаемые часы в неделю у каждого", "Никаких переписок в чатах"],
-      why: "Исчезают сообщения «сможешь в пятницу?». График строится от реальной доступности, поэтому потом меньше обменов и срывов.",
-      shots: [shot("phone-availability", "phone", "Доступность сотрудника в телефоне"), shot("desk-availability", "desktop", "Доступность команды на неделю")],
-    },
-    {
-      title: "Неделя строится сама — вы только правите",
-      body: "Platofy заполняет смены по доступности, позициям и приоритетам и держит каждого в пределах 40 часов. Черновик не видно команде до публикации. Нажмите на смену — видно, кто свободен, у кого конфликт и кто не работает на этой позиции.",
-      points: ["Заполненность, открытые смены и затраты обновляются на ходу", "Ваш выбор всегда побеждает — даже в выходной", "Ночные смены и несколько точек"],
-      why: "Владельцы тратят на график 2–3 часа в неделю. Здесь около 15 минут, а переработки видны ещё до публикации.",
-      shots: [shot("desk-draft", "desktop", "Черновик недели"), shot("desk-shift-editor", "desktop", "Выбор человека на смену")],
-    },
-    {
-      title: "У каждого график в телефоне",
-      body: "После публикации команда получает пуш. Каждый видит свою неделю, с кем работает, и может попросить обмен или взять смену. Вы подтверждаете одним нажатием.",
-      points: ["Ставится на экран «Домой» — без магазина приложений", "Пуши о графике, обменах и задачах", "Задачи с фото-подтверждением"],
-      why: "Больше никаких скриншотов таблицы в чате и «я не знал, что работаю». Обмены остаются в системе, график всегда актуальный.",
-      shots: [shot("phone-my-week", "phone", "Неделя сотрудника"), shot("phone-requests", "phone", "Одобрение обмена и взятия смены")],
-    },
-    {
-      title: "Отметка с телефона или планшета",
-      body: "Сотрудник жмёт «Начать смену» в телефоне или вводит 4-значный PIN на планшете у входа. Перерыв — тоже одно нажатие. Можно требовать, чтобы с телефона отмечались только в ресторане.",
-      points: ["Телефон, планшет или оба", "Перерывы вычитаются из оплачиваемых часов", "Отметки по графику подтверждаются сами"],
-      why: "Часы берутся из реальных отметок, а не из памяти в конце недели. Меньше споров, честнее зарплата, учёту можно доверять.",
-      shots: [shot("phone-on-the-clock", "phone", "На смене, с кнопкой перерыва"), shot("tablet-kiosk", "tablet", "PIN-клавиатура на планшете")],
-    },
-    {
-      title: "Подтверждаете только исключения",
-      body: "Всё, что совпало с графиком, уже подтверждено. Остальное — кто-то задержался или пришёл без смены — ждёт в «Часах», по дням, с кнопками прямо в строке.",
-      points: ["Правка времени в одно нажатие", "«Подтвердить все», когда всё сходится", "Каждое изменение сохраняется с автором"],
-      why: "Проверка часов в понедельник сокращается с часа до пары минут, и ничего не попадает в зарплату без ведома менеджера.",
-      shots: [shot("phone-hours", "phone", "Часы на подтверждение"), shot("desk-hours", "desktop", "Часы по дням")],
-    },
-    {
-      title: "Затраты на персонал и зарплата",
-      body: "Внесите выручку за день и смотрите долю зарплаты в выручке — по дням и точкам. Зарплата считается по подтверждённым часам и выгружается в CSV. Каждый сотрудник видит свои часы и заработок.",
-      points: ["Доля зарплаты против цели 30%", "Переработки и ставки позиций считаются сами", "CSV в американском или польском формате"],
-      why: "Персонал — самая большая статья расходов, которой вы управляете. Видеть её каждый день, а не в конце месяца, — так рестораны держат её ниже 30%.",
-      shots: [shot("desk-overview", "desktop", "Выручка, затраты и доля"), shot("desk-payroll", "desktop", "Зарплата"), shot("phone-pay", "phone", "Заработок сотрудника")],
-    },
-  ],
-  final: {
-    title: "Попробуйте со своей командой на этой неделе",
-    body: "Бесплатно для одной точки и до 15 человек. Платные планы от $26 в месяц, а Pro покрывает до трёх точек — никогда не за человека.",
-    cta: "Начать бесплатно",
-    note: "30 дней Pro бесплатно · без карты",
-  },
-  legal: { terms: "Условия", privacy: "Конфиденциальность", cookies: "Cookies" },
-};
-
-const COPY: Record<Lang, Copy> = { en: EN, pl: PL, ru: RU } as Record<Lang, Copy>;
+const COPY: Record<Lang, Copy> = { en: EN };
 
 function Framed({ shot: item }: { shot: Shot }) {
   // Tap to open the full-size screenshot (small screens show desktop shots scaled down).
@@ -316,7 +168,7 @@ function StepShots({ shots }: { shots: Shot[] }) {
 }
 
 export function HowItWorksPage() {
-  const { lang, setLang } = useLanguage();
+  const { lang } = useLanguage();
   const copy = COPY[lang] ?? EN;
   const links = legalLinks(lang);
 
@@ -347,17 +199,6 @@ export function HowItWorksPage() {
             <BrandLogo kind="wordmark" className="text-[1.8rem]" />
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
-            <Segmented
-              className="max-sm:hidden"
-              ariaLabel="Language"
-              value={lang}
-              onChange={setLang}
-              options={[
-                { value: "en", label: "EN" },
-                { value: "pl", label: "PL" },
-                { value: "ru", label: "RU" },
-              ]}
-            />
             <Link to="/login?mode=signin" className="px-1 text-[15px] font-semibold text-[var(--color-primary-strong)]">
               {copy.nav.signIn}
             </Link>

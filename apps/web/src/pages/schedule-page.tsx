@@ -418,36 +418,12 @@ function getRejectedReasonLabel(reason: string, lang: Lang): string {
       not_in_location: "wrong location",
       location_priority_blocked: "blocked in location",
     },
-    pl: {
-      availability_missing: "brak dostepnosci",
-      availability_window_mismatch: "poza dostepnoscia",
-      overlap: "nakladanie",
-      daily_rest_violation: "brak 11h odpoczynku",
-      weekly_rest_violation: "brak 35h odpoczynku tyg.",
-      desired_hours_cap_exceeded: "limit godzin",
-      staff_position_mismatch: "zla pozycja",
-      not_in_location: "zla lokalizacja",
-      location_priority_blocked: "blokada w lokalu",
-    },
-    ru: {
-      availability_missing: "нет availability",
-      availability_window_mismatch: "вне availability",
-      overlap: "пересечение",
-      daily_rest_violation: "нет 11ч отдыха",
-      weekly_rest_violation: "нет 35ч отдыха в неделю",
-      desired_hours_cap_exceeded: "лимит часов",
-      staff_position_mismatch: "не та позиция",
-      not_in_location: "не та точка",
-      location_priority_blocked: "заблокирован в точке",
-    },
   };
 
   return copy[lang][reason] ?? reason.replace(/_/g, " ");
 }
 
 function getStartCoverageLabel(lang: Lang): string {
-  if (lang === "pl") return "Nikt nie zaczyna o czasie";
-  if (lang === "ru") return "Никто не выходит к началу";
   return "No one starts on time";
 }
 

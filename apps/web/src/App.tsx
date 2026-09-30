@@ -28,9 +28,6 @@ const HowItWorksPage = lazy(() => import("@/pages/how-it-works-page").then((modu
 const TermsPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.TermsPageEn })));
 const PrivacyPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.PrivacyPageEn })));
 const CookiesPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.CookiesPageEn })));
-const TermsPage = lazy(() => import("@/pages/legal-pages").then((module) => ({ default: module.TermsPage })));
-const PrivacyPolicyPage = lazy(() => import("@/pages/legal-pages").then((module) => ({ default: module.PrivacyPolicyPage })));
-const CookiesPolicyPage = lazy(() => import("@/pages/legal-pages").then((module) => ({ default: module.CookiesPolicyPage })));
 
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -179,9 +176,10 @@ export function App() {
       <Route path="/terms" element={<TermsPageEn />} />
       <Route path="/privacy" element={<PrivacyPageEn />} />
       <Route path="/cookies" element={<CookiesPageEn />} />
-      <Route path="/regulamin" element={<TermsPage />} />
-      <Route path="/polityka-prywatnosci" element={<PrivacyPolicyPage />} />
-      <Route path="/polityka-cookies" element={<CookiesPolicyPage />} />
+      {/* Old Polish document links now open the English documents. */}
+      <Route path="/regulamin" element={<Navigate to="/terms" replace />} />
+      <Route path="/polityka-prywatnosci" element={<Navigate to="/privacy" replace />} />
+      <Route path="/polityka-cookies" element={<Navigate to="/cookies" replace />} />
       <Route
         path="/pending-link"
         element={
