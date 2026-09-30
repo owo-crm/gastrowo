@@ -246,6 +246,7 @@ def sync_stripe_locations(db: Session, organization_id: UUID) -> None:
         stripe = import_module("stripe")
         stripe.api_key = settings.stripe_secret_key
         remote = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+        remote = remote.to_dict() if hasattr(remote, "to_dict") else remote
         changes = stripe_items_update(remote["items"]["data"], count_locations(db, organization_id))
         if changes:
             stripe.Subscription.modify(subscription.stripe_subscription_id, items=changes, proration_behavior="create_prorations")

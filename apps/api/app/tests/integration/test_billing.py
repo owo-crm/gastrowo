@@ -199,6 +199,11 @@ def test_checkout_sells_starter_and_pro_in_dollars(client, db_session, monkeypat
     monkeypatch.setattr(billing_router, "_get_stripe", lambda: fake)
 
     headers = _workspace(db_session, members=2, plan=SubscriptionPlanEnum.PRO, status=SubscriptionStatusEnum.TRIALING, trial_ends_at=datetime.now(UTC) + timedelta(days=20))
+    # While the free trial runs, plans can't be bought (it changed nothing and cut the trial short).
+    during = client.post("/billing/checkout-session", headers=headers, json={"plan": "standard", "billing_cycle": "monthly"})
+    assert during.status_code == 409 and "trial" in during.json()["error"]["message"]
+    db_session.query(OrganizationSubscription).update({"trial_ends_at": datetime.now(UTC) - timedelta(days=1)})
+    db_session.commit()
     # An older Polish business still checks out in dollars.
     org = db_session.query(Organization).filter(Organization.name == "Billing pro 2").one()
     org.country = "PL"
@@ -210,3 +215,46 @@ def test_checkout_sells_starter_and_pro_in_dollars(client, db_session, monkeypat
     pro = client.post("/billing/checkout-session", headers=headers, json={"plan": "pro", "billing_cycle": "annual"})
     assert pro.status_code == 200 and sessions[-1]["line_items"][0]["price"] == "price_pro_y"
     assert client.post("/billing/checkout-session", headers=headers, json={"plan": "business"}).status_code == 422
+
+
+def test_stripe_webhook_updates_the_plan_from_the_raw_event(client, db_session, monkeypatch):
+    """Real events from stripe-python 15: SDK objects have no .get(); the webhook reads plain JSON."""
+    import hashlib
+    import hmac
+    import json
+    import time
+
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "stripe_secret_key", "sk_test_x")
+    monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test")
+    monkeypatch.setattr(settings, "stripe_price_starter_usd_monthly", "price_starter_m")
+    _workspace(db_session, members=1, plan=SubscriptionPlanEnum.PRO, status=SubscriptionStatusEnum.TRIALING, trial_ends_at=datetime.now(UTC) + timedelta(days=20))
+    org = db_session.query(Organization).filter(Organization.name == "Billing pro 1").one()
+
+    def send(event: dict):
+        body = json.dumps({"object": "event", "livemode": False, **event})
+        stamp = int(time.time())
+        signature = hmac.new(b"whsec_test", f"{stamp}.{body}".encode(), hashlib.sha256).hexdigest()
+        return client.post("/billing/webhooks/stripe", content=body, headers={"stripe-signature": f"t={stamp},v1={signature}", "content-type": "application/json"})
+
+    period_end = int((datetime.now(UTC) + timedelta(days=30)).timestamp())
+    completed = send({"id": "evt_1", "type": "checkout.session.completed", "data": {"object": {"client_reference_id": str(org.id), "customer": "cus_1", "subscription": "sub_1", "metadata": {}}}})
+    assert completed.status_code == 200, completed.text
+    # Subscription objects from the 2025+ API: the period lives on the items.
+    created = send({"id": "evt_2", "type": "customer.subscription.created", "data": {"object": {
+        "id": "sub_1", "customer": "cus_1", "status": "active", "trial_end": None, "metadata": {"organization_id": str(org.id)},
+        "items": {"data": [{"price": {"id": "price_starter_m"}, "current_period_end": period_end, "quantity": 1}]},
+    }}})
+    assert created.status_code == 200, created.text
+    db_session.expire_all()
+    stored = db_session.query(OrganizationSubscription).filter(OrganizationSubscription.organization_id == org.id).one()
+    assert stored.plan == SubscriptionPlanEnum.STANDARD and stored.status == SubscriptionStatusEnum.ACTIVE
+    assert stored.stripe_subscription_id == "sub_1" and stored.current_period_ends_at is not None and stored.trial_ends_at is None
+    failed = send({"id": "evt_3", "type": "invoice.payment_failed", "data": {"object": {"parent": {"subscription_details": {"subscription": "sub_1"}}}}})
+    assert failed.status_code == 200
+    db_session.expire_all()
+    assert db_session.query(OrganizationSubscription).filter(OrganizationSubscription.organization_id == org.id).one().status == SubscriptionStatusEnum.PAST_DUE
+    assert send({"id": "evt_4", "type": "ping", "data": {"object": {}}}).status_code == 200
+    bad = client.post("/billing/webhooks/stripe", content="{}", headers={"stripe-signature": "t=1,v1=bad"})
+    assert bad.status_code == 400

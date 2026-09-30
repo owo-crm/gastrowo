@@ -833,6 +833,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "templates.starter_hint": "One lunch and one dinner shift for each position, every day, one person each. Adjust them after.",
     "templates.starter_create": "Create",
     "templates.starter_done": "Typical week created. Adjust the times and people.",
+    "billing.trial_no_checkout": "You are on the free Pro trial until {{date}}: everything in Pro is yours until then. Choose a plan here when the trial ends.",
     // @end-en
   },
 };

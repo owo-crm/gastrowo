@@ -22,7 +22,7 @@ export function RouteError() {
         <p className="mt-2 text-[16px] text-[var(--color-text-muted)]">{stale ? "Reload the page to get the new version." : "We've been notified. Reload the page to continue."}</p>
         <button
           type="button"
-          onClick={() => window.location.reload()}
+          onClick={() => reloadForNewBuild() || window.location.reload()}
           className="mt-6 min-h-12 rounded-full bg-[var(--color-primary-strong)] px-6 text-[17px] font-semibold text-white"
         >
           Reload
