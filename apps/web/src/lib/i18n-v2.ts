@@ -2,7 +2,7 @@ import type { Lang } from "@/lib/i18n";
 
 /**
  * Strings for the 2.0 interface (iOS layout, sections and sub-tabs, US market).
- * Keep the three blocks in the same order; each ends with an `@end-<lang>` marker.
+ * English only (Platofy is US-only); the block ends with an `@end-en` marker.
  */
 export const v2Translations: Record<Lang, Record<string, string>> = {
   en: {
@@ -764,6 +764,29 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "platform.roadmap_short": "Roadmap {{done}}/{{total}}",
     "platform.roadmap": "Get started: {{done}} of {{total}}",
     "platform.roadmap_hidden": "The owner hid the roadmap.",
+    "sub.support_inbox": "Support",
+    "support.title": "Chat with Platofy",
+    "support.subtitle": "We usually reply within a few hours",
+    "support.empty_title": "Hi! How can we help?",
+    "support.empty_body": "Ask anything about Platofy. We will answer here and send you a notification.",
+    "support.placeholder": "Message",
+    "support.send": "Send",
+    "support.failed": "Couldn't send. Try again.",
+    "support.open": "Chat with us",
+    "support.open_unread": "Chat with us, {{count}} new",
+    "support.settings_row": "Chat with support",
+    "support.settings_row_hint": "Questions, ideas or problems: we reply here",
+    "support.inbox": "Support",
+    "support.inbox_subtitle": "Customer conversations. Replies reach them as a notification and, if they are away, an email.",
+    "support.filter": "Conversations",
+    "support.filter_open": "Open",
+    "support.filter_closed": "Closed",
+    "support.filter_all": "All",
+    "support.no_threads": "No conversations",
+    "support.pick": "Pick a conversation",
+    "support.close_thread": "Close",
+    "support.reopen_thread": "Reopen",
+    "support.reply_placeholder": "Reply",
     // @end-en
   },
 };

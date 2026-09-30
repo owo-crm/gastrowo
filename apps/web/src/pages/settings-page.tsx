@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { CalendarPlus, Compass, Copy, FileClock, ImagePlus, KeyRound, LogOut, Receipt, Store, Tablet, Trash2, Wallet } from "lucide-react";
+import { CalendarPlus, Compass, Copy, FileClock, ImagePlus, KeyRound, LogOut, MessageCircle, Receipt, Store, Tablet, Trash2, Wallet } from "lucide-react";
 
 import { DemoOffNote } from "@/components/demo-off";
 import { startProductTour } from "@/components/product-tour";
+import { openSupportChat } from "@/components/support-chat";
 import { DeviceSection } from "@/components/device-section";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -301,6 +302,15 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
                 chevron
                 onClick={() => startProductTour()}
               />
+              {!me?.is_sandbox && !me?.is_platform_admin ? (
+                <ListRow
+                  leading={<MessageCircle className="size-5 text-[var(--color-primary-strong)]" />}
+                  title={t("support.settings_row")}
+                  subtitle={t("support.settings_row_hint")}
+                  chevron
+                  onClick={() => openSupportChat()}
+                />
+              ) : null}
             </ListSection>
             <ListSection>
               <ListRow

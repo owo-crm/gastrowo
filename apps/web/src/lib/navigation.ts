@@ -100,7 +100,10 @@ export function getNavSections(me?: MeResponse | null): NavSection[] {
   settingsSubs.push(sub("/settings/calendar", "calendar_sync"));
   if (isAdmin) settingsSubs.push(sub("/settings/billing", "billing"));
   // Platofy-internal analytics.
-  if (me?.is_platform_admin) settingsSubs.push(sub("/platform", "platform"));
+  if (me?.is_platform_admin) {
+    settingsSubs.push(sub("/platform", "platform", { end: true }));
+    settingsSubs.push(sub("/platform/support", "support_inbox"));
+  }
   sections.push({ key: "settings", icon: Settings, subs: settingsSubs });
 
   return sections;

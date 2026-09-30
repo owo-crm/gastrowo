@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { canAccessNotes, canAccessReport, canManageTeam, canViewOverview, canViewPayroll, hasPlanFeature } from "@/lib/access";
 import { ProductTour } from "@/components/product-tour";
+import { SupportLauncher } from "@/components/support-chat";
 import { LandingPage } from "@/pages/landing-page";
 import { LoginPage } from "@/pages/login-page";
 import { PendingLinkPage } from "@/pages/pending-link-page";
@@ -20,6 +21,7 @@ const SettingsPage = lazy(() => import("@/pages/settings-page").then((module) =>
 const ReportPage = lazy(() => import("@/pages/report-page").then((module) => ({ default: module.ReportPage })));
 const SchedulePage = lazy(() => import("@/pages/schedule-page").then((module) => ({ default: module.SchedulePage })));
 const KioskPage = lazy(() => import("@/pages/kiosk-page").then((module) => ({ default: module.KioskPage })));
+const PlatformSupportPage = lazy(() => import("@/pages/platform-support-page").then((module) => ({ default: module.PlatformSupportPage })));
 const PlatformPage = lazy(() => import("@/pages/platform-page").then((module) => ({ default: module.PlatformPage })));
 const StartPage = lazy(() => import("@/pages/start-page").then((module) => ({ default: module.StartPage })));
 const TasksPage = lazy(() => import("@/pages/tasks-page").then((module) => ({ default: module.TasksPage })));
@@ -229,12 +231,14 @@ export function App() {
       <Route path="/notes" element={<ProtectedRoute><NotesAccessRoute><NotesDocumentsPage /></NotesAccessRoute></ProtectedRoute>} />
       <Route path="/inventory" element={<Navigate to={effectiveToken ? linkedDefaultRoute : "/"} replace />} />
       <Route path="/platform" element={<ProtectedRoute><PlatformPage /></ProtectedRoute>} />
+      <Route path="/platform/support" element={<ProtectedRoute><PlatformSupportPage /></ProtectedRoute>} />
 
       <Route path="/home" element={<Navigate to="/overview" replace />} />
       <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
       <Route path="*" element={<Navigate to={effectiveToken ? linkedDefaultRoute : "/"} replace />} />
     </Routes>
     {effectiveToken && effectiveMe ? <ProductTour /> : null}
+    {effectiveToken && effectiveMe ? <SupportLauncher /> : null}
     </Suspense>
   );
 }

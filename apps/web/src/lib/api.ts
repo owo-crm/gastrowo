@@ -49,7 +49,7 @@ import type {
   WorkerSetup,
   ShiftEndPayload,
   MemberRemovalImpact,
-  MemberRemovalResult, MemberPosition, Roadmap } from "@/lib/types";
+  MemberRemovalResult, MemberPosition, Roadmap, SupportConversation, SupportMessage, SupportThreadRow } from "@/lib/types";
 import { deviceTimezone } from "@/lib/date";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -679,6 +679,30 @@ export const api = {
   },
   kioskPunch(kioskToken: string, pin: string, action: "toggle" | "in" | "out" | "break" = "toggle") {
     return request<KioskPunchResult>("/kiosk/punch", { method: "POST", body: JSON.stringify({ pin, action }), headers: { "X-Kiosk-Token": kioskToken } });
+  },
+  supportConversation(token: string, markRead = false) {
+    return request<SupportConversation>(`/support${markRead ? "?read=true" : ""}`, {}, token);
+  },
+  supportUnread(token: string) {
+    return request<{ unread: number }>("/support/unread", {}, token);
+  },
+  writeToSupport(token: string, body: string) {
+    return request<SupportConversation>("/support/messages", { method: "POST", body: JSON.stringify({ body }) }, token);
+  },
+  supportThreads(token: string, status: "open" | "closed" | "all") {
+    return request<SupportThreadRow[]>(`/platform/support/threads?status=${status}`, {}, token);
+  },
+  supportInboxUnread(token: string) {
+    return request<{ threads: number }>("/platform/support/unread", {}, token);
+  },
+  supportThread(token: string, id: string) {
+    return request<SupportThreadRow & { messages: SupportMessage[] }>(`/platform/support/threads/${id}`, {}, token);
+  },
+  replyToSupport(token: string, id: string, body: string) {
+    return request<SupportThreadRow & { messages: SupportMessage[] }>(`/platform/support/threads/${id}/messages`, { method: "POST", body: JSON.stringify({ body }) }, token);
+  },
+  setSupportStatus(token: string, id: string, status: "open" | "closed") {
+    return request<SupportThreadRow & { messages: SupportMessage[] }>(`/platform/support/threads/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }, token);
   },
   platformStats(token: string) {
     return request<PlatformStats>("/platform/stats", {}, token);

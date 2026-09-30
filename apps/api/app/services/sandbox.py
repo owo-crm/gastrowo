@@ -19,6 +19,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import (
+    SupportMessage,
+    SupportThread,
     Assignment,
     AuthSession,
     AvailabilitySlot,
@@ -65,6 +67,8 @@ SANDBOX_BLOCKED: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
         ("POST", r"^/organizations/members/(link-by-email|import)$"),
         ("POST", r"^/organizations/current/demo-restaurant$"),
         ("POST", r"^/push/subscribe$"),
+        # A public demo is anonymous: no support chat (it would be an open channel to the team).
+        ("POST", r"^/support/messages$"),
     )
 )
 
@@ -145,6 +149,8 @@ def delete_sandbox(db: Session, organization_id: UUID) -> None:
         delete(AvailabilitySlot).where(AvailabilitySlot.week_id.in_(week_ids)),
         delete(AvailabilityWeek).where(AvailabilityWeek.organization_id == organization_id),
         delete(InAppNotification).where(InAppNotification.organization_id == organization_id),
+        delete(SupportMessage).where(SupportMessage.thread_id.in_(select(SupportThread.id).where(SupportThread.organization_id == organization_id))),
+        delete(SupportThread).where(SupportThread.organization_id == organization_id),
         delete(InviteToken).where(InviteToken.organization_id == organization_id),
         delete(MemberPosition).where(MemberPosition.organization_id == organization_id),
         delete(LocationMembership).where(LocationMembership.location_id.in_(location_ids)),
