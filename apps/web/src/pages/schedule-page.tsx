@@ -3018,7 +3018,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
           </span>
         ) : null}
         {openCount > 0 ? <Badge tone="red" className="max-md:hidden">{t("schedule.grid_open_count", { count: openCount })}</Badge> : null}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2" data-tour="schedule-actions">
           {scheduleStage === "applied" && !isPhone ? (
             <Segmented
               ariaLabel={t("schedule.view")}

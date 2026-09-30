@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { DevLoginButton } from "@/components/dev-login-button";
 
 type AuthMode = "onboarding" | "signin";
-type SourceOption = "Google" | "Instagram" | "TikTok" | "Recommendation" | "Friends" | "Other";
+type SourceOption = "Facebook" | "Instagram" | "Google" | "Recommendation" | "Friends" | "TikTok" | "Reddit" | "Other";
 type AuthFieldError = {
   email?: string;
   password?: string;
@@ -25,7 +25,14 @@ type AuthFieldError = {
   general?: string;
 };
 
-const sourceOptions: SourceOption[] = ["Google", "Instagram", "TikTok", "Recommendation", "Friends", "Other"];
+const sourceOptions: SourceOption[] = ["Facebook", "Instagram", "Google", "Recommendation", "Friends", "TikTok", "Reddit", "Other"];
+
+/** Owner sign-up: name, email code, password, business, then a short survey (one question per screen). */
+const TOTAL_STEPS = 8;
+type SignupStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+const BUSINESS_TYPES = ["restaurant", "cafe", "bar", "quick_service", "bakery", "food_truck", "hotel", "catering", "other"] as const;
+const TEAM_SIZES = ["1-10", "11-25", "26-50", "51-100", "100+"] as const;
+const PREVIOUS_TOOLS = ["paper", "spreadsheet", "group_chat", "7shifts", "when_i_work", "homebase", "other_app", "nothing"] as const;
 
 function StepPill({ current, total, label }: { current: number; total: number; label: string }) {
   return (
@@ -74,7 +81,10 @@ export function LoginPage() {
   const requestedMode: AuthMode = searchParams.get("mode") === "onboarding" ? "onboarding" : "signin";
 
   const [mode, setMode] = useState<AuthMode>(requestedMode);
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<SignupStep>(1);
+  const [businessType, setBusinessType] = useState("");
+  const [teamSize, setTeamSize] = useState("");
+  const [previousTool, setPreviousTool] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -258,6 +268,9 @@ export function LoginPage() {
         password,
         source,
         country,
+        business_type: businessType || undefined,
+        team_size: teamSize || undefined,
+        previous_tool: previousTool || undefined,
       });
       toast.success(t("login.business_created"));
     } catch (error) {
@@ -447,7 +460,7 @@ export function LoginPage() {
     if (step === 1) {
       return (
         <div className="space-y-5">
-          <StepPill current={1} total={4} label={t("login.step", { current: 1, total: 4 })} />
+          <StepPill current={1} total={TOTAL_STEPS} label={t("login.step", { current: 1, total: TOTAL_STEPS })} />
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.onboarding.step1.title")}</h2>
             <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("login.onboarding.step1.body")}</p>
@@ -473,7 +486,7 @@ export function LoginPage() {
       return (
         <div className="space-y-5">
           <div className="flex items-center justify-between gap-3">
-            <StepPill current={2} total={4} label={t("login.step", { current: 2, total: 4 })} />
+            <StepPill current={2} total={TOTAL_STEPS} label={t("login.step", { current: 2, total: TOTAL_STEPS })} />
             <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary-strong)]" onClick={() => setStep(1)}>
               <ArrowLeft className="size-4" /> {t("common.back")}
             </button>
@@ -532,7 +545,7 @@ export function LoginPage() {
       return (
         <div className="space-y-5">
           <div className="flex items-center justify-between gap-3">
-            <StepPill current={3} total={4} label={t("login.step", { current: 3, total: 4 })} />
+            <StepPill current={3} total={TOTAL_STEPS} label={t("login.step", { current: 3, total: TOTAL_STEPS })} />
             <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary-strong)]" onClick={() => setStep(2)}>
               <ArrowLeft className="size-4" /> {t("common.back")}
             </button>
@@ -556,10 +569,75 @@ export function LoginPage() {
       );
     }
 
+    const surveyHeader = (current: SignupStep) => (
+      <div className="flex items-center justify-between gap-3">
+        <StepPill current={current} total={TOTAL_STEPS} label={t("login.step", { current, total: TOTAL_STEPS })} />
+        <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary-strong)]" onClick={() => setStep((current - 1) as SignupStep)}>
+          <ArrowLeft className="size-4" /> {t("common.back")}
+        </button>
+      </div>
+    );
+    const choiceGrid = (options: readonly string[], value: string, pick: (next: string) => void, labelKey: string) => (
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => pick(item)}
+            className={cn(
+              "min-h-12 rounded-[12px] border px-3 py-3 text-left text-[15px] font-medium transition active:scale-[0.99]",
+              value === item ? "border-[var(--color-primary)] bg-[rgba(47,111,237,0.08)] text-[var(--color-primary-strong)]" : "border-[var(--color-border)] bg-white text-[var(--color-heading)]",
+            )}
+          >
+            {t(`${labelKey}.${item}`)}
+          </button>
+        ))}
+      </div>
+    );
+    // One question per screen; tapping an answer moves on. Only "how did you hear about us" is required.
+    const surveyStep = (current: 5 | 6 | 7, key: string, options: readonly string[], value: string, setValue: (next: string) => void) => (
+      <div className="space-y-5">
+        {surveyHeader(current)}
+        <div>
+          <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t(`signup.${key}.title`)}</h2>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("signup.why")}</p>
+        </div>
+        {choiceGrid(options, value, (next) => {
+          setValue(next);
+          window.setTimeout(() => setStep((current + 1) as SignupStep), 180);
+        }, `signup.${key}`)}
+        <div className="flex justify-end">
+          <button type="button" className="text-sm font-semibold text-[var(--color-text-muted)]" onClick={() => setStep((current + 1) as SignupStep)}>
+            {t("signup.skip")}
+          </button>
+        </div>
+      </div>
+    );
+
+    if (step === 5) return surveyStep(5, "business_type", BUSINESS_TYPES, businessType, setBusinessType);
+    if (step === 6) return surveyStep(6, "team_size", TEAM_SIZES, teamSize, setTeamSize);
+    if (step === 7) return surveyStep(7, "previous_tool", PREVIOUS_TOOLS, previousTool, setPreviousTool);
+    if (step === 8) {
+      return (
+        <div className="space-y-5">
+          {surveyHeader(8)}
+          <div>
+            <h2 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--color-heading)]">{t("login.heard_about")}</h2>
+            <p className="mt-2 text-sm text-[var(--color-text-muted)]">{t("signup.last_question")}</p>
+          </div>
+          {choiceGrid(sourceOptions, source, (next) => setSource(next as SourceOption), "source")}
+          <LegalAuthNotice />
+          <Button type="button" className="w-full" onClick={handleCompleteOwner} disabled={isSubmitting || !organizationName.trim() || !source}>
+            {t("login.create_business")}
+          </Button>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-3">
-          <StepPill current={4} total={4} label={t("login.step", { current: 4, total: 4 })} />
+          <StepPill current={4} total={TOTAL_STEPS} label={t("login.step", { current: 4, total: TOTAL_STEPS })} />
           <button type="button" className="inline-flex items-center gap-2 text-sm text-[var(--color-primary-strong)]" onClick={() => setStep(3)}>
             <ArrowLeft className="size-4" /> {t("common.back")}
           </button>
@@ -586,27 +664,8 @@ export function LoginPage() {
           />
           <p className="text-[13px] text-[var(--color-text-muted)]">{country === "PL" ? t("login.country_hint_pl") : t("login.country_hint_us")}</p>
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-[var(--color-heading)]">{t("login.heard_about")}</label>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {sourceOptions.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setSource(item)}
-                className={cn(
-                  "rounded-[12px] border px-3 py-3 text-left text-sm font-medium transition",
-                  source === item ? "border-[var(--color-primary)] bg-[rgba(47,111,237,0.08)] text-[var(--color-primary-strong)]" : "border-[var(--color-border)] bg-white text-[var(--color-heading)]",
-                )}
-              >
-                {t(`source.${item}`)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <LegalAuthNotice />
-        <Button type="button" className="w-full" onClick={handleCompleteOwner} disabled={isSubmitting || !organizationName.trim() || !source}>
-          {t("login.create_business")}
+        <Button type="button" className="w-full" onClick={() => setStep(5)} disabled={!organizationName.trim()}>
+          {t("common.continue")} <ArrowRight className="size-4" />
         </Button>
       </div>
     );

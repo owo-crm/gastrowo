@@ -215,6 +215,15 @@ function BusinessSheet({ id, onClose, onChanged, onDeleted }: { id: string | nul
             <ListRow title={t("platform.size")} trailing={t("platform.people_locations", { people: item.members, locations: item.locations })} />
           </ListSection>
 
+          {item.survey && Object.values(item.survey).some(Boolean) ? (
+            <ListSection header={t("platform.survey")}>
+              {item.survey.business_type ? <ListRow title={t("signup.business_type.title")} trailing={t(`signup.business_type.${item.survey.business_type}`)} /> : null}
+              {item.survey.team_size ? <ListRow title={t("signup.team_size.title")} trailing={t(`signup.team_size.${item.survey.team_size}`)} /> : null}
+              {item.survey.previous_tool ? <ListRow title={t("signup.previous_tool.title")} trailing={t(`signup.previous_tool.${item.survey.previous_tool}`)} /> : null}
+              {item.survey.source ? <ListRow title={t("login.heard_about")} trailing={t(`source.${item.survey.source}`)} /> : null}
+            </ListSection>
+          ) : null}
+
           <ListSection header={t("platform.extend")} footer={item.has_stripe ? t("platform.extend_footer_stripe") : t("platform.extend_footer")}>
             <li className="flex flex-wrap gap-2 px-4 py-3 sm:px-6">
               {[7, 14, 30, 90].map((days) => (

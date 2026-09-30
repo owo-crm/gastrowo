@@ -154,7 +154,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 px-4 sm:px-6 lg:grid-cols-4 [&>*]:ios-island">
+      <div className="mb-6 grid grid-cols-2 gap-3 px-4 sm:px-6 lg:grid-cols-4 [&>*]:ios-island" data-tour="kpis">
         <Stat label={t("overview.revenue")} value={money(revenue)} />
         <Stat label={t("overview.labor_cost")} value={money(labor)} note={t("overview.labor_note")} />
         <Stat

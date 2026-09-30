@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { CalendarPlus, Copy, FileClock, ImagePlus, KeyRound, LogOut, Receipt, Store, Tablet, Trash2, Wallet } from "lucide-react";
+import { CalendarPlus, Compass, Copy, FileClock, ImagePlus, KeyRound, LogOut, Receipt, Store, Tablet, Trash2, Wallet } from "lucide-react";
 
 import { DemoOffNote } from "@/components/demo-off";
+import { startProductTour } from "@/components/product-tour";
 import { DeviceSection } from "@/components/device-section";
 import { AppShell, LanguageList } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -294,6 +295,14 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
               </div>
             </Sheet>
             <DeviceSection />
+            <ListSection>
+              <ListRow
+                leading={<Compass className="size-5 text-[var(--color-primary-strong)]" />}
+                title={t("tour.replay")}
+                chevron
+                onClick={() => startProductTour()}
+              />
+            </ListSection>
             <ListSection header={t("shell.language")}>
               <li className="px-2 py-1 sm:px-4">
                 <LanguageList />
@@ -361,7 +370,7 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
                   />
                 </ListSection>
                 <ListSection header={t("clock.header")} footer={t("clock.mode_footer")}>
-                  <li className="px-4 py-3 sm:px-6">
+                  <li className="px-4 py-3 sm:px-6" data-tour="time-clock">
                     <Segmented
                       className="w-full"
                       ariaLabel={t("clock.header")}
