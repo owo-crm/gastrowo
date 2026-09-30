@@ -53,6 +53,7 @@ from app.schemas import (
 from app.services.auth_email import send_otp_email
 from app.services.labor_rules import locale_settings, timezone_or_default
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, grant_comp_pro
+from app.services import referrals as referrals_service
 from app.services import sandbox as sandbox_service
 from app.services.demo_access import dev_login_user, is_demo_account
 from app.services.demo_restaurant import display_name
@@ -361,6 +362,9 @@ def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, response:
         signup_team_size=(payload.team_size or "").strip() or None,
         signup_previous_tool=(payload.previous_tool or "").strip() or None,
     )
+    referrer = referrals_service.resolve(db, payload.referral_code)
+    if referrer is not None:
+        org.referred_by_id = referrer.id
     db.add_all([user, org])
     db.flush()
     membership = OrganizationMembership(
@@ -380,8 +384,9 @@ def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, response:
             plan=SubscriptionPlanEnum.PRO,
             status=SubscriptionStatusEnum.TRIALING,
             billing_cycle="monthly",
-            trial_ends_at=utc_now() + timedelta(days=30),
-            current_period_ends_at=utc_now() + timedelta(days=30),
+            # Invited through a referral link: an extra free month of Pro.
+            trial_ends_at=utc_now() + timedelta(days=30 + (referrals_service.BONUS_TRIAL_DAYS if referrer else 0)),
+            current_period_ends_at=utc_now() + timedelta(days=30 + (referrals_service.BONUS_TRIAL_DAYS if referrer else 0)),
         )
     )
     _create_remembered_session(db, response, user, [membership])

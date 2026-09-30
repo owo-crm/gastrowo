@@ -226,6 +226,8 @@ class OwnerOnboardingCompleteRequest(BaseModel):
     business_type: str | None = Field(default=None, max_length=40)
     team_size: str | None = Field(default=None, max_length=20)
     previous_tool: str | None = Field(default=None, max_length=40)
+    # From a referral link (?ref=CODE): the new business gets an extra free month.
+    referral_code: str | None = Field(default=None, max_length=16)
 
 
 class InviteAcceptRequest(BaseModel):

@@ -50,6 +50,7 @@ from app.services.roadmap import roadmap
 from app.services.demo_restaurant import seed_demo_restaurant
 from app.services.labor_rules import default_timezone_for, local_today, locale_settings, timezone_or_default
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, require_feature
+from app.services import referrals as referrals_service
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -302,6 +303,15 @@ def hide_roadmap(context: OrgContext = Depends(require_org_context(RoleEnum.ADMI
     organization.roadmap_hidden_at = datetime.now(UTC)
     db.commit()
     return ok({"hidden": True})
+
+
+@router.get("/current/referrals")
+def referral_summary(context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN)), db: Session = Depends(get_db)):
+    """The business's invite link and what it has earned."""
+    organization = get_current_organization(context, db)
+    data = referrals_service.summary(db, organization)
+    db.commit()
+    return ok(data)
 
 
 @router.post("/members/link-by-email")

@@ -269,6 +269,18 @@ def _ensure_runtime_schema_compat() -> None:
             if "roadmap_hidden_at" not in organization_columns:
                 ddl = "TIMESTAMP WITH TIME ZONE" if engine.dialect.name == "postgresql" else "DATETIME"
                 connection.execute(text(f"ALTER TABLE organizations ADD COLUMN roadmap_hidden_at {ddl}"))
+            # Referral program.
+            if "referral_code" not in organization_columns:
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN referral_code VARCHAR(16)"))
+                connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_organizations_referral_code ON organizations (referral_code)"))
+            if "referred_by_id" not in organization_columns:
+                uuid_type = "UUID" if engine.dialect.name == "postgresql" else "CHAR(32)"
+                connection.execute(text(f"ALTER TABLE organizations ADD COLUMN referred_by_id {uuid_type}"))
+            if "referral_rewarded_at" not in organization_columns:
+                ddl = "TIMESTAMP WITH TIME ZONE" if engine.dialect.name == "postgresql" else "DATETIME"
+                connection.execute(text(f"ALTER TABLE organizations ADD COLUMN referral_rewarded_at {ddl}"))
+            if "referral_free_months" not in organization_columns:
+                connection.execute(text("ALTER TABLE organizations ADD COLUMN referral_free_months INTEGER NOT NULL DEFAULT 0"))
             if "is_sandbox" not in organization_columns:
                 connection.execute(text("ALTER TABLE organizations ADD COLUMN is_sandbox BOOLEAN NOT NULL DEFAULT FALSE"))
             if "sandbox_expires_at" not in organization_columns:

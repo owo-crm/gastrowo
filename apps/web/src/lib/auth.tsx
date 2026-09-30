@@ -28,6 +28,7 @@ type AuthContextValue = {
     business_type?: string;
     team_size?: string;
     previous_tool?: string;
+    referral_code?: string;
   }) => Promise<void>;
   verifyInviteJoin: (payload: { email: string; code: string; invite_token: string; full_name?: string }) => Promise<void>;
   acceptInvite: (payload: { email: string; invite_token: string; full_name: string; password: string }) => Promise<void>;
@@ -212,6 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     business_type?: string;
     team_size?: string;
     previous_tool?: string;
+    referral_code?: string;
   }) => {
     const response = await api.completeOwnerOnboarding(payload);
     await applySession(response.access_token);
