@@ -17,6 +17,8 @@ export type OrganizationSettings = {
   labor_rules?: "US" | "PL";
   clock_mode?: ClockMode;
   schedule_respect_hour_limits?: boolean;
+  /** The owner hid the "Get started" roadmap for good. */
+  roadmap_hidden?: boolean;
 };
 
 export type MembershipPermissionOverrides = {
@@ -695,3 +697,6 @@ export type PlatformAction =
   | { action: "discount"; percent: number; months: number }
   | { action: "remove_discount" }
   | { action: "note"; note: string };
+
+export type RoadmapStep = { key: string; to: string; done: boolean };
+export type Roadmap = { hidden: boolean; done_count: number; total: number; steps: RoadmapStep[] };

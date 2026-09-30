@@ -51,7 +51,7 @@ import type {
   WorkerSetup,
   ShiftEndPayload,
   MemberRemovalImpact,
-  MemberRemovalResult, MemberPosition } from "@/lib/types";
+  MemberRemovalResult, MemberPosition, Roadmap } from "@/lib/types";
 import { deviceTimezone } from "@/lib/date";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -121,6 +121,12 @@ export const api = {
   },
   devLogin(secret?: string | null, asRole: "admin" | "staff" = "admin") {
     return request<AuthLoginResponse>("/auth/dev-login", { method: "POST", body: JSON.stringify({ secret: secret ?? null, as_role: asRole }) });
+  },
+  getRoadmap(token: string) {
+    return request<Roadmap>("/organizations/current/roadmap", {}, token);
+  },
+  hideRoadmap(token: string) {
+    return request<{ hidden: boolean }>("/organizations/current/roadmap/hide", { method: "POST" }, token);
   },
   publicDemo(country: "US" | "PL") {
     return request<AuthLoginResponse>("/auth/demo", { method: "POST", body: JSON.stringify({ country }) });

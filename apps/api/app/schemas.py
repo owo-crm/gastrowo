@@ -80,6 +80,7 @@ class OrganizationSettingsOut(APIModel):
     labor_rules: str = "US"
     clock_mode: str = "both"
     schedule_respect_hour_limits: bool = True
+    roadmap_hidden: bool = False
 
 
 class MeOut(APIModel):

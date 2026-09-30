@@ -46,6 +46,7 @@ from app.services.auth_email import send_invite_email
 from app.services.positions import ensure_catalog
 from app.services.demo_access import is_demo_account
 from app.services.demo_restaurant import display_name
+from app.services.roadmap import roadmap
 from app.services.demo_restaurant import seed_demo_restaurant
 from app.services.labor_rules import default_timezone_for, local_today, locale_settings, timezone_or_default
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, require_feature
@@ -286,6 +287,21 @@ def patch_scheduling_settings(
     organization.schedule_respect_hour_limits = payload.respect_hour_limits
     db.commit()
     return ok({"respect_hour_limits": organization.schedule_respect_hour_limits})
+
+
+@router.get("/current/roadmap")
+def get_roadmap(context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN)), db: Session = Depends(get_db)):
+    """The owner's "Get started" steps, each marked done from what already exists in the business."""
+    return ok(roadmap(db, get_current_organization(context, db), context.user))
+
+
+@router.post("/current/roadmap/hide")
+def hide_roadmap(context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN)), db: Session = Depends(get_db)):
+    """Hide the "Get started" tab for good (for every owner of this business)."""
+    organization = get_current_organization(context, db)
+    organization.roadmap_hidden_at = datetime.now(UTC)
+    db.commit()
+    return ok({"hidden": True})
 
 
 @router.post("/members/link-by-email")

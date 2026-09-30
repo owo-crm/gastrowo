@@ -263,6 +263,9 @@ def _ensure_runtime_schema_compat() -> None:
             for name, size in (("signup_business_type", 40), ("signup_team_size", 20), ("signup_previous_tool", 40)):
                 if name not in organization_columns:
                     connection.execute(text(f"ALTER TABLE organizations ADD COLUMN {name} VARCHAR({size})"))
+            if "roadmap_hidden_at" not in organization_columns:
+                ddl = "TIMESTAMP WITH TIME ZONE" if engine.dialect.name == "postgresql" else "DATETIME"
+                connection.execute(text(f"ALTER TABLE organizations ADD COLUMN roadmap_hidden_at {ddl}"))
             if "is_sandbox" not in organization_columns:
                 connection.execute(text("ALTER TABLE organizations ADD COLUMN is_sandbox BOOLEAN NOT NULL DEFAULT FALSE"))
             if "sandbox_expires_at" not in organization_columns:

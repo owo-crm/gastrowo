@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 /** Settings-style colored tile per section. */
 const SECTION_COLORS: Record<NavSection["key"], string> = {
+  start: "#af52de",
   home: "#007aff",
   schedule: "#ff3b30",
   team: "#007aff",
