@@ -93,6 +93,19 @@ def invite_email_html(*, business_name: str, join_link: str) -> str:
     """.strip()
 
 
+def _sender() -> str:
+    address = settings.resend_from_email
+    return address if "<" in address or not settings.resend_from_name else f"{settings.resend_from_name} <{address}>"
+
+
+def _message(*, to: str, subject: str, html: str, text: str) -> dict:
+    """Both HTML and plain text: HTML-only mail is a common spam signal."""
+    message = {"from": _sender(), "to": to, "subject": subject, "html": html, "text": text}
+    if settings.resend_reply_to:
+        message["reply_to"] = settings.resend_reply_to
+    return message
+
+
 def _require_email_provider_in_production(kind: str) -> None:
     # Without a provider the code/link is only written to logs, which must never happen in production.
     if settings.app_env == "production" and not settings.resend_api_key:
@@ -115,12 +128,13 @@ def send_otp_email(*, email: str, code: str, title: str, subtitle: str, expires_
                     "Authorization": f"Bearer {settings.resend_api_key}",
                     "Content-Type": "application/json",
                 },
-                json={
-                    "from": settings.resend_from_email,
-                    "to": email,
-                    "subject": title,
-                    "html": html,
-                },
+                json=_message(
+                    to=email,
+                    # The code in the subject: people find it without opening the mail, and it reads as expected mail.
+                    subject=f"{code} is your Platofy code",
+                    html=html,
+                    text=f"{title}\n\n{subtitle}\n\nYour code: {code}\nIt expires in {expires_in_minutes} minutes.\n\nIf you didn't ask for it, ignore this email.\n\nPlatofy",
+                ),
                 timeout=10,
             )
             response.raise_for_status()
@@ -148,12 +162,12 @@ def send_invite_email(*, email: str, business_name: str, join_link: str) -> None
                     "Authorization": f"Bearer {settings.resend_api_key}",
                     "Content-Type": "application/json",
                 },
-                json={
-                    "from": settings.resend_from_email,
-                    "to": email,
-                    "subject": f"You were invited to join {business_name}",
-                    "html": html,
-                },
+                json=_message(
+                    to=email,
+                    subject=f"You were invited to join {business_name}",
+                    html=html,
+                    text=f"You were invited to join {business_name} on Platofy.\n\nOpen this link to join:\n{join_link}\n\nPlatofy",
+                ),
                 timeout=10,
             )
             response.raise_for_status()
