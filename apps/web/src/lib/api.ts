@@ -1,5 +1,6 @@
 import type {
   PlatformAction,
+  Role,
   PlatformBusiness,
   PlatformLogItem,
   PlatformStats,
@@ -109,6 +110,18 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
 
   return payload!.data;
 }
+
+/** One shift template as the API takes it. */
+export type TemplateInput = {
+  location_id: string;
+  day_of_week: number;
+  template_name: string;
+  start_time: string;
+  end_time: string;
+  required_role: Role;
+  staff_position: string | null;
+  required_count: number;
+};
 
 export const api = {
   login(input: { email: string; password: string }) {
@@ -368,6 +381,9 @@ export const api = {
     },
   ) {
     return request<ShiftTemplate>("/schedule/templates", { method: "POST", body: JSON.stringify(body) }, token);
+  },
+  bulkTemplates(token: string, body: { create?: TemplateInput[]; update?: Array<TemplateInput & { id: string; is_active: boolean }>; delete?: string[] }) {
+    return request<{ created: number; updated: number; deleted: number }>("/schedule/templates/bulk", { method: "POST", body: JSON.stringify(body) }, token);
   },
   listTemplates(token: string, locationId?: string) {
     const suffix = locationId ? `?location_id=${locationId}` : "";

@@ -561,6 +561,18 @@ class ShiftTemplatePatch(BaseModel):
         return self
 
 
+class ShiftTemplateUpdateItem(ShiftTemplatePatch):
+    id: UUID
+
+
+class ShiftTemplateBulkRequest(BaseModel):
+    """Several template changes at once, all or nothing (edit a Mon–Fri shift, copy a day, bulk edit)."""
+
+    create: list[ShiftTemplateCreate] = Field(default_factory=list, max_length=500)
+    update: list[ShiftTemplateUpdateItem] = Field(default_factory=list, max_length=500)
+    delete: list[UUID] = Field(default_factory=list, max_length=500)
+
+
 class PositionCatalogCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
 
