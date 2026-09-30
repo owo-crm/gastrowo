@@ -597,3 +597,33 @@ class AppSecret(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[str] = mapped_column(Text)
+
+
+class SupportThread(Base):
+    """One support conversation per person per business, between them and the Platofy team."""
+
+    __tablename__ = "support_threads"
+    __table_args__ = (UniqueConstraint("organization_id", "user_id", name="uq_support_thread_org_user"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="open")
+    last_message_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+    customer_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    staff_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Emails are a fallback for people who aren't looking: at most one per side per quiet spell.
+    customer_emailed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    staff_emailed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class SupportMessage(Base):
+    __tablename__ = "support_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    thread_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("support_threads.id", ondelete="CASCADE"), index=True)
+    author_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    from_staff: Mapped[bool] = mapped_column(Boolean, default=False)
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)

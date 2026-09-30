@@ -689,3 +689,30 @@ export type PlatformAction =
 
 export type RoadmapStep = { key: string; to: string; done: boolean };
 export type Roadmap = { hidden: boolean; done_count: number; total: number; steps: RoadmapStep[] };
+
+export type SupportMessage = {
+  id: string;
+  body: string;
+  from_staff: boolean;
+  author_name: string | null;
+  created_at: string;
+};
+
+export type SupportConversation = {
+  thread: { id: string; status: "open" | "closed" } | null;
+  messages: SupportMessage[];
+  unread: number;
+};
+
+export type SupportThreadRow = {
+  id: string;
+  status: "open" | "closed";
+  organization_id: string;
+  organization_name: string;
+  user_name: string;
+  user_email: string | null;
+  last_message_at: string;
+  last_message: string;
+  last_from_staff: boolean;
+  unread: number;
+};

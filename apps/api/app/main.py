@@ -35,6 +35,7 @@ from app.routers import (
     reports,
     schedule,
     shifts,
+    support,
     tasks,
     timesheets,
     users,
@@ -197,6 +198,7 @@ app.include_router(positions.router)
 app.include_router(availability.router)
 app.include_router(schedule.router)
 app.include_router(shifts.router)
+app.include_router(support.router)
 app.include_router(calendar.router)
 app.include_router(timesheets.router)
 app.include_router(tasks.router)

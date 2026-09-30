@@ -178,3 +178,32 @@ def send_invite_email(*, email: str, business_name: str, join_link: str) -> None
             raise HTTPException(status_code=502, detail="Failed to send invite email") from exc
     else:
         logger.info("DEV INVITE EMAIL -> %s | join_link=%s | html=%s", email, join_link, html)
+
+
+def send_notice_email(*, email: str, subject: str, text: str, html: str) -> None:
+    """A best-effort notice (support replies and the like): logged, never raised."""
+    if not settings.resend_api_key:
+        logger.info("DEV NOTICE EMAIL -> %s | %s | %s", email, subject, text)
+        return
+    try:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {settings.resend_api_key}", "Content-Type": "application/json"},
+            json=_message(to=email, subject=subject, html=html, text=text),
+            timeout=10,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        provider_body = exc.response.text if isinstance(exc, requests.HTTPError) and exc.response is not None else None
+        logger.error("Failed to send notice email to %s: %s | provider=%s", email, exc, provider_body)
+
+
+def support_email_html(*, heading: str, preview: str, link: str, button: str) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en"><body style="margin:0;padding:32px 0;background:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#000">
+<div style="max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:32px">
+<p style="margin:0 0 16px;font-size:13px;font-weight:700;letter-spacing:1px;color:#007aff;text-transform:uppercase">Platofy</p>
+<h1 style="margin:0 0 12px;font-size:21px">{escape(heading)}</h1>
+<p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#3c3c43;white-space:pre-line">{escape(preview)}</p>
+<a href="{escape(link)}" style="display:inline-block;background:#007aff;color:#fff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:12px">{escape(button)}</a>
+</div></body></html>"""
