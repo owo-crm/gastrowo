@@ -12,85 +12,95 @@ from app.core.config import settings
 logger = logging.getLogger("gastrowo.auth_email")
 
 
-def otp_email_html(*, title: str, subtitle: str, code: str, expires_in_minutes: int = 5) -> str:
+# Brand colours from the app (styles.css): primary-strong, grouped background, labels.
+_BLUE = "#1f5bd6"
+_BG = "#f2f2f7"
+_TEXT = "#000000"
+_MUTED = "#3c3c43"
+_TERTIARY = "#6c6c70"
+_FILL = "#eef3fd"
+_FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+
+
+def _email_layout(*, preheader: str, body: str, footer: str) -> str:
+    """One card on a light gray page, like the app. Tables and inline styles only: that is what mail clients keep."""
+    icon = f"{settings.frontend_url.rstrip('/')}/brand/platofy/platofy-icon-192.png"
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verification Code</title>
-    <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; color: #1f2937; margin: 0; padding: 0; width: 100% !important; }}
-        .email-wrapper {{ width: 100%; background-color: #f9fafb; padding: 40px 0; }}
-        .email-content {{ max-width: 480px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 12px; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }}
-        
-        .logo-container {{ text-align: center; margin-bottom: 24px; }}
-        .brand-logo {{ display: inline-block; background-color: rgb(4, 120, 87); color: #ffffff; font-size: 14px; font-weight: bold; letter-spacing: 1.5px; padding: 8px 18px; border-radius: 6px; text-transform: uppercase; }}
-        
-        h1 {{ color: #111827; font-size: 24px; font-weight: 700; margin-top: 0; margin-bottom: 16px; text-align: center; }}
-        p {{ font-size: 15px; line-height: 1.6; color: #4b5563; margin-top: 0; margin-bottom: 20px; }}
-        
-        .code-container {{ background-color: rgba(4, 120, 87, 0.06); border: 1px solid rgba(4, 120, 87, 0.15); border-radius: 8px; padding: 18px; text-align: center; margin: 24px 0; letter-spacing: 4px; }}
-        .verification-code {{ font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; color: rgb(4, 120, 87); }}
-        
-        .expire-text {{ font-size: 13px; color: #9ca3af; text-align: center; margin-top: -10px; margin-bottom: 24px; }}
-        .noreply-warning {{ background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 12px; font-size: 13px; color: #991b1b; border-radius: 0 4px 4px 0; margin-bottom: 20px; }}
-        .footer {{ font-size: 12px; color: #9ca3af; text-align: center; margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 20px; line-height: 1.5; }}
-        .footer a {{ color: rgb(4, 120, 87); text-decoration: none; }}
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>Platofy</title>
 </head>
-<body>
-    <div class="email-wrapper">
-        <div class="email-content">
-            <div class="logo-container">
-                <div class="brand-logo">Platofy</div>
-            </div>
-            
-            <h1>Confirm your email</h1>
-            
-            <p>To complete your registration, please use the following one-time verification code (OTP):</p>
-            
-            <div class="code-container">
-                <span class="verification-code">{code}</span>
-            </div>
-            
-            <p class="expire-text">This code is valid for {expires_in_minutes} minutes.</p>
-            
-            <div class="noreply-warning">
-                <strong>Please note:</strong> This is an automated message from an unmonitored address. Do not reply to this email.
-            </div>
-
-            <p>If you did not request this code, you can safely ignore this email. Someone may have entered your email address by mistake.</p>
-            
-            <div class="footer">
-                <p>Sent by <strong>Platofy</strong><br>
-                Stryjska 13, Gdynia</p>
-                <p>© 2026 Platofy. All rights reserved.</p>
-            </div>
-        </div>
-    </div>
+<body style="margin:0;padding:0;background:{_BG};-webkit-text-size-adjust:100%;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:{_BG};">{escape(preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{_BG};">
+  <tr>
+    <td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:460px;">
+        <tr>
+          <td style="padding:0 4px 20px;font-family:{_FONT};">
+            <img src="{icon}" width="36" height="36" alt="" style="display:inline-block;vertical-align:middle;border:0;border-radius:9px;">
+            <span style="display:inline-block;vertical-align:middle;margin-left:10px;font-size:22px;font-weight:700;letter-spacing:-0.4px;color:{_TEXT};">platofy</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;border-radius:20px;padding:32px 28px;font-family:{_FONT};color:{_TEXT};">
+{body}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 8px 0;font-family:{_FONT};font-size:12px;line-height:18px;color:{_TERTIARY};text-align:center;">
+            {footer}<br>
+            Platofy · Scheduling, time clock and payroll for restaurants
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
 </body>
 </html>"""
 
 
+def _button(link: str, label: str) -> str:
+    return (
+        f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 4px;"><tr>'
+        f'<td style="background:{_BLUE};border-radius:12px;">'
+        f'<a href="{escape(link)}" style="display:inline-block;padding:14px 24px;font-family:{_FONT};font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;">{escape(label)}</a>'
+        f"</td></tr></table>"
+    )
+
+
+def otp_email_html(*, title: str, subtitle: str, code: str, expires_in_minutes: int = 5) -> str:
+    body = f"""            <h1 style="margin:0 0 8px;font-size:24px;line-height:30px;font-weight:700;letter-spacing:-0.3px;">{escape(title)}</h1>
+            <p style="margin:0 0 24px;font-size:16px;line-height:23px;color:{_MUTED};">{escape(subtitle)}</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" style="background:{_FILL};border-radius:16px;padding:22px 12px;">
+                  <span style="font-family:'SF Mono',Menlo,Consolas,'Courier New',monospace;font-size:36px;line-height:42px;font-weight:700;letter-spacing:10px;white-space:nowrap;color:{_BLUE};">{escape(code)}</span>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:16px 0 0;font-size:14px;line-height:20px;color:{_TERTIARY};text-align:center;">The code works for {expires_in_minutes} minutes. Never share it with anyone.</p>"""
+    return _email_layout(
+        preheader=f"Your Platofy code is {code}",
+        body=body,
+        footer="Didn't ask for this code? Ignore this email: nobody can sign in without it.",
+    )
+
+
 def invite_email_html(*, business_name: str, join_link: str) -> str:
-    return f"""
-    <html>
-      <body style="margin:0;padding:32px;background:#f5f7fb;font-family:Inter,Arial,sans-serif;color:#132238;">
-        <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5ebf4;border-radius:24px;overflow:hidden;box-shadow:0 16px 48px rgba(15,23,42,0.06);">
-          <div style="padding:32px;background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);">
-            <div style="display:inline-block;padding:8px 14px;border-radius:999px;background:#eef5ff;color:#2f6fed;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">Platofy</div>
-            <h1 style="margin:20px 0 8px;font-size:28px;line-height:1.1;">You were invited to join {business_name}</h1>
-            <p style="margin:0;font-size:15px;line-height:1.7;color:#5d6b80;">Open the link below, request your code, and finish joining the workspace.</p>
-          </div>
-          <div style="padding:0 32px 32px;">
-            <a href="{join_link}" style="display:inline-block;margin-top:8px;padding:14px 22px;border-radius:14px;background:#2f6fed;color:#ffffff;text-decoration:none;font-weight:700;">Open join flow</a>
-            <p style="margin:18px 0 0;font-size:13px;line-height:1.7;color:#6d7890;">This invite link stays active for 48 hours and works once.</p>
-          </div>
-        </div>
-      </body>
-    </html>
-    """.strip()
+    """`business_name` and `join_link` arrive already escaped."""
+    body = f"""            <h1 style="margin:0 0 8px;font-size:24px;line-height:30px;font-weight:700;letter-spacing:-0.3px;">Join {business_name} on Platofy</h1>
+            <p style="margin:0 0 20px;font-size:16px;line-height:23px;color:{_MUTED};">Your team uses Platofy for schedules, shift swaps and the time clock. Open the invite, confirm your email and you're in.</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 4px;"><tr>
+              <td style="background:{_BLUE};border-radius:12px;"><a href="{join_link}" style="display:inline-block;padding:14px 24px;font-family:{_FONT};font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;">Accept the invite</a></td>
+            </tr></table>
+            <p style="margin:16px 0 0;font-size:14px;line-height:20px;color:{_TERTIARY};">The link works once and stays active for 48 hours.</p>"""
+    return _email_layout(preheader=f"You're invited to join {business_name}", body=body, footer="Not expecting this invite? You can ignore this email.")
 
 
 def _sender() -> str:
@@ -199,11 +209,7 @@ def send_notice_email(*, email: str, subject: str, text: str, html: str) -> None
 
 
 def support_email_html(*, heading: str, preview: str, link: str, button: str) -> str:
-    return f"""<!DOCTYPE html>
-<html lang="en"><body style="margin:0;padding:32px 0;background:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#000">
-<div style="max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:32px">
-<p style="margin:0 0 16px;font-size:13px;font-weight:700;letter-spacing:1px;color:#007aff;text-transform:uppercase">Platofy</p>
-<h1 style="margin:0 0 12px;font-size:21px">{escape(heading)}</h1>
-<p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#3c3c43;white-space:pre-line">{escape(preview)}</p>
-<a href="{escape(link)}" style="display:inline-block;background:#007aff;color:#fff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:12px">{escape(button)}</a>
-</div></body></html>"""
+    body = f"""            <h1 style="margin:0 0 12px;font-size:21px;line-height:27px;font-weight:700;letter-spacing:-0.2px;">{escape(heading)}</h1>
+            <div style="margin:0 0 22px;padding:14px 16px;background:{_BG};border-radius:16px;font-size:15px;line-height:21px;color:{_TEXT};white-space:pre-line;">{escape(preview)}</div>
+            {_button(link, button)}"""
+    return _email_layout(preheader=preview[:120], body=body, footer="You get this email because of a support conversation in Platofy.")

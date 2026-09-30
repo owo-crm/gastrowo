@@ -79,8 +79,12 @@ def _datetime_from_unix(value: Any) -> datetime | None:
 def _status_from_stripe(raw_status: str | None) -> SubscriptionStatusEnum:
     if raw_status == "trialing":
         return SubscriptionStatusEnum.TRIALING
-    if raw_status in {"past_due", "unpaid", "incomplete"}:
+    # past_due: Stripe is still retrying the card, the plan stays on meanwhile.
+    if raw_status == "past_due":
         return SubscriptionStatusEnum.PAST_DUE
+    # unpaid: retries ran out; incomplete: the first payment never went through. Neither keeps the plan.
+    if raw_status in {"unpaid", "incomplete"}:
+        return SubscriptionStatusEnum.EXPIRED
     if raw_status in {"canceled", "cancelled"}:
         return SubscriptionStatusEnum.CANCELED
     if raw_status == "incomplete_expired":
