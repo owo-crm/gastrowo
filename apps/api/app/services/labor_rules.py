@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import UTC, date, datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Organization
+from app.models import Location, Organization
 
 # FLSA: hours over 40 in a workweek are paid at 1.5x.
 US_WEEKLY_OVERTIME_HOURS = 40.0
@@ -38,6 +41,26 @@ def weekly_overtime_issue(country: str, hours_after_shift: float) -> list[str]:
 
 def default_timezone_for(country: str) -> str:
     return DEFAULT_TIMEZONE_BY_COUNTRY.get(country.upper(), "America/New_York")
+
+
+def timezone_or_default(zone: str | None, country: str) -> str:
+    """The zone the owner's device reported, when it is a real IANA zone; otherwise the country's default."""
+    if zone and len(zone) <= 64:
+        try:
+            ZoneInfo(zone)
+            return zone
+        except (ZoneInfoNotFoundError, ValueError):
+            pass
+    return default_timezone_for(country)
+
+
+def local_today(db: Session, organization_id: UUID) -> date:
+    """Today in the business's own time zone (its first location), not the server's UTC day."""
+    zone = db.scalar(select(Location.timezone).where(Location.organization_id == organization_id).order_by(Location.name))
+    try:
+        return datetime.now(ZoneInfo(zone)).date() if zone else datetime.now(UTC).date()
+    except (ZoneInfoNotFoundError, ValueError):
+        return datetime.now(UTC).date()
 
 
 def locale_settings(organization) -> dict[str, str]:

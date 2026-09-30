@@ -1,3 +1,12 @@
+/** The IANA time zone this device is set to (e.g. "America/Chicago"), or null if the browser won't say. */
+export function deviceTimezone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
 export function toLocalIso(date: Date) {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");

@@ -52,6 +52,7 @@ import type {
   ShiftEndPayload,
   MemberRemovalImpact,
   MemberRemovalResult, MemberPosition } from "@/lib/types";
+import { deviceTimezone } from "@/lib/date";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -143,9 +144,10 @@ export const api = {
     });
   },
   completeOwnerOnboarding(input: { verification_token: string; full_name: string; organization_name: string; password: string; source: string; country?: "US" | "PL" }) {
+    // The first location starts in the owner's own time zone instead of the country's default.
     return request<AuthLoginResponse>("/auth/onboarding/owner/complete", {
       method: "POST",
-      body: JSON.stringify(input),
+      body: JSON.stringify({ ...input, timezone: deviceTimezone() }),
     });
   },
   acceptInvite(input: { email: string; invite_token: string; full_name: string; password: string }) {

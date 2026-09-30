@@ -15,4 +15,6 @@ stripe==15.2.0
 requests==2.32.3
 pywebpush==2.5.0
 cryptography>=42
+# Time zone database for zoneinfo; slim images may not ship /usr/share/zoneinfo.
+tzdata>=2024.1
 sentry-sdk[fastapi]==2.71.0

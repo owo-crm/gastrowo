@@ -612,6 +612,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "demo.off_billing": "There's nothing to pay for in the demo. Your own account starts with 30 days of Pro, no card needed.",
     "demo.off_invites": "Invites send real emails, so they're off here. In your own account you add people by email or import a list.",
     "demo.banner_short": "Made-up data · deleted in 24 h",
+    "team.zone_hint": "Your locations use {{current}} time, but this device is on {{device}} time. Shift times and clock-ins follow the location time zone.",
+    "team.zone_hint_switch": "Switch to {{device}}",
+    "team.zone_hint_keep": "Keep as is",
     // @end-en
   },
   pl: {
@@ -1221,6 +1224,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "demo.off_billing": "W demo nie ma za co płacić. Własne konto zaczyna się od 30 dni Pro, bez karty.",
     "demo.off_invites": "Zaproszenia wysyłają prawdziwe e-maile, więc tu są wyłączone. Na własnym koncie dodajesz ludzi przez e-mail lub import listy.",
     "demo.banner_short": "Wymyślone dane · znikną za 24 h",
+    "team.zone_hint": "Twoje lokale mają czas {{current}}, a to urządzenie — {{device}}. Godziny zmian i wejścia liczą się według strefy lokalu.",
+    "team.zone_hint_switch": "Przełącz na {{device}}",
+    "team.zone_hint_keep": "Zostaw",
     // @end-pl
   },
   ru: {
@@ -1830,6 +1836,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "demo.off_billing": "В демо платить не за что. Свой аккаунт начинается с 30 дней Pro без карты.",
     "demo.off_invites": "Приглашения отправляют настоящие письма, поэтому здесь выключены. В своём аккаунте вы добавляете людей по email или импортом списка.",
     "demo.banner_short": "Данные вымышленные · удалятся через 24 ч",
+    "team.zone_hint": "Ваши точки работают по времени {{current}}, а это устройство — по {{device}}. Время смен и отметок считается по поясу точки.",
+    "team.zone_hint_switch": "Переключить на {{device}}",
+    "team.zone_hint_keep": "Оставить",
     // @end-ru
   },
 };
