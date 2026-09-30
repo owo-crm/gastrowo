@@ -49,6 +49,7 @@ from app.schemas import (
     ShiftRequestOut,
     ShiftRequestPatch,
     ShiftTemplatePatch,
+    ShiftTemplateBulkRequest,
     ShiftTemplateCreate,
     ShiftTemplateOut,
     StaffCalendarDayOut,
@@ -611,6 +612,66 @@ def delete_template(
     db.delete(template)
     db.commit()
     return ok({"deleted": True, "id": str(template_id)})
+
+
+@router.post("/templates/bulk")
+def bulk_templates(
+    payload: ShiftTemplateBulkRequest,
+    context: OrgContext = Depends(require_org_context(RoleEnum.ADMIN, RoleEnum.MANAGER)),
+    db: Session = Depends(get_db),
+):
+    organization_id = context.membership.organization_id
+    checked: set[UUID] = set()
+
+    def check_location(location_id: UUID) -> None:
+        if location_id in checked:
+            return
+        location = db.scalar(select(Location).where(Location.id == location_id, Location.organization_id == organization_id))
+        if location is None:
+            raise HTTPException(status_code=404, detail="Location not found")
+        if context.membership.role == RoleEnum.MANAGER and db.scalar(
+            select(LocationMembership).where(LocationMembership.location_id == location_id, LocationMembership.user_id == context.user.id)
+        ) is None:
+            raise HTTPException(status_code=403, detail="Manager must belong to target location")
+        checked.add(location_id)
+
+    def owned(template_id: UUID) -> ShiftTemplate:
+        template = db.get(ShiftTemplate, template_id)
+        if template is None or template.organization_id != organization_id:
+            raise HTTPException(status_code=404, detail="Template not found")
+        check_location(template.location_id)
+        return template
+
+    for template_id in payload.delete:
+        db.delete(owned(template_id))
+    for item in payload.update:
+        template = owned(item.id)
+        template.day_of_week = item.day_of_week
+        template.template_name = item.template_name.strip()
+        template.start_time = item.start_time
+        template.end_time = item.end_time
+        template.required_role = item.required_role
+        template.staff_position = item.staff_position.strip() if item.staff_position else None
+        template.required_count = item.required_count
+        template.is_active = item.is_active
+    created: list[ShiftTemplate] = []
+    for item in payload.create:
+        check_location(item.location_id)
+        template = ShiftTemplate(
+            organization_id=organization_id,
+            location_id=item.location_id,
+            day_of_week=item.day_of_week,
+            template_name=item.template_name.strip(),
+            start_time=item.start_time,
+            end_time=item.end_time,
+            required_role=item.required_role,
+            staff_position=item.staff_position.strip() if item.staff_position else None,
+            required_count=item.required_count,
+        )
+        db.add(template)
+        created.append(template)
+    db.commit()
+    return ok({"created": len(created), "updated": len(payload.update), "deleted": len(payload.delete)})
 
 
 @router.post("/templates/suggest")
