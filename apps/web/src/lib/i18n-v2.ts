@@ -643,6 +643,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "history.saved": "Hours updated",
     "history.save_failed": "Couldn't update the hours",
     "home.current_shift": "Your shift now",
+    "schedule.open_short": "Open",
     // @end-en
   },
   pl: {
@@ -1283,6 +1284,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "history.saved": "Godziny zaktualizowane",
     "history.save_failed": "Nie udało się zaktualizować godzin",
     "home.current_shift": "Twoja zmiana teraz",
+    "schedule.open_short": "Wolna",
     // @end-pl
   },
   ru: {
@@ -1923,6 +1925,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "history.saved": "Часы обновлены",
     "history.save_failed": "Не удалось обновить часы",
     "home.current_shift": "Ваша смена сейчас",
+    "schedule.open_short": "Свободна",
     // @end-ru
   },
 };

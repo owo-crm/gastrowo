@@ -38,6 +38,8 @@ import { StaffWeek } from "@/components/schedule/staff-week";
 import { ClockCard } from "@/components/clock/clock-card";
 import { DayList, DayStrip, WeekGrid, type GridDay, type GridPerson, type GridShift } from "@/components/schedule/week-grid";
 import { currencyOf, formatDate, formatMoney } from "@/lib/format";
+import { positionColor, tint } from "@/lib/position-colors";
+import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OverlayPortal } from "@/components/ui/overlay-portal";
@@ -822,7 +824,9 @@ type AppliedTimetableBoardProps = {
   timeSlots: number[];
   startMinutes: number;
   todayIso: string;
-  compact?: boolean;
+  /** Catalog order of positions, so blocks get the same colors as in the grid. */
+  positionOrder: string[];
+  lang: Lang;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
@@ -1076,6 +1080,26 @@ function AppliedCardsBoard({
   );
 }
 
+/** Pixels per hour on the timeline. */
+const TIMELINE_HOUR = 56;
+
+const minutesOfDay = (date: Date) => date.getHours() * 60 + date.getMinutes();
+
+/** "17:00" for a board minute, wrapping past midnight (24:00 → 00:00). */
+function boardHourLabel(minutes: number): string {
+  return `${String(Math.floor(minutes / 60) % 24).padStart(2, "0")}:00`;
+}
+
+/** "17:00" → "17", "16:30" → "16:30": narrow blocks keep the whole range readable. */
+function shortClock(value: string): string {
+  const clock = formatTime(value);
+  return clock.endsWith(":00") ? String(Number(clock.slice(0, 2))) : clock;
+}
+
+/**
+ * The week as a calendar: one column per day, shifts placed by their exact start and length, side by
+ * side when they overlap. Same colors as the grid; open shifts show as dashed blocks.
+ */
 function AppliedTimetableBoard({
   weekDays,
   entriesByDate,
@@ -1083,165 +1107,153 @@ function AppliedTimetableBoard({
   timeSlots,
   startMinutes,
   todayIso,
-  compact = false,
+  positionOrder,
+  lang,
   t,
 }: AppliedTimetableBoardProps) {
   const [openWarningDay, setOpenWarningDay] = useState<string | null>(null);
-  const rowHeight = compact ? 30 : 36;
-  const timeColumnWidth = compact ? 50 : 56;
-  const laneWidth = compact ? 56 : 64;
-  const dayBaseWidth = compact ? 56 : 64;
-  const boardHeight = Math.max((timeSlots.length - 1) * rowHeight, rowHeight);
-  const dayHeaderClass = compact ? "px-3 py-3" : "px-4 py-4";
-  const visibleEntriesByDate = Object.fromEntries(
-    weekDays.map((day) => [day.iso, entriesByDate[day.iso] ?? []]),
-  ) as Record<string, AppliedTimetableLayoutEntry[]>;
-  const dayLaneCounts = weekDays.map((day) =>
-    Math.max(1, ...(visibleEntriesByDate[day.iso] ?? []).map((entry) => entry.laneCount)),
-  );
-  const dayWidths = dayLaneCounts.map((count) => Math.max(dayBaseWidth, count * laneWidth + Math.max(0, count - 1) * 1 + 2));
-  const gridTemplateColumns = `${timeColumnWidth}px ${dayWidths.map((width) => `${width}px`).join(" ")}`;
-  const boardMinWidth = timeColumnWidth + dayWidths.reduce((sum, width) => sum + width, 0);
+  const [nowMinutes, setNowMinutes] = useState(() => minutesOfDay(new Date()));
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMinutes(minutesOfDay(new Date())), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const hourCount = Math.max(timeSlots.length - 1, 1);
+  const boardHeight = hourCount * TIMELINE_HOUR;
+  const laneCounts = weekDays.map((day) => Math.max(1, ...(entriesByDate[day.iso] ?? []).map((entry) => entry.laneCount)));
+  // Days fill the width; a busy day (many shifts at once) gets wider so blocks stay readable.
+  const gridTemplateColumns = `56px ${laneCounts.map((count) => `minmax(${Math.max(140, count * 68)}px, 1fr)`).join(" ")}`;
+  const nowTop = ((nowMinutes < startMinutes ? nowMinutes + 24 * 60 : nowMinutes) - startMinutes) / 60 * TIMELINE_HOUR;
 
   return (
-    <div className="overflow-x-auto overflow-y-hidden">
-      <div style={{ minWidth: boardMinWidth, width: "max-content" }}>
-        <div
-          className="sticky top-0 z-30 grid bg-white"
-          style={{ gridTemplateColumns }}
-        >
-          <div className="sticky left-0 z-40 border-r border-b border-[var(--color-separator)] bg-white" />
-          {weekDays.map((day) => {
-            const warningEntries = warningEntriesByDate[day.iso] ?? [];
-            const isWarningOpen = openWarningDay === day.iso;
-            return (
-            <div
-              key={`header-${day.iso}`}
-              className={`relative border-b border-r border-[var(--color-separator)] ${dayHeaderClass} ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.05)]" : "bg-white"}`}
-            >
-              <div className="pr-8">
-                <p className={`font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)] ${compact ? "text-[11px]" : "text-[12px]"}`}>{day.title}</p>
-              </div>
-              <div className="absolute right-3 top-3">
+    <div className="min-w-max" style={{ minWidth: "100%" }} data-timeline-board>
+      <div className="sticky top-0 z-20 grid border-b border-[var(--color-separator)] bg-white" style={{ gridTemplateColumns }}>
+        <div className="sticky left-0 z-10 bg-white" />
+        {weekDays.map((day) => {
+          const isToday = day.iso === todayIso;
+          const warningEntries = warningEntriesByDate[day.iso] ?? [];
+          const isWarningOpen = openWarningDay === day.iso;
+          return (
+            <div key={`header-${day.iso}`} className="relative flex items-center justify-center gap-1.5 border-l border-[var(--color-separator)] py-2.5">
+              <span className={cn("text-[12px] font-semibold uppercase", isToday ? "text-[var(--color-danger)]" : "text-[#3c3c43]")}>
+                {formatDate(day.iso, lang, { weekday: "short" })}
+              </span>
+              <span className={cn("grid size-7 place-items-center rounded-full text-[15px] font-semibold", isToday ? "bg-[var(--color-danger)] text-white" : "text-black")}>
+                {day.dayOfMonth}
+              </span>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2">
                 <DayWarningPopover
                   warningEntries={warningEntries}
                   isOpen={isWarningOpen}
                   onToggle={() => setOpenWarningDay(isWarningOpen ? null : day.iso)}
                   t={t}
-                  buttonClassName="inline-flex size-6 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100"
+                  buttonClassName="inline-flex size-6 items-center justify-center rounded-full bg-[var(--color-warning-fill)] text-[var(--color-warning)] transition hover:brightness-95"
                 />
               </div>
-              <p className={`mt-1 font-semibold tracking-[-0.01em] text-[var(--color-heading)] ${compact ? "text-lg" : "text-2xl"}`}>
-                {compact ? day.caption : day.dayOfMonth}
-              </p>
             </div>
-          )})}
+          );
+        })}
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns }}>
+        <div className="sticky left-0 z-10 bg-white" style={{ height: boardHeight + 12 }}>
+          {timeSlots.slice(0, -1).map((slot, index) => (
+            <span
+              key={`time-${slot}`}
+              className="absolute right-2 text-[12px] font-medium tabular-nums text-[var(--color-text-muted)]"
+              style={{ top: index === 0 ? 4 : index * TIMELINE_HOUR - 8 }}
+            >
+              {boardHourLabel(slot)}
+            </span>
+          ))}
         </div>
 
-        <div
-          className="grid"
-          style={{ gridTemplateColumns }}
-        >
-          <div className="sticky left-0 z-20 border-r border-[var(--color-separator)] bg-white">
-            <div className="relative" style={{ height: boardHeight }}>
-              {timeSlots.map((slot, index) => {
-                const top = index * rowHeight;
-                const hourLabel = `${`${Math.floor(slot / 60)}`.padStart(2, "0")}:${`${slot % 60}`.padStart(2, "0")}:00`;
+        {weekDays.map((day) => {
+          const isToday = day.iso === todayIso;
+          const entries = entriesByDate[day.iso] ?? [];
+          return (
+            <div
+              key={`column-${day.iso}`}
+              className={cn("relative border-l border-[var(--color-separator)]", isToday && "bg-[var(--color-accent)]/30")}
+              style={{ height: boardHeight + 12 }}
+            >
+              {Array.from({ length: hourCount }, (_item, index) => (
+                <div key={`h-${index}`} className="pointer-events-none absolute inset-x-0" style={{ top: index * TIMELINE_HOUR }}>
+                  {index > 0 ? <div className="border-t border-[var(--color-separator)]" /> : null}
+                  <div className="border-t border-dashed border-[#ececf0]" style={{ marginTop: TIMELINE_HOUR / 2 }} />
+                </div>
+              ))}
+
+              {entries.map((entry) => {
+                const color = positionColor(entry.positionLabel, positionOrder);
+                const top = ((entry.startMinutes - startMinutes) / 60) * TIMELINE_HOUR + 1;
+                const height = Math.max(22, (entry.durationMinutes / 60) * TIMELINE_HOUR - 3);
+                const width = 100 / entry.laneCount;
+                const names = entry.assignedNames.join(", ");
+                const timeLabel = `${formatTime(entry.startTime)}–${formatTime(entry.endTime)}`;
+                const shortTime = `${shortClock(entry.startTime)}–${shortClock(entry.endTime)}`;
                 return (
-                  <div key={`time-${slot}`} className="absolute inset-x-0" style={{ top }}>
-                    <div className="border-t border-[var(--color-separator)]" />
-                    {index < timeSlots.length - 1 ? (
-                      <span className={`absolute left-2 top-1 ${compact ? "text-[10px]" : "text-xs"} font-semibold text-[var(--color-text-muted)]`}>
-                        {formatTime(hourLabel)}
+                  <div
+                    key={entry.key}
+                    data-timeline-event={timeLabel}
+                    data-timeline-open={entry.isOpen ? "true" : undefined}
+                    title={`${timeLabel} · ${entry.positionLabel}${names ? ` · ${names}` : ""}${entry.isOpen ? ` · ${entry.metaLabel}` : ""}`}
+                    className={cn(
+                      "absolute overflow-hidden rounded-[10px] px-2 py-1.5 text-left",
+                      entry.isConflict && "ring-2 ring-[var(--color-danger)]",
+                    )}
+                    style={{
+                      top,
+                      height,
+                      left: `calc(${entry.lane * width}% + 3px)`,
+                      width: `calc(${width}% - 6px)`,
+                      ...(entry.isOpen
+                        ? { backgroundColor: "rgba(255,255,255,0.92)", border: `1.5px dashed ${color}` }
+                        : { backgroundColor: tint(color, entry.isMine ? 0.26 : 0.16), boxShadow: `inset 3px 0 0 ${color}` }),
+                    }}
+                  >
+                    <p className="truncate text-[12px] font-semibold tabular-nums leading-4 text-black">{shortTime}</p>
+                    {entry.isOpen ? (
+                      <>
+                        <p className="mt-0.5 truncate text-[13px] font-semibold leading-4" style={{ color }}>
+                          {t("schedule.open_short")}
+                          {entry.missingCount > 1 ? ` × ${entry.missingCount}` : ""}
+                        </p>
+                        <p className="truncate text-[12px] leading-4 text-[#3c3c43]">{entry.positionLabel}</p>
+                      </>
+                    ) : (
+                      <>
+                        {(entry.assignedNames.length ? entry.assignedNames : [t("schedule.assigned_label")]).slice(0, 3).map((name) => (
+                          <p key={name} className="mt-0.5 truncate text-[13px] font-medium leading-4 text-black">
+                            {name.split(" ")[0]}
+                          </p>
+                        ))}
+                        {height >= 96 ? <p className="mt-0.5 truncate text-[12px] leading-4 text-[#3c3c43]">{entry.positionLabel}</p> : null}
+                      </>
+                    )}
+                    {entry.isConflict ? (
+                      <span className="mt-1 inline-block rounded-full bg-[var(--color-danger-fill)] px-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-danger)]">
+                        {t("schedule.conflict")}
                       </span>
                     ) : null}
                   </div>
                 );
               })}
-            </div>
-          </div>
 
-          {weekDays.map((day, dayIndex) => (
-            <div
-              key={`column-${day.iso}`}
-              className={`relative min-w-0 border-r border-[var(--color-separator)] ${day.iso === todayIso ? "bg-[rgba(47,111,237,0.04)]" : "bg-white"}`}
-              style={{ height: boardHeight }}
-            >
-              {timeSlots.map((slot, index) => (
-                <div
-                  key={`line-${day.iso}-${slot}`}
-                  className="absolute inset-x-0 border-t border-[var(--color-separator)]"
-                  style={{ top: index * rowHeight }}
-                />
-              ))}
-
-              <div
-                className="absolute inset-0 grid px-0.5"
-                style={{
-                  gridTemplateColumns: `repeat(${dayLaneCounts[dayIndex]}, ${laneWidth}px)`,
-                  gridTemplateRows: `repeat(${Math.max(timeSlots.length - 1, 1)}, ${rowHeight}px)`,
-                  columnGap: "1px",
-                  rowGap: "0px",
-                }}
-              >
-                {visibleEntriesByDate[day.iso].map((entry) => {
-                  const tone = positionTone(entry.positionLabel);
-                  const namesLabel = entry.assignedNames.map((name) => name.split(" ")[0]).join("\n");
-                  const backgroundColor = entry.isConflict
-                    ? "rgba(254, 242, 242, 0.98)"
-                    : entry.isOpen
-                      ? "rgba(254, 242, 242, 0.94)"
-                      : hexToRgba(tone.accent, 0.24);
-                  const borderColor = entry.isConflict ? "#ef4444" : entry.isOpen ? "#fca5a5" : hexToRgba(tone.accent, 0.38);
-                  const rowStart = Math.max(1, Math.round((entry.startMinutes - startMinutes) / 60) + 1);
-                  const rowSpan = Math.max(1, Math.round(entry.durationMinutes / 60) + 1);
-                  return (
-                    <div
-                      key={entry.key}
-                      style={{
-                        gridColumn: `${entry.lane + 1} / span 1`,
-                        gridRow: `${rowStart} / span ${rowSpan}`,
-                      }}
-                      >
-                      <div
-                        className={`relative flex h-full w-full flex-col rounded-none border px-1 py-0 ${compact ? "gap-0.5" : "gap-1"} ${entry.isMine ? "ring-1 ring-emerald-200" : ""}`}
-                        style={{
-                          backgroundColor,
-                          borderColor: entry.isMine && !entry.isConflict && !entry.isOpen ? "#86efac" : borderColor,
-                        }}
-                      >
-                        {entry.isConflict ? (
-                          <span className="self-start rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-red-700">
-                            {t("schedule.conflict")}
-                          </span>
-                        ) : null}
-                        {entry.isOpen ? (
-                          <p className={`whitespace-normal font-semibold text-red-700 ${compact ? "text-[10px] leading-3" : "text-[11px] leading-3.5"}`}>
-                            {entry.positionLabel}{"\n"}{entry.metaLabel}
-                          </p>
-                        ) : (
-                          <div className="pt-1" title={`${formatTime(entry.startTime)}-${formatTime(entry.endTime)} ${entry.assignedNames.join(", ")}`}>
-                            <p className={`whitespace-pre-line font-semibold text-[var(--color-heading)] ${compact ? "text-[9px] leading-3" : "text-[10px] leading-3.5"}`}>
-                              {namesLabel || t("schedule.assigned_label")}
-                            </p>
-                            <p className={`mt-0.5 text-[var(--color-text-muted)] ${compact ? "text-[8px] leading-3" : "text-[9px] leading-3"}`}>
-                              {formatTime(entry.startTime)}–{formatTime(entry.endTime)}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              {isToday && nowTop >= 0 && nowTop <= boardHeight ? (
+                <div className="pointer-events-none absolute inset-x-0 z-10" style={{ top: nowTop }} data-now-line>
+                  <div className="relative border-t-2 border-[var(--color-danger)]">
+                    <span className="absolute -left-1.5 -top-[5px] size-2 rounded-full bg-[var(--color-danger)]" />
+                  </div>
+                </div>
+              ) : null}
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
     </div>
   );
 }
-
 
 type RequestDraft = {
 
@@ -2209,7 +2221,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
   const appliedTimetableByDate = useMemo(() => {
     const map: Record<string, AppliedTimetableLayoutEntry[]> = {};
     for (const day of weekDays) {
-      map[day.iso] = packTimetableEntries((appliedEntriesByDate[day.iso] ?? []).filter((entry) => !entry.isOpen));
+      map[day.iso] = packTimetableEntries(appliedEntriesByDate[day.iso] ?? []);
     }
     return map;
   }, [appliedEntriesByDate, weekDays]);
@@ -3073,13 +3085,14 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
         ) : scheduleStage === "applied" && calendarView === "timeline" && !isPhone ? (
           <div className="h-full overflow-auto">
             <AppliedTimetableBoard
-              compact={isPhone}
               weekDays={weekDays}
               entriesByDate={appliedTimetableByDate}
               warningEntriesByDate={appliedWarningEntriesByDate}
               timeSlots={appliedTimetableSlots}
               startMinutes={appliedTimetableStartMinutes}
               todayIso={todayIso}
+              positionOrder={positionOrder}
+              lang={lang}
               t={t}
             />
           </div>
