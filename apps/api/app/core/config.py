@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     resend_api_key: str = ""
     resend_from_email: str = "noreply@info.owocrm.com"
+    # Shown as the sender name ("Platofy <noreply@…>"); mail with a real name lands in spam less often.
+    resend_from_name: str = "Platofy"
+    # Where replies go; a real inbox is another trust signal for spam filters.
+    resend_reply_to: str = ""
     auth_session_cookie_name: str = "gastrowo_session"
     auth_session_ttl_days: int = 30
     auth_session_secure_cookie: bool = False
