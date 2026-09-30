@@ -140,6 +140,80 @@ export function seoPage(path: string): SeoPage {
   return ALL_SEO_PAGES.find((page) => page.path === path) ?? TOOLS_HUB;
 }
 
+export type Competitor = {
+  slug: "7shifts" | "homebase" | "when-i-work";
+  name: string;
+  /** How they charge, in general terms (check their pricing page for current numbers). */
+  pricing: string;
+  freePlan: string;
+  bestFor: string;
+};
+
+export const COMPETITORS: Competitor[] = [
+  {
+    slug: "7shifts",
+    name: "7shifts",
+    pricing: "Per location per month, several tiers",
+    freePlan: "Limited free plan for one location",
+    bestFor: "Restaurant groups that want deep POS integrations and many add-ons",
+  },
+  {
+    slug: "homebase",
+    name: "Homebase",
+    pricing: "Per location per month, several tiers",
+    freePlan: "Free basic plan for one location",
+    bestFor: "Small businesses of any kind that also want hiring and HR tools in one place",
+  },
+  {
+    slug: "when-i-work",
+    name: "When I Work",
+    pricing: "Per user per month",
+    freePlan: "Free trial",
+    bestFor: "Hourly teams across many industries that are fine paying per person",
+  },
+];
+
+export const COMPARE_PAGES: SeoPage[] = COMPETITORS.map((competitor) => ({
+  path: `/compare/${competitor.slug}`,
+  title: `${competitor.name} Alternative for Restaurants: Platofy vs ${competitor.name}`,
+  description: `Looking for a ${competitor.name} alternative? Compare Platofy and ${competitor.name} for restaurant scheduling: pricing, auto-scheduling, time clock and payroll export. Free switch-over.`,
+  h1: `Platofy vs ${competitor.name}`,
+  intro: `${competitor.name} is a solid tool. Platofy is built only for independent restaurants: the week is built from your team's availability in minutes, pricing is a flat price per location (never per person), and we move your team and schedule over for free.`,
+  faq: [
+    {
+      q: `How do I switch from ${competitor.name} to Platofy?`,
+      a: `Export your employee list from ${competitor.name} (or send a photo of this week's schedule) through the free switch-over form. We set up your team, positions and shift templates and send you a link when it's ready, usually within one business day.`,
+    },
+    {
+      q: "How much does Platofy cost?",
+      a: "Free for one location and up to 15 people. Starter is $26 a month for one location and up to 30 people. Pro is $58 a month for up to three locations with unlimited people, and each extra location is $15. New businesses get 30 days of Pro free, no card.",
+    },
+    {
+      q: "Do my staff need to download an app?",
+      a: "No. Platofy runs in the phone's browser and can be added to the home screen, with notifications for new schedules, swaps and time-off answers.",
+    },
+    {
+      q: `Can I run Platofy next to ${competitor.name} for a week first?`,
+      a: "Yes. Many managers build one week in Platofy while the old tool is still running, then switch once the team is in. The free plan and the 30-day Pro trial make that easy.",
+    },
+  ],
+}));
+
+export const SWITCH_PAGE: SeoPage = {
+  path: "/switch",
+  title: "Switch to Platofy for Free — We Move Your Schedule for You | Platofy",
+  description:
+    "Moving from 7shifts, Homebase, When I Work or a spreadsheet? Send us your export or a photo of your schedule and we set up Platofy for your restaurant for free.",
+  h1: "We'll move your schedule to Platofy, free",
+  intro:
+    "Send us your team list or export from your current tool, or just a photo of this week's schedule. We set up your team, positions, pay rates and shift templates, and send you a link when it's ready.",
+  faq: [
+    { q: "What do you need from me?", a: "An export of your employees (CSV or Excel from any tool) or a photo of your current schedule. That's it." },
+    { q: "How long does it take?", a: "Usually within one business day. You get an email with a link when your restaurant is ready." },
+    { q: "What does it cost?", a: "Nothing. The switch-over is free, and Platofy itself is free for one location and up to 15 people." },
+  ],
+};
+
 /** The landing page and How it works: prerendered too (search engines saw an empty page before). */
 export const SITE_PAGES: SeoPage[] = [
   {
@@ -186,10 +260,14 @@ export const SITE_LINKS: Array<{ href: string; label: string }> = [
   { href: "/tools/labor-cost-calculator", label: "Labor cost calculator" },
   { href: "/tools/overtime-calculator", label: "Overtime calculator" },
   { href: "/tools/tip-pool-calculator", label: "Tip pool calculator" },
+  { href: "/compare/7shifts", label: "7shifts alternative" },
+  { href: "/compare/homebase", label: "Homebase alternative" },
+  { href: "/compare/when-i-work", label: "When I Work alternative" },
+  { href: "/switch", label: "Free switch-over" },
   { href: "/demo", label: "Try the live demo" },
   { href: "/login?mode=onboarding", label: "Start free" },
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
 ];
 
-export const PRERENDERED: SeoPage[] = [...SITE_PAGES, ...ALL_SEO_PAGES];
+export const PRERENDERED: SeoPage[] = [...SITE_PAGES, ...ALL_SEO_PAGES, ...COMPARE_PAGES, SWITCH_PAGE];

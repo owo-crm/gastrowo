@@ -111,7 +111,7 @@ export function ProductTour() {
   const steps = useMemo(() => (me ? stepsFor(me) : []), [me]);
   const step = index === null ? null : steps[index] ?? null;
   const inApp =
-    !["/", "/login", "/join", "/kiosk", "/demo", "/pending-link", "/how-it-works", "/terms", "/privacy", "/cookies"].includes(location.pathname) &&
+    !["/", "/login", "/join", "/kiosk", "/demo", "/pending-link", "/how-it-works", "/terms", "/privacy", "/cookies", "/switch"].includes(location.pathname) &&
     !location.pathname.startsWith("/tools") &&
     !location.pathname.startsWith("/compare");
 

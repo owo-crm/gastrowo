@@ -31,6 +31,8 @@ const ScheduleTemplatePage = lazy(() => import("@/pages/tools-pages").then((modu
 const LaborCostPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.LaborCostPage })));
 const OvertimePage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.OvertimePage })));
 const TipPoolPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.TipPoolPage })));
+const ComparePage = lazy(() => import("@/pages/compare-pages").then((module) => ({ default: module.ComparePage })));
+const SwitchPage = lazy(() => import("@/pages/compare-pages").then((module) => ({ default: module.SwitchPage })));
 const HowItWorksPage = lazy(() => import("@/pages/how-it-works-page").then((module) => ({ default: module.HowItWorksPage })));
 const TermsPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.TermsPageEn })));
 const PrivacyPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.PrivacyPageEn })));
@@ -181,6 +183,8 @@ export function App() {
       <Route path="/kiosk" element={<KioskPage />} />
       <Route path="/how-it-works" element={<HowItWorksPage />} />
       <Route path="/tools" element={<ToolsHubPage />} />
+      <Route path="/compare/:slug" element={<ComparePage />} />
+      <Route path="/switch" element={<SwitchPage />} />
       <Route path="/tools/restaurant-schedule-template" element={<ScheduleTemplatePage />} />
       <Route path="/tools/labor-cost-calculator" element={<LaborCostPage />} />
       <Route path="/tools/overtime-calculator" element={<OvertimePage />} />

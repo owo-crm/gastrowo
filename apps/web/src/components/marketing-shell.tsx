@@ -87,6 +87,8 @@ export function MarketingFooter() {
           <ul className="space-y-1.5">
             <li><Link to="/how-it-works" className="hover:text-black">How it works</Link></li>
             <li><Link to="/demo" className="hover:text-black">Live demo</Link></li>
+            <li><Link to="/switch" className="hover:text-black">Free switch-over</Link></li>
+            <li><Link to="/compare/7shifts" className="hover:text-black">vs 7shifts</Link> · <Link to="/compare/homebase" className="hover:text-black">vs Homebase</Link> · <Link to="/compare/when-i-work" className="hover:text-black">vs When I Work</Link></li>
             <li><a href="/#pricing" className="hover:text-black">Pricing</a></li>
             <li><Link to="/terms" className="hover:text-black">Terms</Link> · <Link to="/privacy" className="hover:text-black">Privacy</Link></li>
           </ul>
