@@ -168,6 +168,8 @@ class Organization(Base):
     signup_business_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
     signup_team_size: Mapped[str | None] = mapped_column(String(20), nullable=True)
     signup_previous_tool: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # The owner hid the "Get started" roadmap for good.
+    roadmap_hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 

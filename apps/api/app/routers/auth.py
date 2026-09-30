@@ -236,6 +236,7 @@ def _settings_out(organization: Organization | None) -> OrganizationSettingsOut 
         manager_can_access_inventory=organization.manager_can_access_inventory,
         clock_mode=organization.clock_mode or "both",
         schedule_respect_hour_limits=organization.schedule_respect_hour_limits is not False,
+        roadmap_hidden=organization.roadmap_hidden_at is not None,
         **locale_settings(organization),
     )
 

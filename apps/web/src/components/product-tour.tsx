@@ -82,7 +82,11 @@ function markDone(userId: string) {
 function stepsFor(me: MeResponse): TourStep[] {
   const sections = getNavSections(me);
   const steps = me.role === "STAFF" ? STAFF_STEPS : MANAGER_STEPS;
-  return steps.filter((step) => !step.route || Boolean(findActive(sections, step.route)));
+  // Owners end the tour on their "Get started" roadmap; everyone else on the notifications bell.
+  const hasRoadmap = Boolean(findActive(sections, "/start"));
+  return steps
+    .map((step) => (step.id === "finish" && hasRoadmap ? { id: "finish_roadmap", route: "/start", target: "[data-testid=roadmap]" } : step))
+    .filter((step) => !step.route || Boolean(findActive(sections, step.route)));
 }
 
 type Rect = { top: number; left: number; width: number; height: number };

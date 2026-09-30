@@ -1,4 +1,4 @@
-import { Briefcase, CalendarDays, House, ListTodo, Settings, Users, type LucideIcon } from "lucide-react";
+import { Briefcase, CalendarDays, House, ListTodo, Rocket, Settings, Users, type LucideIcon } from "lucide-react";
 
 import { canAccessReport, canManageBusinessSettings, canManageTeam, canViewOverview, canViewPayroll, hasPlanFeature } from "@/lib/access";
 import type { MeResponse } from "@/lib/types";
@@ -18,7 +18,7 @@ export type NavSub = {
 };
 
 export type NavSection = {
-  key: "home" | "schedule" | "team" | "business" | "earnings" | "tasks" | "settings";
+  key: "start" | "home" | "schedule" | "team" | "business" | "earnings" | "tasks" | "settings";
   icon: LucideIcon;
   subs: NavSub[];
 };
@@ -60,6 +60,8 @@ export function getNavSections(me?: MeResponse | null): NavSection[] {
   const isStaff = role === "STAFF";
   if (isStaff) return staffSections(me);
   const sections: NavSection[] = [];
+  // The owner's temporary "Get started" roadmap, until they hide it.
+  if (isAdmin && !me?.organization_settings?.roadmap_hidden) sections.push({ key: "start", icon: Rocket, subs: [sub("/start", "get_started")] });
 
   const scheduleSubs = [
     sub("/schedule", "calendar", { end: true }),
