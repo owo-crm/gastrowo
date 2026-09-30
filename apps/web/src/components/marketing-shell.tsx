@@ -1,6 +1,6 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { ArrowRight, Check } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { ArrowRight, Check, Menu, X } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { api } from "@/lib/api";
@@ -36,29 +36,103 @@ const TOOL_LINKS = [
   { to: "/tools/tip-pool-calculator", label: "Tip pool calculator" },
 ];
 
+const NAV = [
+  { to: "/how-it-works", label: "How it works" },
+  { to: "/#features", label: "Features" },
+  { to: "/#pricing", label: "Pricing" },
+  { to: "/tools", label: "Free tools" },
+  { to: "/#faq", label: "FAQ" },
+];
+
+/**
+ * One header for every public page (landing, How it works, tools, comparisons), so the menu is the
+ * same everywhere. Section links point at the landing page ("/#pricing"); the landing scrolls to them.
+ */
+export function MarketingHeader() {
+  const { pathname, hash } = useLocation();
+  const [open, setOpen] = useState(false);
+  const active = (to: string) => {
+    const [path, anchor] = to.split("#");
+    if (anchor) return pathname === "/" && hash === `#${anchor}`;
+    return pathname === path || pathname.startsWith(`${path}/`);
+  };
+  return (
+    <header className="ios-bar sticky top-0 z-30 border-b border-[var(--color-separator)]">
+      <Container className="flex h-14 items-center justify-between gap-3">
+        <Link to="/" className="shrink-0" aria-label="Platofy home" onClick={() => setOpen(false)}>
+          <BrandLogo kind="wordmark" className="text-[1.8rem]" />
+        </Link>
+        <nav aria-label="Main" className="hidden md:block">
+          <ul className="flex items-center gap-6 text-[15px] font-medium">
+            {NAV.map((item) => (
+              <li key={item.to}>
+                <Link
+                  to={item.to}
+                  aria-current={active(item.to) ? "page" : undefined}
+                  className={cn("transition hover:text-black", active(item.to) ? "text-black" : "text-[var(--color-text-muted)]")}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link to="/login?mode=signin" className="px-1 text-[15px] font-semibold text-[var(--color-primary-strong)]">
+            Sign in
+          </Link>
+          <SignupButton context="header" className="min-h-9 rounded-full px-4 text-[15px]" />
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={open}
+            aria-label={open ? "Close menu" : "Open menu"}
+            className="grid size-9 place-items-center rounded-full text-black md:hidden"
+          >
+            {open ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
+        </div>
+      </Container>
+      {open ? (
+        <nav aria-label="Main" className="border-t border-[var(--color-separator)] bg-white md:hidden">
+          <ul className="mx-auto max-w-5xl px-4 py-2">
+            {NAV.map((item) => (
+              <li key={item.to}>
+                <Link to={item.to} onClick={() => setOpen(false)} className="flex min-h-12 items-center border-b border-[var(--color-separator)] text-[17px] font-medium text-black last:border-0">
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ) : null}
+    </header>
+  );
+}
+
+/** Scroll to "#section" after navigating to a page (the router doesn't do it for us). */
+export function useScrollToHash() {
+  const { hash, pathname } = useLocation();
+  useEffect(() => {
+    if (!hash) {
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    let tries = 0;
+    const find = () => {
+      const element = document.getElementById(decodeURIComponent(hash.slice(1)));
+      if (element) element.scrollIntoView({ behavior: "smooth", block: "start" });
+      else if (tries++ < 20) window.setTimeout(find, 50);
+    };
+    find();
+  }, [hash, pathname]);
+}
+
 export function MarketingShell({ children }: { children: ReactNode }) {
+  useScrollToHash();
   return (
     <div className="min-h-dvh overflow-x-clip bg-white text-black">
-      <header className="ios-bar sticky top-0 z-30 border-b border-[var(--color-separator)]">
-        <Container className="flex h-14 items-center justify-between gap-3">
-          <Link to="/" className="shrink-0" aria-label="Platofy home">
-            <BrandLogo kind="wordmark" className="text-[1.8rem]" />
-          </Link>
-          <nav aria-label="Main" className="hidden md:block">
-            <ul className="flex items-center gap-7 text-[15px] font-medium text-[var(--color-text-muted)]">
-              <li><Link to="/how-it-works" className="hover:text-black">How it works</Link></li>
-              <li><Link to="/tools" className="hover:text-black">Free tools</Link></li>
-              <li><a href="/#pricing" className="hover:text-black">Pricing</a></li>
-            </ul>
-          </nav>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link to="/login?mode=signin" className="px-1 text-[15px] font-semibold text-[var(--color-primary-strong)]">
-              Sign in
-            </Link>
-            <SignupButton context="tools-header" className="min-h-9 rounded-full px-4 text-[15px]" />
-          </div>
-        </Container>
-      </header>
+      <MarketingHeader />
       <main>{children}</main>
       <MarketingFooter />
     </div>

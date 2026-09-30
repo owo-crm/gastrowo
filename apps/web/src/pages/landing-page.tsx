@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowRight, Bell, CalendarCheck2, Check, ChevronDown, Clock3, Facebook, FileSpreadsheet, Instagram, PieChart, PlayCircle, Repeat2, Scale, Users, type LucideIcon } from "lucide-react";
 import { legalLinks } from "@/lib/legal-links";
+import { MarketingHeader, useScrollToHash } from "@/components/marketing-shell";
 import { Link } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand-logo";
@@ -185,44 +186,14 @@ function WeekPreview({ copy }: { copy: Copy["preview"] }) {
 
 export function LandingPage() {
   const { lang, t } = useLanguage();
+  useScrollToHash();
   const copy = COPY[lang] ?? COPY.en;
   const currency = currencyForLang(lang);
   const fromPrice = formatMoney(PLAN_PRICE[currency].standard.monthly, currency, lang);
 
   return (
     <div className="min-h-dvh overflow-x-clip bg-white text-black">
-      <header className="ios-bar sticky top-0 z-30 border-b border-[var(--color-separator)]">
-        <Container className="flex h-14 items-center justify-between gap-3">
-          <Link to="/" className="shrink-0" aria-label="Platofy">
-            <BrandLogo kind="wordmark" className="text-[1.8rem]" />
-          </Link>
-          <nav aria-label={copy.nav.features} className="hidden md:block">
-            <ul className="flex items-center gap-7">
-              {[
-                ["/how-it-works", copy.hero.secondary],
-                ["/tools", "Free tools"],
-                ["#features", copy.nav.features],
-                ["#pricing", copy.nav.pricing],
-                ["#faq", copy.nav.faq],
-              ].map(([href, label]) => (
-                <li key={href}>
-                  <a href={href} className="text-[15px] font-medium text-[var(--color-text-muted)] transition hover:text-black">
-                    {label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link to={SIGNIN_URL} className="px-1 text-[15px] font-semibold text-[var(--color-primary-strong)]">
-              {copy.nav.signIn}
-            </Link>
-            <SignupLink context="header" className="min-h-9 rounded-full px-4 text-[15px]">
-              {copy.nav.start}
-            </SignupLink>
-          </div>
-        </Container>
-      </header>
+      <MarketingHeader />
       <div className="flex justify-center px-4 pt-3 empty:hidden">
         <DevLoginButton />
       </div>
