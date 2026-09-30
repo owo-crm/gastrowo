@@ -198,6 +198,9 @@ export const api = {
   me(token: string) {
     return request<MeResponse>("/auth/me", {}, token);
   },
+  tourDone(token: string) {
+    return request<{ done: boolean }>("/auth/me/tour-done", { method: "POST" }, token);
+  },
   seedDemoRestaurant(token: string) {
     return request<{ people: number; locations: number; shifts: number; timesheets: number; revenue_days: number; tasks: number; requests: number }>(
       "/organizations/current/demo-restaurant",

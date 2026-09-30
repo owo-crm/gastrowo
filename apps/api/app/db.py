@@ -121,6 +121,9 @@ def _ensure_runtime_schema_compat() -> None:
                 connection.execute(text("ALTER TABLE users ADD COLUMN avatar_url TEXT"))
             if "onboarding_source" not in user_columns:
                 connection.execute(text("ALTER TABLE users ADD COLUMN onboarding_source VARCHAR(80)"))
+            if "tour_completed_at" not in user_columns:
+                ddl = "TIMESTAMP WITH TIME ZONE" if engine.dialect.name == "postgresql" else "DATETIME"
+                connection.execute(text(f"ALTER TABLE users ADD COLUMN tour_completed_at {ddl}"))
 
         if "organizations" in tables:
             organization_columns = {column["name"] for column in inspector.get_columns("organizations")}

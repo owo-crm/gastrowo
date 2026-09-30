@@ -11,7 +11,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.deps import OrgContext, get_current_organization, oauth2_scheme, require_org_context
+from app.core.deps import OrgContext, get_current_organization, get_current_user, oauth2_scheme, require_org_context
 from app.core.envelope import ok
 from app.core.security import create_access_token, decode_token, hash_password, verify_password
 from app.db import get_db
@@ -54,6 +54,7 @@ from app.services.auth_email import send_otp_email
 from app.services.labor_rules import locale_settings, timezone_or_default
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, grant_comp_pro
 from app.services import referrals as referrals_service
+from app.services.roadmap import roadmap_is_hidden
 from app.services import sandbox as sandbox_service
 from app.services.demo_access import dev_login_user, is_demo_account
 from app.services.demo_restaurant import display_name
@@ -237,7 +238,7 @@ def _settings_out(organization: Organization | None) -> OrganizationSettingsOut 
         manager_can_access_inventory=organization.manager_can_access_inventory,
         clock_mode=organization.clock_mode or "both",
         schedule_respect_hour_limits=organization.schedule_respect_hour_limits is not False,
-        roadmap_hidden=organization.roadmap_hidden_at is not None,
+        roadmap_hidden=roadmap_is_hidden(organization),
         **locale_settings(organization),
     )
 
@@ -696,6 +697,25 @@ def logout(
     return ok({"logged_out": True})
 
 
+# Only new accounts get the guided tour automatically; it can always be replayed from Settings.
+TOUR_FOR_DAYS = 7
+
+
+def _show_tour(user: User) -> bool:
+    if user.tour_completed_at is not None or user.created_at is None:
+        return False
+    created = user.created_at if user.created_at.tzinfo else user.created_at.replace(tzinfo=UTC)
+    return created > utc_now() - timedelta(days=TOUR_FOR_DAYS)
+
+
+@router.post("/me/tour-done")
+def tour_done(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.tour_completed_at is None:
+        user.tour_completed_at = utc_now()
+        db.commit()
+    return ok({"done": True})
+
+
 @router.get("/me")
 def me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
@@ -732,6 +752,7 @@ def me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
         organization_settings=_settings_out(organization),
         subscription=build_subscription_summary(db, active_membership.organization_id if active_membership else None),
         is_platform_admin=user.email.lower() in settings.parsed_platform_admin_emails,
+        show_tour=_show_tour(user),
         is_demo_account=is_demo_account(db, user),
         is_sandbox=bool(organization and organization.is_sandbox),
         sandbox_expires_at=organization.sandbox_expires_at if organization and organization.is_sandbox else None,
