@@ -10,7 +10,7 @@ import { ListRow, ListSection } from "@/components/ui/list";
 import { Segmented } from "@/components/ui/segmented";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { currencyOf, formatDate, formatMoney } from "@/lib/format";
+import { type Currency, formatDate, formatMoney } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
 import { PLAN_PRICE, PRO_EXTRA_LOCATION_PRICE, SEVENSHIFTS_USD, normalizePlan, planTitleKey, planTotal, plans, type PaidPlan } from "@/lib/plans";
 import { useToast } from "@/lib/toast";
@@ -34,7 +34,8 @@ export function BillingPage() {
   const { t, lang } = useLanguage();
   const toast = useToast();
   const [cycle, setCycle] = useState<BillingCheckoutCycle>("monthly");
-  const currency = currencyOf(me);
+  // Plans are sold in dollars only (the checkout charges USD for every business).
+  const currency: Currency = "USD";
 
   const subscriptionQuery = useQuery({
     queryKey: ["subscription"],

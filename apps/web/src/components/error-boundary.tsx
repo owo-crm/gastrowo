@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 import { reportClientError } from "@/lib/error-reporting";
+import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
 
 /** A crash in one screen shows a way out instead of a blank page. */
 export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -11,6 +12,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    if (isStaleBuildError(error) && reloadForNewBuild()) return;
     reportClientError(error.message, `${error.stack ?? ""}\n${info.componentStack ?? ""}`);
   }
 
