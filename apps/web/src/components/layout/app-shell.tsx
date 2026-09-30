@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Check, CheckCircle2, ChevronRight, Clock3, Coins, CreditCard, FilePlus2, Lock, LogOut, Trash2, XCircle } from "lucide-react";
+import { Bell, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Coins, CreditCard, FilePlus2, Lock, LogOut, Trash2, XCircle } from "lucide-react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 
 import { CloseButton } from "@/components/ui/sheet";
@@ -9,12 +9,13 @@ import { useAuth } from "@/lib/auth";
 import { loadBusinessLogo } from "@/lib/business-branding";
 import { formatRelativeTimestamp } from "@/lib/date";
 import { type Lang, useLanguage } from "@/lib/i18n";
-import { findActive, getHomeRoute, getNavSections, type NavSection, type NavSub } from "@/lib/navigation";
+import { findActive, getHomeRoute, getNavSections, type NavSection, type NavSub, visibleSubs } from "@/lib/navigation";
 import type { NotificationItem, NotificationListResponse } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Settings-style colored tile per section. */
 const SECTION_COLORS: Record<NavSection["key"], string> = {
+  home: "#007aff",
   schedule: "#ff3b30",
   team: "#007aff",
   business: "#34c759",
@@ -322,17 +323,19 @@ function SidebarSection({ section, active }: { section: NavSection; active: bool
   const { t } = useLanguage();
   const hasNewTasks = useHasNewTasks();
   const dot = section.key === "tasks" && hasNewTasks;
-  const single = section.subs.length === 1;
-  const first = section.subs[0];
+  const subs = visibleSubs(section);
+  const single = subs.length === 1;
+  const first = subs[0];
 
   if (single) {
     return (
       <NavLink
         to={first.to}
+        end={first.end}
         className={({ isActive }) =>
           cn(
             "flex min-h-11 items-center gap-3 rounded-2xl px-2.5 text-[16px] font-semibold transition",
-            isActive && !first.locked ? "bg-white text-black shadow-[0_1px_3px_rgba(0,0,0,0.08)]" : "text-black hover:bg-white/60",
+            (isActive || active) && !first.locked ? "bg-white text-black shadow-[0_1px_3px_rgba(0,0,0,0.08)]" : "text-black hover:bg-white/60",
           )
         }
       >
@@ -347,7 +350,7 @@ function SidebarSection({ section, active }: { section: NavSection; active: bool
   return (
     <div>
       <Link
-        to={section.subs.find((item) => !item.locked)?.to ?? first.to}
+        to={subs.find((item) => !item.locked)?.to ?? first.to}
         aria-expanded={active}
         className="flex min-h-11 items-center gap-3 rounded-2xl px-2.5 text-[16px] font-semibold text-black hover:bg-white/60"
       >
@@ -357,7 +360,7 @@ function SidebarSection({ section, active }: { section: NavSection; active: bool
       </Link>
       {active ? (
         <div className="mt-0.5 space-y-0.5">
-          {section.subs.map((item) => (
+          {subs.map((item) => (
             <SubLink key={item.key} item={item} />
           ))}
         </div>
@@ -393,10 +396,11 @@ function DemoBanner() {
 /** Sub-tabs of the current section on phones: a scrollable row of pills under the title. */
 function MobileSubTabs({ section }: { section: NavSection }) {
   const { t } = useLanguage();
-  if (section.subs.length < 2) return null;
+  const subs = visibleSubs(section);
+  if (subs.length < 2) return null;
   return (
     <nav aria-label={t(`section.${section.key}`)} className="flex gap-2 overflow-x-auto px-4 pb-2.5 [scrollbar-width:none] lg:hidden">
-      {section.subs.map((item) => (
+      {subs.map((item) => (
         <NavLink
           key={item.key}
           to={item.to}
@@ -426,7 +430,7 @@ function TabBar({ sections, activeKey }: { sections: NavSection[]; activeKey?: s
     >
       <ul className="mx-auto flex max-w-xl">
         {sections.map((section) => {
-          const target = section.subs.find((item) => !item.locked) ?? section.subs[0];
+          const target = visibleSubs(section).find((item) => !item.locked) ?? section.subs[0];
           const active = section.key === activeKey;
           return (
             <li key={section.key} className="flex flex-1">
@@ -475,6 +479,7 @@ export function AppShell({
   hideBottomNav?: boolean;
 }) {
   const { me } = useAuth();
+  const { t } = useLanguage();
   const location = useLocation();
   const sections = getNavSections(me);
   const active = findActive(sections, location.pathname);
@@ -498,6 +503,15 @@ export function AppShell({
         <header className="ios-bar sticky top-0 z-30">
           <div className={cn("flex min-h-[var(--nav-height)] items-center gap-2 pl-4 pr-2 pt-1 sm:pl-6", !fullBleed && "mx-auto max-w-[1180px]")}>
             <div className="min-w-0 flex-1 py-2">
+              {active?.sub.hidden ? (
+                // Opened from a list (e.g. Settings → Payments): a way back to that list.
+                <Link
+                  to={visibleSubs(active.section)[0]?.to ?? "/"}
+                  className="-ml-1 mb-0.5 inline-flex min-h-8 items-center gap-0.5 text-[17px] text-[var(--color-primary-strong)]"
+                >
+                  <ChevronLeft className="size-5" aria-hidden /> {t(`section.${active.section.key}`)}
+                </Link>
+              ) : null}
               <h1 className="truncate text-[28px] font-semibold leading-[1.15] tracking-[-0.01em] text-black lg:text-[30px]">{title}</h1>
               {subtitle ? <p className="hidden truncate text-[15px] text-[#3c3c43] md:block">{subtitle}</p> : null}
             </div>

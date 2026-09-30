@@ -30,6 +30,7 @@ from app.services.timeclock import (
     generate_pin,
     membership_for_pin,
     mode_allows,
+    next_shift,
     open_session,
     read_pin,
     set_pin,
@@ -99,8 +100,25 @@ def my_clock(context: OrgContext = Depends(require_org_context()), db: Session =
             "has_pin": True,
             "pin": pin,
             "open_session": _session_out(db, open_session(db, organization.id, context.user.id)),
+            "next_shift": _next_shift_out(db, organization.id, context.user.id),
         }
     )
+
+
+def _next_shift_out(db: Session, organization_id: UUID, user_id: UUID) -> dict | None:
+    """The shift running now or coming next, for the "Next shift" card on the worker's home."""
+    found = next_shift(db, organization_id, user_id)
+    if found is None:
+        return None
+    shift, location = found
+    return {
+        "shift_id": str(shift.id),
+        "date": shift.date.isoformat(),
+        "start_time": shift.start_time.isoformat(timespec="minutes"),
+        "end_time": shift.end_time.isoformat(timespec="minutes"),
+        "staff_position": shift.staff_position,
+        "location_name": location.name,
+    }
 
 
 @router.post("/clock/in")

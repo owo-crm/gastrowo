@@ -627,7 +627,17 @@ export type ClockSessionInfo = {
   shift: { id: string; date: string; start_time: string; end_time: string; staff_position: string | null } | null;
 };
 
-export type ClockMe = { mode: ClockMode; phone_allowed: boolean; has_pin: boolean; pin: string | null; open_session: ClockSessionInfo | null };
+export type NextShift = { shift_id: string; date: string; start_time: string; end_time: string; staff_position: string | null; location_name: string };
+
+export type ClockMe = {
+  mode: ClockMode;
+  phone_allowed: boolean;
+  has_pin: boolean;
+  pin: string | null;
+  open_session: ClockSessionInfo | null;
+  /** The shift running now or coming next (worker's home card). */
+  next_shift?: NextShift | null;
+};
 
 export type KioskDeviceItem = { id: string; name: string; location_id: string; location_name: string; created_at: string; last_seen_at: string | null };
 

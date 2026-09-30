@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { CalendarPlus, Copy, ImagePlus, KeyRound, LogOut, Store, Tablet, Trash2 } from "lucide-react";
+import { CalendarPlus, Copy, FileClock, ImagePlus, KeyRound, LogOut, Receipt, Store, Tablet, Trash2, Wallet } from "lucide-react";
 
 import { DemoOffNote } from "@/components/demo-off";
 import { DeviceSection } from "@/components/device-section";
@@ -13,6 +13,7 @@ import { ListRow, ListSection } from "@/components/ui/list";
 import { Segmented } from "@/components/ui/segmented";
 import { Sheet } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import { canAccessReport, hasPlanFeature } from "@/lib/access";
 import { api, apiAbsoluteUrl } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { loadBusinessLogo, saveBusinessLogo } from "@/lib/business-branding";
@@ -83,6 +84,8 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [pinSheet, setPinSheet] = useState(false);
+  const [profileSheet, setProfileSheet] = useState(false);
+  const isStaff = me?.role === "STAFF";
   const [pinValue, setPinValue] = useState("");
   const [kioskSheet, setKioskSheet] = useState(false);
   const [kioskLocation, setKioskLocation] = useState("");
@@ -168,6 +171,7 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
     mutationFn: () => api.patchMe(token!, { full_name: fullName.trim(), avatar_url: avatarUrl }),
     onSuccess: async () => {
       toast.success(t("profile.profile_updated"));
+      setProfileSheet(false);
       await refreshMe();
     },
     onError: (error) => toast.error(t("profile.profile_update_failed"), error instanceof Error ? error.message : undefined),
@@ -212,7 +216,7 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
     }
   };
 
-  const title = section === "business" ? t("sub.business") : section === "calendar" ? t("sub.calendar_sync") : t("sub.profile");
+  const title = section === "business" ? t("sub.business") : section === "calendar" ? t("sub.calendar_sync") : isStaff ? t("section.settings") : t("sub.profile");
   const profileDirty = fullName.trim() !== (me?.full_name ?? "") || avatarUrl !== (me?.avatar_url ?? null);
 
   return (
@@ -220,24 +224,34 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
       <div>
         {section === "profile" ? (
           <>
-            <ListSection header={t("settings.you")}>
-              <li>
+            {/* You: just the avatar, name and email; tap to edit. */}
+            <ListSection>
+              <ListRow
+                leading={
+                  <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-primary-strong)] text-[19px] font-semibold text-white">
+                    {me?.avatar_url ? <img src={me.avatar_url} alt="" className="size-full object-cover" /> : initialsOf(me?.full_name, "U")}
+                  </span>
+                }
+                title={<span className="text-[19px] font-semibold">{me?.full_name}</span>}
+                subtitle={me?.email}
+                chevron
+                onClick={() => setProfileSheet(true)}
+              />
+            </ListSection>
+            <Sheet
+              open={profileSheet}
+              onClose={() => setProfileSheet(false)}
+              title={t("settings.you")}
+              action={{ label: t("common.save"), onClick: () => saveProfile.mutate(), disabled: !fullName.trim() || !profileDirty || saveProfile.isPending }}
+            >
+              <div className="-mx-4 sm:-mx-6">
                 <PhotoPicker image={avatarUrl} fallback={initialsOf(fullName, "U")} label={t("profile.upload_avatar")} rounded="full" onPick={setAvatarUrl} />
-              </li>
-              <li>
                 <Field label={t("login.full_name")}>
                   <Input value={fullName} onChange={(event) => setFullName(event.target.value)} />
                 </Field>
-              </li>
-              <ListRow title={t("profile.account")} trailing={me?.email} />
-              <ListRow title={t("profile.role")} trailing={me?.role ? t(`shell.role.${me.role}`) : ""} />
-            </ListSection>
-            <div className="px-4 py-4 sm:px-6">
-              <Button size="lg" className="w-full sm:w-auto" onClick={() => saveProfile.mutate()} disabled={!fullName.trim() || !profileDirty || saveProfile.isPending}>
-                {t("common.save")}
-              </Button>
-            </div>
-            <ListSection header={t("clock.header")} footer={t("clock.pin_footer")}>
+              </div>
+            </Sheet>
+            <ListSection footer={t("clock.pin_footer")}>
               <ListRow
                 leading={<KeyRound className="size-5 text-[var(--color-primary-strong)]" />}
                 title={t("clock.my_pin")}
@@ -246,6 +260,21 @@ export function SettingsPage({ section = "profile" }: { section?: SettingsSectio
                 onClick={() => setPinSheet(true)}
               />
             </ListSection>
+            {/* A worker has no sub-tabs in Settings: pay, hours and the calendar feed open from here. */}
+            {isStaff ? (
+              <ListSection>
+                {hasPlanFeature(me, "payroll") ? (
+                  <ListRow leading={<Wallet className="size-5 text-[var(--color-primary-strong)]" />} title={t("sub.payments")} chevron onClick={() => navigate("/payroll")} />
+                ) : null}
+                {hasPlanFeature(me, "timesheets") ? (
+                  <ListRow leading={<FileClock className="size-5 text-[var(--color-primary-strong)]" />} title={t("sub.my_hours")} chevron onClick={() => navigate("/schedule/hours")} />
+                ) : null}
+                {canAccessReport(me) ? (
+                  <ListRow leading={<Receipt className="size-5 text-[var(--color-primary-strong)]" />} title={t("sub.revenue")} chevron onClick={() => navigate("/overview/revenue")} />
+                ) : null}
+                <ListRow leading={<CalendarPlus className="size-5 text-[var(--color-primary-strong)]" />} title={t("sub.calendar_sync")} chevron onClick={() => navigate("/settings/calendar")} />
+              </ListSection>
+            ) : null}
             <Sheet
               open={pinSheet}
               onClose={() => setPinSheet(false)}

@@ -130,7 +130,7 @@ export function PayrollPage() {
 
   return (
     <AppShell
-      title={t("sub.payroll")}
+      title={isStaff ? t("sub.payments") : t("sub.payroll")}
       flush
       action={
         isStaff ? undefined : (

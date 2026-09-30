@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, History, Plus, Trash2, X } from "lucide-react";
 
 import { WorkerAvatar } from "@/components/worker-avatar";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import type { MemberPosition, MembershipPermissionOverrides } from "@/lib/types";
 import { UnsavedDialog, useUnsavedChangesBlocker } from "@/lib/unsaved";
+import { WorkerHistorySheet } from "@/pages/team/worker-history";
 
 type Override = "inherit" | "allow" | "block";
 
@@ -73,6 +74,7 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
   const [pinDraft, setPinDraft] = useState<string | null>(null);
   const [role, setRole] = useState<"STAFF" | "MANAGER">("STAFF");
   const [askClose, setAskClose] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const setup = setupQuery.data;
   useEffect(() => {
@@ -108,7 +110,8 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
   }, [setup]);
   const dirty = Boolean(setup) && Boolean(userId) && snapshot({ positions, locations, overrides, role }) !== initialSnapshot;
   const blocker = useUnsavedChangesBlocker(dirty);
-  const requestClose = () => (dirty ? setAskClose(true) : onClose());
+  // With the history sheet on top, Escape is meant for it, not for this card underneath.
+  const requestClose = () => (historyOpen ? undefined : dirty ? setAskClose(true) : onClose());
   const catalogOptions = useMemo(() => {
     const taken = new Set(positions.map((item) => item.position.toLowerCase()));
     return (catalogQuery.data ?? []).filter((item) => !taken.has(item.name.toLowerCase())).map((item) => ({ value: item.name, label: item.name }));
@@ -358,6 +361,20 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
             </SheetSection>
           ) : null}
 
+          {hasPlanFeature(me, "timesheets") ? (
+            <SheetSection title={t("history.title")} footer={t("history.card_footer")}>
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(true)}
+                className="flex min-h-12 w-full items-center gap-3 text-left text-[16px] text-black active:opacity-60"
+              >
+                <History className="size-5 text-[var(--color-primary-strong)]" />
+                <span className="flex-1">{t("history.open")}</span>
+                <ChevronRight className="size-4 text-[#c4c4c6]" aria-hidden />
+              </button>
+            </SheetSection>
+          ) : null}
+
           <SheetSection title={t("clock.header")} footer={t("clock.member_pin_footer")}>
             <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 py-2">
               <span className="text-[16px] text-black">{t("clock.pin")}</span>
@@ -431,6 +448,7 @@ export function WorkerSheet({ userId, onClose }: { userId: string | null; onClos
         </>
       ) : null}
     </Sheet>
+    <WorkerHistorySheet userId={historyOpen ? userId : null} name={setup?.full_name ?? ""} onClose={() => setHistoryOpen(false)} />
     <UnsavedDialog
       open={askClose || blocker.state === "blocked"}
       title={t("unsaved.title")}

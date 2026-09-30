@@ -225,6 +225,27 @@ def todays_shift(db: Session, organization_id: UUID, user_id: UUID, location: Lo
     )
 
 
+def next_shift(db: Session, organization_id: UUID, user_id: UUID, now: datetime | None = None) -> tuple[Shift, Location] | None:
+    """The person's shift that is running now or starts next, by each location's own clock."""
+    now = now or datetime.now(UTC)
+    rows = db.execute(
+        select(Shift, Location)
+        .join(Assignment, Assignment.shift_id == Shift.id)
+        .join(Location, Location.id == Shift.location_id)
+        .where(
+            Shift.organization_id == organization_id,
+            Assignment.user_id == user_id,
+            Shift.date >= (now - timedelta(days=1)).date(),
+        )
+        .order_by(Shift.date, Shift.start_time)
+        .limit(60)
+    ).all()
+    for shift, location in rows:
+        if _shift_end(shift, _zone(location)) > now:
+            return shift, location
+    return None
+
+
 def clock_in(
     db: Session,
     organization_id: UUID,
