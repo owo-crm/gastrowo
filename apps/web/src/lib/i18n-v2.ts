@@ -761,6 +761,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "roadmap.step.revenue_body": "See what share of sales goes to wages.",
     "tour.finish_roadmap.title": "Your roadmap",
     "tour.finish_roadmap.body": "Follow these steps to get fully set up — each ticks itself off when you do it. Replay this tour in Settings.",
+    "platform.roadmap_short": "Roadmap {{done}}/{{total}}",
+    "platform.roadmap": "Get started: {{done}} of {{total}}",
+    "platform.roadmap_hidden": "The owner hid the roadmap.",
     // @end-en
   },
   pl: {
@@ -1519,6 +1522,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "roadmap.step.revenue_body": "Zobacz, jaka część sprzedaży idzie na wynagrodzenia.",
     "tour.finish_roadmap.title": "Twoja mapa drogowa",
     "tour.finish_roadmap.body": "Przejdź te kroki, by wszystko skonfigurować — każdy odhacza się sam. Przewodnik powtórzysz w Ustawieniach.",
+    "platform.roadmap_short": "Start {{done}}/{{total}}",
+    "platform.roadmap": "Pierwsze kroki: {{done}} z {{total}}",
+    "platform.roadmap_hidden": "Właściciel ukrył listę kroków.",
     // @end-pl
   },
   ru: {
@@ -2277,6 +2283,9 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "roadmap.step.revenue_body": "Увидите, какая доля выручки уходит на зарплаты.",
     "tour.finish_roadmap.title": "Ваша дорожная карта",
     "tour.finish_roadmap.body": "Пройдите эти шаги, чтобы всё настроить — каждый отмечается сам. Тур можно пройти снова в Настройках.",
+    "platform.roadmap_short": "Старт {{done}}/{{total}}",
+    "platform.roadmap": "Первые шаги: {{done}} из {{total}}",
+    "platform.roadmap_hidden": "Владелец скрыл вкладку с шагами.",
     // @end-ru
   },
 };

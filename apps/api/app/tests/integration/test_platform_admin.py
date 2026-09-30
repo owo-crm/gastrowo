@@ -11,6 +11,8 @@ def _setup(client, monkeypatch):
     customer, _ = signup_ADMIN(client, organization_name="Taco Stand", email="owner@taco-stand.com")
     orgs = client.get("/platform/organizations", headers=auth_header(boss)).json()["data"]
     taco = next(item for item in orgs if item["name"] == "Taco Stand")
+    # The owner's Get started progress is visible to the platform team.
+    assert taco["roadmap"]["total"] == 12 and len(taco["roadmap"]["steps"]) == 12
     return boss, customer, taco["id"]
 
 

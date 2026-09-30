@@ -663,6 +663,7 @@ export type PlatformBusiness = {
   discount_percent: number | null;
   discount_months: number | null;
   admin_note: string | null;
+  roadmap?: { hidden: boolean; done_count: number; total: number; steps: { key: string; done: boolean }[] } | null;
   survey?: { business_type: string | null; team_size: string | null; previous_tool: string | null; source: string | null } | null;
 };
 

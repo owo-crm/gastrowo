@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { Check, Search } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -124,7 +124,7 @@ export function PlatformPage() {
             onClick={() => setOpenId(item.id)}
             chevron
             title={item.name}
-            subtitle={`${item.owners[0] ?? "—"} · ${t("platform.people_locations", { people: item.members, locations: item.locations })}`}
+            subtitle={`${item.owners[0] ?? "—"} · ${t("platform.people_locations", { people: item.members, locations: item.locations })}${item.roadmap ? ` · ${t("platform.roadmap_short", { done: item.roadmap.done_count, total: item.roadmap.total })}` : ""}`}
             trailing={<Badge tone={PLAN_TONE[item.plan] ?? "neutral"}>{planLabel(item, t)}</Badge>}
           />
         ))}
@@ -221,6 +221,21 @@ function BusinessSheet({ id, onClose, onChanged, onDeleted }: { id: string | nul
               {item.survey.team_size ? <ListRow title={t("signup.team_size.title")} trailing={t(`signup.team_size.${item.survey.team_size}`)} /> : null}
               {item.survey.previous_tool ? <ListRow title={t("signup.previous_tool.title")} trailing={t(`signup.previous_tool.${item.survey.previous_tool}`)} /> : null}
               {item.survey.source ? <ListRow title={t("login.heard_about")} trailing={t(`source.${item.survey.source}`)} /> : null}
+            </ListSection>
+          ) : null}
+
+          {item.roadmap ? (
+            <ListSection
+              header={t("platform.roadmap", { done: item.roadmap.done_count, total: item.roadmap.total })}
+              footer={item.roadmap.hidden ? t("platform.roadmap_hidden") : undefined}
+            >
+              {item.roadmap.steps.map((step) => (
+                <ListRow
+                  key={step.key}
+                  title={<span className={step.done ? "text-black" : "text-[var(--color-text-muted)]"}>{t(`roadmap.step.${step.key}`)}</span>}
+                  trailing={step.done ? <Check className="size-5 text-[var(--color-success)]" /> : <span className="text-[var(--color-text-muted)]">—</span>}
+                />
+              ))}
             </ListSection>
           ) : null}
 

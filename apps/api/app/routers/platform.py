@@ -35,8 +35,10 @@ from app.models import (
     User,
 )
 from app.services.billing import effective_plan, get_or_create_subscription
+from app.services.roadmap import roadmap
 
 logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/platform", tags=["platform"])
 
 
@@ -114,6 +116,17 @@ def _survey(db: Session, organization: Organization) -> dict:
     }
 
 
+def _roadmap(db: Session, organization: Organization) -> dict | None:
+    """How far the owner got on the Get started roadmap (same checks they see on /start)."""
+    owner = db.scalar(
+        select(User)
+        .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+        .where(OrganizationMembership.organization_id == organization.id, OrganizationMembership.role == RoleEnum.ADMIN)
+        .order_by(User.created_at)
+    )
+    return roadmap(db, organization, owner) if owner else None
+
+
 def _row(db: Session, organization: Organization, members: int, locations: int) -> dict:
     subscription = get_or_create_subscription(db, organization.id)
     plan, status = effective_plan(subscription)
@@ -124,6 +137,7 @@ def _row(db: Session, organization: Organization, members: int, locations: int) 
         "created_at": organization.created_at.isoformat() if organization.created_at else None,
         "owners": _owners(db, organization.id),
         "survey": _survey(db, organization),
+        "roadmap": _roadmap(db, organization),
         "members": members,
         "locations": locations,
         "plan": plan.value,
