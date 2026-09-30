@@ -250,17 +250,17 @@ def send_otp(payload: OtpSendRequest, db: Session = Depends(get_db)):
         if user is None:
             raise HTTPException(status_code=404, detail="Account with this email was not found")
         title = "Sign in to Platofy"
-        subtitle = "Use this code to finish signing in."
+        subtitle = "Enter this code in Platofy to sign in."
     elif payload.purpose == OtpPurposeEnum.OWNER_SIGNUP:
         if user is not None:
             raise HTTPException(status_code=409, detail="Email already exists")
-        title = "Verify your owner email"
-        subtitle = "Confirm this email to continue setting up your business."
+        title = "Confirm your email"
+        subtitle = "Enter this code in Platofy to finish creating your account."
     elif payload.purpose == OtpPurposeEnum.WORKER_SIGNUP:
         if user is not None:
             raise HTTPException(status_code=409, detail="Email already exists")
-        title = "Verify your worker email"
-        subtitle = "Confirm this email to create your Platofy account."
+        title = "Confirm your email"
+        subtitle = "Enter this code in Platofy to create your account."
     else:
         invite = db.scalar(select(InviteToken).where(InviteToken.token == payload.invite_token))
         if invite is None:
@@ -273,8 +273,8 @@ def send_otp(payload: OtpSendRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Invite email mismatch")
         if user is not None:
             _ensure_single_business_rule(db, user.id, invite.organization_id)
-        title = "Confirm your invite"
-        subtitle = "Use this code to join the invited business."
+        title = "Join your team"
+        subtitle = "Enter this code in Platofy to join your team."
 
     code = _create_otp_challenge(db, email=email, purpose=payload.purpose, invite_token=payload.invite_token)
     send_otp_email(email=email, code=code, title=title, subtitle=subtitle, expires_in_minutes=OTP_EXPIRES_SECONDS // 60)
