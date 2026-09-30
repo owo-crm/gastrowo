@@ -834,6 +834,13 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "templates.starter_create": "Create",
     "templates.starter_done": "Typical week created. Adjust the times and people.",
     "billing.trial_no_checkout": "You are on the free Pro trial until {{date}}: everything in Pro is yours until then. Choose a plan here when the trial ends.",
+    "platform.leads": "Leads ({{count}})",
+    "platform.leads_footer": "Emails left on the free tools and the switch-over form. Newest first.",
+    "platform.no_leads": "No leads yet",
+    "platform.lead_kind.template": "Schedule template",
+    "platform.lead_kind.calculator": "Calculator",
+    "platform.lead_kind.migration": "Switch-over request",
+    "platform.lead_kind.compare": "Comparison page",
     // @end-en
   },
 };

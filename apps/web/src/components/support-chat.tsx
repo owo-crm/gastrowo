@@ -204,7 +204,9 @@ export function SupportLauncher() {
     Boolean(token && me?.is_linked) &&
     !me?.is_sandbox &&
     !me?.is_platform_admin &&
-    !HIDDEN_ON.includes(location.pathname);
+    !HIDDEN_ON.includes(location.pathname) &&
+    !location.pathname.startsWith("/tools") &&
+    !location.pathname.startsWith("/compare");
 
   const unread = useQuery({
     queryKey: ["support", "unread"],

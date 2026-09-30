@@ -627,3 +627,21 @@ class SupportMessage(Base):
     from_staff: Mapped[bool] = mapped_column(Boolean, default=False)
     body: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+
+
+class MarketingLead(Base):
+    """Someone who left an email on a public page: a free tool, the switch-over form, a comparison page."""
+
+    __tablename__ = "marketing_leads"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    # template | calculator | migration | compare
+    kind: Mapped[str] = mapped_column(String(32), index=True)
+    source: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    business: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    current_tool: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    team_size: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)

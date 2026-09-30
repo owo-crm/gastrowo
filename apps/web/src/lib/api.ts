@@ -139,6 +139,12 @@ export const api = {
   hideRoadmap(token: string) {
     return request<{ hidden: boolean }>("/organizations/current/roadmap/hide", { method: "POST" }, token);
   },
+  submitLead(body: { email: string; kind: "template" | "calculator" | "migration" | "compare"; source?: string; name?: string; business?: string; current_tool?: string; team_size?: string; message?: string; website?: string }) {
+    return request<{ received: boolean }>("/marketing/leads", { method: "POST", body: JSON.stringify(body) });
+  },
+  platformLeads(token: string) {
+    return request<Array<{ id: string; email: string; kind: string; source: string | null; name: string | null; business: string | null; current_tool: string | null; team_size: string | null; message: string | null; created_at: string | null }>>("/platform/leads", {}, token);
+  },
   publicDemo(country: "US" | "PL") {
     return request<AuthLoginResponse>("/auth/demo", { method: "POST", body: JSON.stringify({ country }) });
   },

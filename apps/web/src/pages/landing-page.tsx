@@ -200,6 +200,7 @@ export function LandingPage() {
             <ul className="flex items-center gap-7">
               {[
                 ["/how-it-works", copy.hero.secondary],
+                ["/tools", "Free tools"],
                 ["#features", copy.nav.features],
                 ["#pricing", copy.nav.pricing],
                 ["#faq", copy.nav.faq],
@@ -386,6 +387,15 @@ export function LandingPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <Link to="/tools" className="hover:text-black">
+              Free tools
+            </Link>
+            <Link to="/tools/restaurant-schedule-template" className="hover:text-black">
+              Schedule template
+            </Link>
+            <Link to="/tools/labor-cost-calculator" className="hover:text-black">
+              Labor cost calculator
+            </Link>
             <Link to={legalLinks(lang).terms} className="hover:text-black">
               {copy.legal.terms}
             </Link>

@@ -110,7 +110,10 @@ export function ProductTour() {
 
   const steps = useMemo(() => (me ? stepsFor(me) : []), [me]);
   const step = index === null ? null : steps[index] ?? null;
-  const inApp = !["/", "/login", "/join", "/kiosk", "/demo", "/pending-link"].includes(location.pathname);
+  const inApp =
+    !["/", "/login", "/join", "/kiosk", "/demo", "/pending-link", "/how-it-works", "/terms", "/privacy", "/cookies"].includes(location.pathname) &&
+    !location.pathname.startsWith("/tools") &&
+    !location.pathname.startsWith("/compare");
 
   // First sign-in: start once the app has rendered. Replays come from Settings.
   useEffect(() => {

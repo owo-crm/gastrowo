@@ -79,6 +79,7 @@ export function PlatformPage() {
     placeholderData: keepPreviousData,
   });
   const auditQuery = useQuery({ queryKey: ["platform-audit"], queryFn: () => api.platformAudit(token!), enabled: Boolean(token) });
+  const leadsQuery = useQuery({ queryKey: ["platform-leads"], queryFn: () => api.platformLeads(token!), enabled: Boolean(token) });
 
   const stats = statsQuery.data;
   const refreshAll = (withDetail = true) => {
@@ -129,6 +130,23 @@ export function PlatformPage() {
           />
         ))}
         {listQuery.data && !listQuery.data.length ? <ListRow title={<span className="text-[var(--color-text-muted)]">{t("platform.nothing_found")}</span>} /> : null}
+      </ListSection>
+
+      <ListSection header={t("platform.leads", { count: leadsQuery.data?.length ?? 0 })} footer={t("platform.leads_footer")}>
+        {(leadsQuery.data ?? []).slice(0, 30).map((lead) => (
+          <ListRow
+            key={lead.id}
+            title={
+              <a href={`mailto:${lead.email}`} className="text-[var(--color-primary-strong)]">
+                {lead.email}
+              </a>
+            }
+            subtitle={[t(`platform.lead_kind.${lead.kind}`), lead.business, lead.current_tool, lead.team_size, lead.message, lead.created_at ? formatDate(lead.created_at, lang, { month: "short", day: "numeric" }) : null]
+              .filter(Boolean)
+              .join(" · ")}
+          />
+        ))}
+        {leadsQuery.data && !leadsQuery.data.length ? <ListRow title={<span className="text-[var(--color-text-muted)]">{t("platform.no_leads")}</span>} /> : null}
       </ListSection>
 
       <ListSection header={t("platform.recent")}>
