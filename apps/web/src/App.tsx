@@ -24,7 +24,6 @@ const PlatformPage = lazy(() => import("@/pages/platform-page").then((module) =>
 const StartPage = lazy(() => import("@/pages/start-page").then((module) => ({ default: module.StartPage })));
 const TasksPage = lazy(() => import("@/pages/tasks-page").then((module) => ({ default: module.TasksPage })));
 const TeamPage = lazy(() => import("@/pages/team/team-page").then((module) => ({ default: module.TeamPage })));
-const WaitlistPage = lazy(() => import("@/pages/waitlist-page").then((module) => ({ default: module.WaitlistPage })));
 const HowItWorksPage = lazy(() => import("@/pages/how-it-works-page").then((module) => ({ default: module.HowItWorksPage })));
 const TermsPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.TermsPageEn })));
 const PrivacyPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.PrivacyPageEn })));
@@ -232,7 +231,6 @@ export function App() {
       <Route path="/notes" element={<ProtectedRoute><NotesAccessRoute><NotesDocumentsPage /></NotesAccessRoute></ProtectedRoute>} />
       <Route path="/inventory" element={<Navigate to={effectiveToken ? linkedDefaultRoute : "/"} replace />} />
       <Route path="/platform" element={<ProtectedRoute><PlatformPage /></ProtectedRoute>} />
-      <Route path="/waitlist" element={<ProtectedRoute><ADMINRoute><WaitlistPage /></ADMINRoute></ProtectedRoute>} />
 
       <Route path="/home" element={<Navigate to="/overview" replace />} />
       <Route path="/dashboard" element={<Navigate to="/overview" replace />} />

@@ -26,7 +26,6 @@ from app.routers import (
     clock,
     dashboard,
     locations,
-    marketing,
     notifications,
     organizations,
     payroll,
@@ -192,7 +191,6 @@ app.include_router(auth.router)
 app.include_router(organizations.router)
 app.include_router(billing.router)
 app.include_router(locations.router)
-app.include_router(marketing.router)
 app.include_router(users.router)
 app.include_router(workers.router)
 app.include_router(positions.router)

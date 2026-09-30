@@ -46,8 +46,6 @@ import type {
   PayrollSummary,
   User,
   WeeklyShiftOverride,
-  WaitlistLead,
-  WaitlistSignupResponse,
   WorkerSetup,
   ShiftEndPayload,
   MemberRemovalImpact,
@@ -164,15 +162,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     });
-  },
-  joinWaitlist(input: { email: string }) {
-    return request<WaitlistSignupResponse>("/marketing/waitlist", {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-  },
-  listWaitlist(token: string) {
-    return request<WaitlistLead[]>("/marketing/waitlist", {}, token);
   },
   bootstrapSession() {
     return request<SessionBootstrapResponse | null>("/auth/session");
