@@ -36,7 +36,7 @@ import { Switch } from "@/components/ui/switch";
 import { Segmented } from "@/components/ui/segmented";
 import { StaffWeek } from "@/components/schedule/staff-week";
 import { ClockCard } from "@/components/clock/clock-card";
-import { DayList, DayStrip, WeekGrid, type GridDay, type GridPerson, type GridShift } from "@/components/schedule/week-grid";
+import { DayList, DayStrip, WeekGrid, type GridDay, type GridDropTarget, type GridPerson, type GridShift } from "@/components/schedule/week-grid";
 import { currencyOf, formatDate, formatMoney } from "@/lib/format";
 import { positionColor, tint } from "@/lib/position-colors";
 import { cn } from "@/lib/utils";
@@ -2901,6 +2901,19 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
     );
   };
 
+  // Drag and drop in the draft: another day, another person, or back to open shifts.
+  const moveDraftShift = (shift: GridShift, target: GridDropTarget) => {
+    patchPreviewEditMutation.mutate(
+      { action: "upsert", shift_key: `override:${shift.key}`, day_of_week: target.dayIndex, assigned_user_id: target.personId },
+      {
+        onError: (error) => {
+          const overlap = error instanceof Error && /overlap/i.test(error.message);
+          toast.error(t("schedule.move_failed"), overlap ? t("schedule.move_overlap") : error instanceof Error ? error.message : undefined);
+        },
+      },
+    );
+  };
+
   // ---- Full-screen week grid (manager calendar) ----
   const positionOrder = (positionsCatalogQuery.data ?? []).map((item) => item.name);
   const gridDays: GridDay[] = weekDays.map((day) => ({
@@ -2994,6 +3007,9 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
           </span>
         ) : null}
         {openCount > 0 ? <Badge tone="red" className="max-md:hidden">{t("schedule.grid_open_count", { count: openCount })}</Badge> : null}
+        {!isPhone && (scheduleStage === "preview" || scheduleStage === "applied") ? (
+          <span className="hidden text-[13px] text-[var(--color-text-muted)] xl:inline">{t(scheduleStage === "preview" ? "schedule.drag_hint" : "schedule.drag_hint_published")}</span>
+        ) : null}
         <div className="ml-auto flex flex-wrap items-center gap-2" data-tour="schedule-actions">
           {scheduleStage === "applied" && !isPhone ? (
             <Segmented
@@ -3087,6 +3103,7 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
             shifts={visibleShifts}
             positionOrder={positionOrder}
             t={t}
+            onMove={scheduleStage === "preview" ? moveDraftShift : undefined}
             onAdd={
               scheduleStage === "preview"
                 ? (dayIndex, personId) => {

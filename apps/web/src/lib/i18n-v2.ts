@@ -862,6 +862,10 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "referral.on_trial": "On trial",
     "referral.credit_footer": "{{count}} free month(s) waiting: they are applied when you choose a plan.",
     "referral.signup_note": "You were invited: 60 days of Pro free instead of 30.",
+    "schedule.drag_hint": "Drag shifts to move them between days and people",
+    "schedule.drag_hint_published": "Edit week to move shifts by dragging",
+    "schedule.move_failed": "Couldn't move the shift",
+    "schedule.move_overlap": "This person already has a shift at that time.",
     // @end-en
   },
 };
