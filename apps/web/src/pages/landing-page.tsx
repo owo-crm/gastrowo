@@ -36,7 +36,7 @@ type Copy = {
   legal: { terms: string; privacy: string; cookies: string };
 };
 
-const COPY: Record<Lang, Copy> = {
+const COPY: Record<"en", Copy> = {
   en: {
     nav: { features: "Features", pricing: "Pricing", faq: "FAQ", signIn: "Sign in", start: "Start free" },
     hero: {
@@ -187,7 +187,7 @@ function WeekPreview({ copy }: { copy: Copy["preview"] }) {
 export function LandingPage() {
   const { lang, t } = useLanguage();
   useScrollToHash();
-  const copy = COPY[lang] ?? COPY.en;
+  const copy = COPY.en;
   const currency = currencyForLang(lang);
   const fromPrice = formatMoney(PLAN_PRICE[currency].standard.monthly, currency, lang);
 

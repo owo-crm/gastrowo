@@ -418,13 +418,24 @@ function getRejectedReasonLabel(reason: string, lang: Lang): string {
       not_in_location: "wrong location",
       location_priority_blocked: "blocked in location",
     },
+    pl: {
+      availability_missing: "brak dostępności",
+      availability_window_mismatch: "poza dostępnością",
+      overlap: "nakładanie",
+      daily_rest_violation: "brak 11h odpoczynku",
+      weekly_rest_violation: "brak 35h odpoczynku tyg.",
+      desired_hours_cap_exceeded: "limit godzin",
+      staff_position_mismatch: "zła pozycja",
+      not_in_location: "zła lokalizacja",
+      location_priority_blocked: "blokada w lokalu",
+    },
   };
 
   return copy[lang][reason] ?? reason.replace(/_/g, " ");
 }
 
 function getStartCoverageLabel(lang: Lang): string {
-  return "No one starts on time";
+  return lang === "pl" ? "Nikt nie zaczyna o czasie" : "No one starts on time";
 }
 
 function summariseRejectedReasons(reasonCounts: Record<string, number>, lang: Lang): string | undefined {

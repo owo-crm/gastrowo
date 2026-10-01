@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import { useLanguage } from "@/lib/i18n";
+import { useLanguage, type Lang } from "@/lib/i18n";
 import { usePlatformSession } from "@/lib/platform-session";
 import type { SupportThreadRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -71,7 +71,7 @@ export function PlatformSupportPage() {
   );
 }
 
-function ThreadRow({ row, active, onClick, lang }: { row: SupportThreadRow; active: boolean; onClick: () => void; lang: "en" }) {
+function ThreadRow({ row, active, onClick, lang }: { row: SupportThreadRow; active: boolean; onClick: () => void; lang: Lang }) {
   return (
     <li>
       <button

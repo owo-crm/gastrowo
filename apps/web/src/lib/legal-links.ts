@@ -1,4 +1,6 @@
-/** Links to the legal documents (English; Platofy is US-only). */
-export function legalLinks(_lang?: string) {
-  return { terms: "/terms", privacy: "/privacy", cookies: "/cookies" };
+/** Polish app users get the Polish documents; everyone else (and the marketing site) the English ones. */
+export function legalLinks(lang?: string) {
+  return lang === "pl"
+    ? { terms: "/regulamin", privacy: "/polityka-prywatnosci", cookies: "/polityka-cookies" }
+    : { terms: "/terms", privacy: "/privacy", cookies: "/cookies" };
 }

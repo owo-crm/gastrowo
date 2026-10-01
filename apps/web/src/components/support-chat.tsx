@@ -7,7 +7,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
-import { useLanguage } from "@/lib/i18n";
+import { useLanguage, type Lang } from "@/lib/i18n";
 import type { SupportMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ export function openSupportChat() {
   window.dispatchEvent(new Event(OPEN_EVENT));
 }
 
-function timeLabel(value: string, lang: "en") {
+function timeLabel(value: string, lang: Lang) {
   const date = new Date(value);
   const today = new Date();
   const sameDay = date.toDateString() === today.toDateString();

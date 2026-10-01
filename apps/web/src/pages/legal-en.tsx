@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { BrandLogo } from "@/components/brand-logo";
 
 /**
- * Legal pages (Platofy is US-only; the old Polish URLs redirect here). Company details are filled in once the operating
+ * English legal pages; the Polish documents are at /regulamin, /polityka-prywatnosci and /polityka-cookies. Company details are filled in once the operating
  * entity is registered; until then the operator is referred to by the service name.
  */
 

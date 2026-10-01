@@ -110,7 +110,7 @@ const EN: Copy = {
 };
 
 
-const COPY: Record<Lang, Copy> = { en: EN };
+const COPY: Record<"en", Copy> = { en: EN };
 
 function Framed({ shot: item }: { shot: Shot }) {
   // Tap to open the full-size screenshot (small screens show desktop shots scaled down).
@@ -171,7 +171,7 @@ function StepShots({ shots }: { shots: Shot[] }) {
 export function HowItWorksPage() {
   const { lang } = useLanguage();
   useScrollToHash();
-  const copy = COPY[lang] ?? EN;
+  const copy = COPY.en;
   const links = legalLinks(lang);
 
   useEffect(() => {

@@ -3,7 +3,7 @@ import type { MeResponse } from "@/lib/types";
 
 export type Currency = "USD" | "PLN";
 
-const LOCALE: Record<Lang, string> = { en: "en-US" };
+const LOCALE: Record<Lang, string> = { en: "en-US", pl: "pl-PL" };
 
 export function localeFor(lang: Lang): string {
   return LOCALE[lang] ?? "en-US";
