@@ -9,7 +9,7 @@ import { LoginPage } from "@/pages/login-page";
 import { PendingLinkPage } from "@/pages/pending-link-page";
 import { useAuth } from "@/lib/auth";
 import { getHomeRoute } from "@/lib/navigation";
-import { useLanguage } from "@/lib/i18n";
+import { EnglishOnly, useLanguage } from "@/lib/i18n";
 
 // App pages load on demand so the landing and login stay small.
 const DemoPage = lazy(() => import("@/pages/demo-page").then((module) => ({ default: module.DemoPage })));
@@ -36,6 +36,9 @@ const TipPoolPage = lazy(() => import("@/pages/tools-pages").then((module) => ({
 const ComparePage = lazy(() => import("@/pages/compare-pages").then((module) => ({ default: module.ComparePage })));
 const SwitchPage = lazy(() => import("@/pages/compare-pages").then((module) => ({ default: module.SwitchPage })));
 const ReferralsPage = lazy(() => import("@/pages/referrals-page").then((module) => ({ default: module.ReferralsPage })));
+const TermsPage = lazy(() => import("@/pages/legal-pages").then((module) => ({ default: module.TermsPage })));
+const PrivacyPolicyPage = lazy(() => import("@/pages/legal-pages").then((module) => ({ default: module.PrivacyPolicyPage })));
+const CookiesPolicyPage = lazy(() => import("@/pages/legal-pages").then((module) => ({ default: module.CookiesPolicyPage })));
 const HowItWorksPage = lazy(() => import("@/pages/how-it-works-page").then((module) => ({ default: module.HowItWorksPage })));
 const TermsPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.TermsPageEn })));
 const PrivacyPageEn = lazy(() => import("@/pages/legal-en").then((module) => ({ default: module.PrivacyPageEn })));
@@ -172,7 +175,7 @@ export function App() {
     <Routes>
       <Route
         path="/"
-        element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : hasUnresolvedSession ? <PendingLinkPage /> : <LandingPage />}
+        element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : hasUnresolvedSession ? <PendingLinkPage /> : <EnglishOnly><LandingPage /></EnglishOnly>}
       />
       <Route
         path="/login"
@@ -184,21 +187,20 @@ export function App() {
       />
       <Route path="/demo" element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : <DemoPage />} />
       <Route path="/kiosk" element={<KioskPage />} />
-      <Route path="/how-it-works" element={<HowItWorksPage />} />
-      <Route path="/tools" element={<ToolsHubPage />} />
-      <Route path="/compare/:slug" element={<ComparePage />} />
-      <Route path="/switch" element={<SwitchPage />} />
-      <Route path="/tools/restaurant-schedule-template" element={<ScheduleTemplatePage />} />
-      <Route path="/tools/labor-cost-calculator" element={<LaborCostPage />} />
-      <Route path="/tools/overtime-calculator" element={<OvertimePage />} />
-      <Route path="/tools/tip-pool-calculator" element={<TipPoolPage />} />
-      <Route path="/terms" element={<TermsPageEn />} />
-      <Route path="/privacy" element={<PrivacyPageEn />} />
-      <Route path="/cookies" element={<CookiesPageEn />} />
-      {/* Old Polish document links now open the English documents. */}
-      <Route path="/regulamin" element={<Navigate to="/terms" replace />} />
-      <Route path="/polityka-prywatnosci" element={<Navigate to="/privacy" replace />} />
-      <Route path="/polityka-cookies" element={<Navigate to="/cookies" replace />} />
+      <Route path="/how-it-works" element={<EnglishOnly><HowItWorksPage /></EnglishOnly>} />
+      <Route path="/tools" element={<EnglishOnly><ToolsHubPage /></EnglishOnly>} />
+      <Route path="/compare/:slug" element={<EnglishOnly><ComparePage /></EnglishOnly>} />
+      <Route path="/switch" element={<EnglishOnly><SwitchPage /></EnglishOnly>} />
+      <Route path="/tools/restaurant-schedule-template" element={<EnglishOnly><ScheduleTemplatePage /></EnglishOnly>} />
+      <Route path="/tools/labor-cost-calculator" element={<EnglishOnly><LaborCostPage /></EnglishOnly>} />
+      <Route path="/tools/overtime-calculator" element={<EnglishOnly><OvertimePage /></EnglishOnly>} />
+      <Route path="/tools/tip-pool-calculator" element={<EnglishOnly><TipPoolPage /></EnglishOnly>} />
+      <Route path="/terms" element={<EnglishOnly><TermsPageEn /></EnglishOnly>} />
+      <Route path="/privacy" element={<EnglishOnly><PrivacyPageEn /></EnglishOnly>} />
+      <Route path="/cookies" element={<EnglishOnly><CookiesPageEn /></EnglishOnly>} />
+      <Route path="/regulamin" element={<TermsPage />} />
+      <Route path="/polityka-prywatnosci" element={<PrivacyPolicyPage />} />
+      <Route path="/polityka-cookies" element={<CookiesPolicyPage />} />
       <Route
         path="/pending-link"
         element={
