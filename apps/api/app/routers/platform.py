@@ -1,6 +1,6 @@
 """Platform admin panel: every business on Platofy, their subscriptions, and a log of what was changed.
 
-Only emails in PLATFORM_ADMIN_EMAILS get in. Changes to a business with a live Stripe subscription are
+Only emails in PLATFORM_ADMIN_EMAILS get in, with an admin session from /platform/auth (email code + authenticator app). Changes to a business with a live Stripe subscription are
 mirrored to Stripe where Stripe has an equivalent (free days, coupon, cancel); the local record is the
 source of truth for businesses without one.
 """
@@ -20,7 +20,6 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.deps import get_current_user
 from app.core.envelope import ok
 from app.db import get_db
 from app.models import (
@@ -34,6 +33,7 @@ from app.models import (
     SubscriptionStatusEnum,
     User,
 )
+from app.routers.platform_auth import require_platform_admin
 from app.services.billing import effective_plan, get_or_create_subscription
 from app.services.roadmap import roadmap
 
@@ -42,10 +42,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/platform", tags=["platform"])
 
 
-def require_platform_admin(user: User = Depends(get_current_user)) -> User:
-    if user.email.lower() not in settings.parsed_platform_admin_emails:
-        raise HTTPException(status_code=403, detail="Platform admin access required")
-    return user
 
 
 class SubscriptionAction(BaseModel):

@@ -114,6 +114,7 @@ export function ProductTour() {
   const inApp =
     !["/", "/login", "/join", "/kiosk", "/demo", "/pending-link", "/how-it-works", "/terms", "/privacy", "/cookies", "/switch"].includes(location.pathname) &&
     !location.pathname.startsWith("/tools") &&
+    !location.pathname.startsWith("/platform") &&
     !location.pathname.startsWith("/compare");
 
   // First sign-in of a new account: start once the app has rendered. The server remembers a finished

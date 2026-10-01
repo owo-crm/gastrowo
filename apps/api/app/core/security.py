@@ -60,6 +60,10 @@ def create_access_token(subject: str, org_id: str, expires_delta: timedelta | No
 
 def decode_token(token: str) -> dict[str, Any]:
     try:
-        return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
     except JWTError as exc:
         raise ValueError("Invalid token") from exc
+    # Admin-panel sessions and tickets carry a scope; they never act as a normal sign-in.
+    if payload.get("scope"):
+        raise ValueError("Invalid token")
+    return payload

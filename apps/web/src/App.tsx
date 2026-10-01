@@ -22,6 +22,8 @@ const ReportPage = lazy(() => import("@/pages/report-page").then((module) => ({ 
 const SchedulePage = lazy(() => import("@/pages/schedule-page").then((module) => ({ default: module.SchedulePage })));
 const KioskPage = lazy(() => import("@/pages/kiosk-page").then((module) => ({ default: module.KioskPage })));
 const PlatformSupportPage = lazy(() => import("@/pages/platform-support-page").then((module) => ({ default: module.PlatformSupportPage })));
+const PlatformLoginPage = lazy(() => import("@/pages/platform-login-page").then((module) => ({ default: module.PlatformLoginPage })));
+const PlatformGuard = lazy(() => import("@/components/platform-shell").then((module) => ({ default: module.PlatformGuard })));
 const PlatformPage = lazy(() => import("@/pages/platform-page").then((module) => ({ default: module.PlatformPage })));
 const StartPage = lazy(() => import("@/pages/start-page").then((module) => ({ default: module.StartPage })));
 const TasksPage = lazy(() => import("@/pages/tasks-page").then((module) => ({ default: module.TasksPage })));
@@ -246,8 +248,10 @@ export function App() {
 
       <Route path="/notes" element={<ProtectedRoute><NotesAccessRoute><NotesDocumentsPage /></NotesAccessRoute></ProtectedRoute>} />
       <Route path="/inventory" element={<Navigate to={effectiveToken ? linkedDefaultRoute : "/"} replace />} />
-      <Route path="/platform" element={<ProtectedRoute><PlatformPage /></ProtectedRoute>} />
-      <Route path="/platform/support" element={<ProtectedRoute><PlatformSupportPage /></ProtectedRoute>} />
+      {/* The admin panel has its own sign-in (email code + authenticator app), separate from business accounts. */}
+      <Route path="/platform/login" element={<PlatformLoginPage />} />
+      <Route path="/platform" element={<PlatformGuard><PlatformPage /></PlatformGuard>} />
+      <Route path="/platform/support" element={<PlatformGuard><PlatformSupportPage /></PlatformGuard>} />
 
       <Route path="/home" element={<Navigate to="/overview" replace />} />
       <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
