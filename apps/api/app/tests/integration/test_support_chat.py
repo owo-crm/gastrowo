@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.tests.integration.test_api_flow import auth_header, signup_ADMIN
+from app.tests.integration.test_api_flow import auth_header, platform_session, signup_ADMIN
 
 
 def _setup(client, monkeypatch):
@@ -9,7 +9,7 @@ def _setup(client, monkeypatch):
     boss, _ = signup_ADMIN(client, organization_name="Platofy HQ", email="me@plato-hq.com")
     monkeypatch.setattr(settings, "platform_admin_emails", "me@plato-hq.com")
     customer, _ = signup_ADMIN(client, organization_name="Taco Stand", email="owner@taco-stand.com")
-    return boss, customer
+    return boss, platform_session(client, "me@plato-hq.com"), customer
 
 
 def _bell(client, token):
@@ -17,7 +17,7 @@ def _bell(client, token):
 
 
 def test_customer_writes_team_replies_both_are_notified(client, monkeypatch):
-    boss, customer = _setup(client, monkeypatch)
+    boss, boss_admin, customer = _setup(client, monkeypatch)
     assert client.get("/support", headers=auth_header(customer)).json()["data"] == {"thread": None, "messages": [], "unread": 0}
 
     sent = client.post("/support/messages", headers=auth_header(customer), json={"body": "  How do I add a second location?  "})
@@ -27,17 +27,17 @@ def test_customer_writes_team_replies_both_are_notified(client, monkeypatch):
     # The team gets a bell notification (which also pushes) that opens the conversation.
     bell = _bell(client, boss)
     assert bell["unread_count"] == 1 and bell["items"][0]["action_url"].startswith("/platform/support?thread=")
-    assert client.get("/platform/support/unread", headers=auth_header(boss)).json()["data"]["threads"] == 1
+    assert client.get("/platform/support/unread", headers=auth_header(boss_admin)).json()["data"]["threads"] == 1
 
-    threads = client.get("/platform/support/threads", headers=auth_header(boss)).json()["data"]
+    threads = client.get("/platform/support/threads", headers=auth_header(boss_admin)).json()["data"]
     assert len(threads) == 1 and threads[0]["organization_name"] == "Taco Stand" and threads[0]["unread"] == 1
     thread_id = threads[0]["id"]
 
-    opened = client.get(f"/platform/support/threads/{thread_id}", headers=auth_header(boss)).json()["data"]
+    opened = client.get(f"/platform/support/threads/{thread_id}", headers=auth_header(boss_admin)).json()["data"]
     assert opened["unread"] == 0 and len(opened["messages"]) == 1
-    assert client.get("/platform/support/unread", headers=auth_header(boss)).json()["data"]["threads"] == 0
+    assert client.get("/platform/support/unread", headers=auth_header(boss_admin)).json()["data"]["threads"] == 0
 
-    replied = client.post(f"/platform/support/threads/{thread_id}/messages", headers=auth_header(boss), json={"body": "Team → Locations → Add."})
+    replied = client.post(f"/platform/support/threads/{thread_id}/messages", headers=auth_header(boss_admin), json={"body": "Team → Locations → Add."})
     assert replied.status_code == 200 and replied.json()["data"]["messages"][-1]["from_staff"] is True
 
     # The customer is told and sees one unread reply signed by the team, not by a person.
@@ -49,19 +49,19 @@ def test_customer_writes_team_replies_both_are_notified(client, monkeypatch):
     assert client.get("/support/unread", headers=auth_header(customer)).json()["data"]["unread"] == 0
 
     # Closing hides it from the open list; a new customer message reopens it.
-    client.patch(f"/platform/support/threads/{thread_id}", headers=auth_header(boss), json={"status": "closed"})
-    assert client.get("/platform/support/threads", headers=auth_header(boss)).json()["data"] == []
+    client.patch(f"/platform/support/threads/{thread_id}", headers=auth_header(boss_admin), json={"status": "closed"})
+    assert client.get("/platform/support/threads", headers=auth_header(boss_admin)).json()["data"] == []
     client.post("/support/messages", headers=auth_header(customer), json={"body": "One more thing"})
-    assert client.get("/platform/support/threads", headers=auth_header(boss)).json()["data"][0]["status"] == "open"
+    assert client.get("/platform/support/threads", headers=auth_header(boss_admin)).json()["data"][0]["status"] == "open"
 
 
 def test_only_the_team_reads_the_inbox_and_empty_messages_are_refused(client, monkeypatch):
-    boss, customer = _setup(client, monkeypatch)
+    boss, boss_admin, customer = _setup(client, monkeypatch)
     assert client.post("/support/messages", headers=auth_header(customer), json={"body": "   "}).status_code == 422
     client.post("/support/messages", headers=auth_header(customer), json={"body": "Hi"})
-    assert client.get("/platform/support/threads", headers=auth_header(customer)).status_code == 403
-    thread_id = client.get("/platform/support/threads", headers=auth_header(boss)).json()["data"][0]["id"]
-    assert client.post(f"/platform/support/threads/{thread_id}/messages", headers=auth_header(customer), json={"body": "x"}).status_code == 403
+    assert client.get("/platform/support/threads", headers=auth_header(customer)).status_code == 401
+    thread_id = client.get("/platform/support/threads", headers=auth_header(boss_admin)).json()["data"][0]["id"]
+    assert client.post(f"/platform/support/threads/{thread_id}/messages", headers=auth_header(customer), json={"body": "x"}).status_code == 401
     # Another business never sees this conversation.
     other, _ = signup_ADMIN(client, organization_name="Pho Place", email="owner@pho.com")
     assert client.get("/support", headers=auth_header(other)).json()["data"]["thread"] is None

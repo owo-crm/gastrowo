@@ -206,6 +206,7 @@ export function SupportLauncher() {
     !me?.is_platform_admin &&
     !HIDDEN_ON.includes(location.pathname) &&
     !location.pathname.startsWith("/tools") &&
+    !location.pathname.startsWith("/platform") &&
     !location.pathname.startsWith("/compare") &&
     location.pathname !== "/switch";
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Search } from "lucide-react";
 
-import { AppShell } from "@/components/layout/app-shell";
+import { PlatformShell } from "@/components/platform-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,9 +10,9 @@ import { ListRow, ListSection } from "@/components/ui/list";
 import { Segmented } from "@/components/ui/segmented";
 import { Sheet } from "@/components/ui/sheet";
 import { api } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
+import { usePlatformSession } from "@/lib/platform-session";
 import { useToast } from "@/lib/toast";
 import type { PlatformAction, PlatformBusiness, PlatformLogItem } from "@/lib/types";
 
@@ -58,7 +58,7 @@ function describe(log: PlatformLogItem, t: Translate) {
 
 /** Platofy-internal: every business, its subscription, and the buttons to change it. */
 export function PlatformPage() {
-  const { token } = useAuth();
+  const { token } = usePlatformSession();
   const { t, lang } = useLanguage();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -89,14 +89,14 @@ export function PlatformPage() {
 
   if (statsQuery.isError) {
     return (
-      <AppShell title={t("sub.platform")} flush>
+      <PlatformShell title={t("sub.platform")} flush>
         <p className="px-4 py-10 text-center text-[15px] text-[var(--color-text-muted)] sm:px-6">{t("platform.no_access")}</p>
-      </AppShell>
+      </PlatformShell>
     );
   }
 
   return (
-    <AppShell title={t("sub.platform")} flush>
+    <PlatformShell title={t("sub.platform")} flush>
       <div className="mb-6 grid grid-cols-2 gap-3 px-4 sm:grid-cols-4 sm:px-6 [&>*]:ios-island">
         {[
           [t("platform.businesses"), stats?.businesses],
@@ -171,12 +171,12 @@ export function PlatformPage() {
           toast.success(t("platform.deleted"));
         }}
       />
-    </AppShell>
+    </PlatformShell>
   );
 }
 
 function BusinessSheet({ id, onClose, onChanged, onDeleted }: { id: string | null; onClose: () => void; onChanged: () => void; onDeleted: () => void }) {
-  const { token } = useAuth();
+  const { token } = usePlatformSession();
   const { t, lang } = useLanguage();
   const toast = useToast();
   const [plan, setPlan] = useState<"standard" | "pro">("pro");

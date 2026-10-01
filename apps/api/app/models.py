@@ -583,6 +583,30 @@ class PlatformAuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
 
 
+class PlatformAdminCredential(Base):
+    """Second factor for the platform admin panel: an email code, then an authenticator app (TOTP).
+
+    Kept apart from the person's own business account: signing in to Platofy never opens the panel.
+    """
+
+    __tablename__ = "platform_admin_credentials"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    # Encrypted with the app secret. `totp_pending` holds a secret shown during setup until its first code is confirmed.
+    totp_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
+    totp_pending: Mapped[str | None] = mapped_column(Text, nullable=True)
+    totp_last_step: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    email_code_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    email_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_code_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Bumped on sign-out: every admin session issued before it stops working.
+    session_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
 class PushSubscription(Base):
     """A browser or installed app that accepts push notifications for one person."""
 

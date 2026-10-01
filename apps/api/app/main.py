@@ -31,6 +31,7 @@ from app.routers import (
     organizations,
     payroll,
     platform,
+    platform_auth,
     push,
     positions,
     reports,
@@ -210,4 +211,5 @@ app.include_router(dashboard.router)
 app.include_router(payroll.router)
 app.include_router(clock.router)
 app.include_router(platform.router)
+app.include_router(platform_auth.router)
 app.include_router(push.router)

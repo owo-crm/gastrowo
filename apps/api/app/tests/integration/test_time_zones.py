@@ -6,7 +6,7 @@ from uuid import UUID
 import pytest
 
 from app.services import labor_rules
-from app.tests.integration.test_api_flow import auth_header, sent_code
+from app.tests.integration.test_api_flow import auth_header, platform_session, sent_code
 
 
 def _owner(client, email: str, name: str, **extra) -> str:
@@ -75,6 +75,7 @@ def test_signup_survey_is_stored_and_shown_to_platform_staff(client, db_session,
         team_size="11-25",
         previous_tool="excel",
     )
-    rows = client.get("/platform/organizations", headers=auth_header(token)).json()["data"]
+    token_admin = platform_session(client, "owner@survey-diner.com")
+    rows = client.get("/platform/organizations", headers=auth_header(token_admin)).json()["data"]
     row = next(item for item in (rows["items"] if isinstance(rows, dict) else rows) if item["name"] == "Survey Diner")
     assert row["survey"] == {"business_type": "cafe", "team_size": "11-25", "previous_tool": "excel", "source": "Facebook"}

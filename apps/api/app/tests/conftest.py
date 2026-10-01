@@ -38,6 +38,7 @@ def capture_otp_emails(monkeypatch: pytest.MonkeyPatch) -> None:
         SENT_CODES[email] = code
 
     monkeypatch.setattr("app.routers.auth.send_otp_email", fake_send_otp_email)
+    monkeypatch.setattr("app.routers.platform_auth.send_otp_email", fake_send_otp_email)
 
 
 @pytest.fixture()

@@ -3,20 +3,20 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { ChevronLeft } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-import { AppShell } from "@/components/layout/app-shell";
+import { PlatformShell } from "@/components/platform-shell";
 import { ChatComposer, ChatMessages } from "@/components/support-chat";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { api } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
+import { usePlatformSession } from "@/lib/platform-session";
 import type { SupportThreadRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Platofy-internal: every customer conversation, newest first; answer right here. */
 export function PlatformSupportPage() {
-  const { token, me } = useAuth();
+  const { token } = usePlatformSession();
   const { t, lang } = useLanguage();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<"open" | "closed" | "all">("open");
@@ -25,7 +25,7 @@ export function PlatformSupportPage() {
   const threads = useQuery({
     queryKey: ["platform-support", filter],
     queryFn: () => api.supportThreads(token!, filter),
-    enabled: Boolean(token && me?.is_platform_admin),
+    enabled: Boolean(token),
     refetchInterval: 8_000,
     placeholderData: keepPreviousData,
   });
@@ -37,18 +37,10 @@ export function PlatformSupportPage() {
     setParams(next, { replace: true });
   };
 
-  if (!me?.is_platform_admin) {
-    return (
-      <AppShell title={t("support.inbox")}>
-        <p className="text-[15px] text-[var(--color-text-muted)]">{t("platform.no_access")}</p>
-      </AppShell>
-    );
-  }
-
   const rows = threads.data ?? [];
 
   return (
-    <AppShell title={t("support.inbox")} subtitle={t("support.inbox_subtitle")} flush>
+    <PlatformShell title={t("support.inbox")} subtitle={t("support.inbox_subtitle")} flush>
       <div className="grid gap-3 px-4 pb-6 sm:px-0 lg:h-[calc(100dvh-10rem)] lg:grid-cols-[340px_1fr]">
         <section className={cn("flex min-h-0 flex-col overflow-hidden rounded-[20px] bg-white", openId && "max-lg:hidden")}>
           <div className="border-b border-[var(--color-separator)] p-3">
@@ -75,7 +67,7 @@ export function PlatformSupportPage() {
           {openId ? <Conversation id={openId} onBack={() => select(null)} /> : <p className="m-auto p-6 text-[15px] text-[var(--color-text-muted)]">{t("support.pick")}</p>}
         </section>
       </div>
-    </AppShell>
+    </PlatformShell>
   );
 }
 
@@ -105,7 +97,7 @@ function ThreadRow({ row, active, onClick, lang }: { row: SupportThreadRow; acti
 }
 
 function Conversation({ id, onBack }: { id: string; onBack: () => void }) {
-  const { token } = useAuth();
+  const { token } = usePlatformSession();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
 

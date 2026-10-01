@@ -736,6 +736,24 @@ export const api = {
   setSupportStatus(token: string, id: string, status: "open" | "closed") {
     return request<SupportThreadRow & { messages: SupportMessage[] }>(`/platform/support/threads/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }, token);
   },
+  platformAuthStart(email: string) {
+    return request<{ sent: boolean }>("/platform/auth/start", { method: "POST", body: JSON.stringify({ email }) });
+  },
+  platformVerifyEmail(email: string, code: string) {
+    return request<{ next: "totp" | "setup"; ticket: string; secret?: string; otpauth_uri?: string }>("/platform/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    });
+  },
+  platformVerifyTotp(ticket: string, code: string) {
+    return request<{ token: string; expires_in_seconds: number; email: string }>("/platform/auth/verify-totp", { method: "POST", body: JSON.stringify({ ticket, code }) });
+  },
+  platformMe(token: string) {
+    return request<{ email: string; name: string }>("/platform/auth/me", {}, token);
+  },
+  platformLogout(token: string) {
+    return request<{ logged_out: boolean }>("/platform/auth/logout", { method: "POST" }, token);
+  },
   platformStats(token: string) {
     return request<PlatformStats>("/platform/stats", {}, token);
   },

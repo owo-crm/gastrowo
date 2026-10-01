@@ -808,3 +808,15 @@ def test_session_bootstrap_without_cookie_is_not_an_error(client):
     response = client.get("/auth/session")
     assert response.status_code == 200
     assert response.json()["data"] is None
+
+
+def platform_session(client, email: str) -> str:
+    """Sign in to the admin panel: email code, then (first time) set up the authenticator app."""
+    from app.services import totp
+    from app.tests.otp_outbox import SENT_CODES
+
+    assert client.post("/platform/auth/start", json={"email": email}).status_code == 200
+    step = client.post("/platform/auth/verify-email", json={"email": email, "code": SENT_CODES[email]}).json()["data"]
+    assert step["next"] == "setup"
+    code = totp.code_at(step["secret"], totp.current_step())
+    return client.post("/platform/auth/verify-totp", json={"ticket": step["ticket"], "code": code}).json()["data"]["token"]

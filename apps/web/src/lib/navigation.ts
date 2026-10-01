@@ -101,11 +101,6 @@ export function getNavSections(me?: MeResponse | null): NavSection[] {
   if (isAdmin) settingsSubs.push(sub("/settings/billing", "billing"));
   // Hidden from the public demo: its link would invite people into nothing.
   if (isAdmin && !me?.is_sandbox) settingsSubs.push(sub("/settings/referrals", "referrals"));
-  // Platofy-internal analytics.
-  if (me?.is_platform_admin) {
-    settingsSubs.push(sub("/platform", "platform", { end: true }));
-    settingsSubs.push(sub("/platform/support", "support_inbox"));
-  }
   sections.push({ key: "settings", icon: Settings, subs: settingsSubs });
 
   return sections;
