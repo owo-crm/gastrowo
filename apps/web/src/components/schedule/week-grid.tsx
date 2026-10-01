@@ -1,3 +1,5 @@
+import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { Plus } from "lucide-react";
 
 import { positionColor, tint } from "@/lib/position-colors";
@@ -18,6 +20,9 @@ export type GridShift = {
   onClick?: () => void;
 };
 
+/** Where a dragged shift was dropped: a day, and a person (null = the open shifts row). */
+export type GridDropTarget = { dayIndex: number; personId: string | null };
+
 export type GridPerson = { id: string; name: string; position: string | null; maxHours?: number };
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
@@ -34,7 +39,21 @@ const hhmm = (value: string) => value.slice(0, 5);
 const fmtHours = (value: number) => (value % 1 ? value.toFixed(1) : String(value));
 
 /** One shift filling its day cell: time on top, position under it, centered vertically. */
-function ShiftChip({ shift, color, showPosition, t }: { shift: GridShift; color: string; showPosition: boolean; t: Translate }) {
+function ShiftChip({
+  shift,
+  color,
+  showPosition,
+  t,
+  onDragStart,
+  dragging,
+}: {
+  shift: GridShift;
+  color: string;
+  showPosition: boolean;
+  t: Translate;
+  onDragStart?: (shift: GridShift, event: ReactPointerEvent<HTMLElement>) => void;
+  dragging?: boolean;
+}) {
   const open = Boolean(shift.missing);
   const body = (
     <>
@@ -57,15 +76,132 @@ function ShiftChip({ shift, color, showPosition, t }: { shift: GridShift; color:
     "flex min-h-[48px] w-full min-w-0 flex-col justify-center rounded-[10px] px-2.5 py-1 text-left",
     !open && "flex-1",
     shift.onClick && "transition hover:brightness-95 active:opacity-70",
+    onDragStart && "cursor-grab select-none",
+    dragging && "opacity-35",
   );
+  // A long press on touch screens must start a drag, not the system's copy menu.
+  const dragStyle: CSSProperties = onDragStart ? { ...style, WebkitTouchCallout: "none" } : style;
+  const onPointerDown = onDragStart ? (event: ReactPointerEvent<HTMLElement>) => onDragStart(shift, event) : undefined;
   return shift.onClick ? (
-    <button type="button" onClick={shift.onClick} className={className} style={style}>
+    <button type="button" onClick={shift.onClick} onPointerDown={onPointerDown} className={className} style={dragStyle} data-shift-key={shift.key}>
       {body}
     </button>
   ) : (
-    <div className={className} style={style}>
+    <div className={className} style={dragStyle} onPointerDown={onPointerDown} data-shift-key={shift.key}>
       {body}
     </div>
+  );
+}
+
+
+type DragState = { shift: GridShift; x: number; y: number; width: number; over: GridDropTarget | null };
+
+function dropTargetAt(x: number, y: number): GridDropTarget | null {
+  const cell = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-drop-day]");
+  if (!cell) return null;
+  return { dayIndex: Number(cell.dataset.dropDay), personId: cell.dataset.dropPerson || null };
+}
+
+/**
+ * Moving shifts by dragging, with a mouse or a finger. A mouse drag starts after a few pixels; on touch
+ * screens a long press picks the shift up, so a quick swipe still scrolls the grid.
+ */
+function useShiftDrag(onMove: ((shift: GridShift, target: GridDropTarget) => void) | undefined, scrollRef: RefObject<HTMLDivElement | null>) {
+  const [state, setState] = useState<DragState | null>(null);
+  const suppressClick = useRef(false);
+
+  const start = (shift: GridShift, event: ReactPointerEvent<HTMLElement>) => {
+    if (!onMove || event.button !== 0) return;
+    const pointerId = event.pointerId;
+    const origin = { x: event.clientX, y: event.clientY };
+    const width = Math.min(event.currentTarget.getBoundingClientRect().width, 200);
+    const touch = event.pointerType !== "mouse";
+    let current: DragState | null = null;
+    let timer: number | undefined;
+
+    const show = (x: number, y: number) => {
+      current = { shift, x, y, width, over: dropTargetAt(x, y) };
+      setState(current);
+    };
+    const autoScroll = (x: number, y: number) => {
+      const box = scrollRef.current?.getBoundingClientRect();
+      if (!box) return;
+      const edge = 56;
+      const dx = x < box.left + edge + 140 ? -18 : x > box.right - edge ? 18 : 0;
+      const dy = y < box.top + edge ? -18 : y > box.bottom - edge ? 18 : 0;
+      if (dx || dy) scrollRef.current?.scrollBy(dx, dy);
+    };
+    const finish = () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("touchmove", holdPage);
+      setState(null);
+    };
+    const move = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return;
+      if (!current) {
+        const distance = Math.hypot(next.clientX - origin.x, next.clientY - origin.y);
+        // On touch, moving before the long press means scrolling.
+        if (touch) {
+          if (distance > 8) finish();
+          return;
+        }
+        if (distance < 5) return;
+      }
+      show(next.clientX, next.clientY);
+      autoScroll(next.clientX, next.clientY);
+    };
+    const up = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return;
+      const dragged = current;
+      finish();
+      if (!dragged) return;
+      // The click that follows a drop must not open the shift.
+      suppressClick.current = true;
+      window.setTimeout(() => {
+        suppressClick.current = false;
+      }, 0);
+      const target = dropTargetAt(next.clientX, next.clientY);
+      if (target && (target.dayIndex !== shift.dayIndex || target.personId !== shift.personId)) onMove(shift, target);
+    };
+    const cancel = (next: PointerEvent) => {
+      if (next.pointerId === pointerId) finish();
+    };
+    // While a shift is held, the finger moves the shift, not the page.
+    const holdPage = (next: TouchEvent) => {
+      if (current) next.preventDefault();
+    };
+
+    if (touch) {
+      timer = window.setTimeout(() => {
+        show(origin.x, origin.y);
+        navigator.vibrate?.(12);
+      }, 350);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("touchmove", holdPage, { passive: false });
+  };
+
+  return { state, start: onMove ? start : undefined, suppressClick };
+}
+
+function DragGhost({ state, color }: { state: DragState; color: string }) {
+  return createPortal(
+    <div
+      className="pointer-events-none fixed z-[400] rounded-[10px] px-2.5 py-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.25)]"
+      style={{ left: state.x - state.width / 2, top: state.y - 26, width: state.width, backgroundColor: tint(color, 0.3), boxShadow: `inset 3px 0 0 ${color}, 0 12px 30px rgba(0,0,0,0.25)`, transform: "rotate(-2deg)" }}
+      aria-hidden
+    >
+      <span className="block whitespace-nowrap text-[15px] font-semibold tabular-nums leading-5 text-black">
+        {hhmm(state.shift.start)}–{hhmm(state.shift.end)}
+      </span>
+      <span className="block truncate text-[12px] leading-4 text-[#3c3c43]">{state.shift.position ?? ""}</span>
+    </div>,
+    document.body,
   );
 }
 
@@ -79,6 +215,7 @@ export function WeekGrid({
   shifts,
   positionOrder,
   onAdd,
+  onMove,
   t,
 }: {
   days: GridDay[];
@@ -86,8 +223,18 @@ export function WeekGrid({
   shifts: GridShift[];
   positionOrder: string[];
   onAdd?: (dayIndex: number, personId?: string) => void;
+  /** Drag and drop: move a shift to another day or person (or back to open shifts). */
+  onMove?: (shift: GridShift, target: GridDropTarget) => void;
   t: Translate;
 }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const drag = useShiftDrag(onMove, scrollRef);
+  const isOver = (dayIndex: number, personId: string | null) => Boolean(drag.state?.over && drag.state.over.dayIndex === dayIndex && drag.state.over.personId === personId);
+  const chipDrag = (shift: GridShift) => ({
+    onDragStart: drag.start,
+    dragging: drag.state?.shift.key === shift.key,
+    shift: shift.onClick ? { ...shift, onClick: () => !drag.suppressClick.current && shift.onClick?.() } : shift,
+  });
   const byPerson = new Map<string, GridShift[]>();
   const open: GridShift[] = [];
   for (const shift of shifts) {
@@ -119,7 +266,8 @@ export function WeekGrid({
   const cellShifts = (list: GridShift[] | undefined, dayIndex: number) => (list ?? []).filter((shift) => shift.dayIndex === dayIndex).sort((a, b) => a.start.localeCompare(b.start));
 
   return (
-    <div className="h-full overflow-auto overscroll-contain" role="grid" aria-label={t("schedule.title")}>
+    <div ref={scrollRef} className="h-full overflow-auto overscroll-contain" role="grid" aria-label={t("schedule.title")}>
+      {drag.state ? <DragGhost state={drag.state} color={positionColor(drag.state.shift.position, positionOrder)} /> : null}
       <div className="min-w-max" style={{ minWidth: "100%" }}>
         <div className="sticky top-0 z-20 grid border-b border-[var(--color-separator)] bg-white" style={{ gridTemplateColumns: columns }} role="row">
           <div className="sticky left-0 z-10 border-r border-[var(--color-separator)] bg-white" />
@@ -138,15 +286,25 @@ export function WeekGrid({
           ))}
         </div>
 
-        {open.length ? (
+        {/* While dragging, the open row is always there: dropping on it takes the shift off the person. */}
+        {open.length || drag.state ? (
           <div className="grid border-b border-[var(--color-separator)] bg-[var(--color-danger-fill)]/40" style={{ gridTemplateColumns: columns }} role="row">
             <div className="sticky left-0 z-10 flex items-center border-r border-[var(--color-separator)] bg-[#fff5f6] px-3 py-2">
               <span className="text-[14px] font-semibold text-[var(--color-danger)]">{t("schedule.grid_open")}</span>
             </div>
             {days.map((day, index) => (
-              <div key={day.iso} className="flex min-h-[64px] flex-col justify-center gap-1 border-r border-[var(--color-separator)] p-1 last:border-r-0" role="gridcell">
+              <div
+                key={day.iso}
+                className={cn(
+                  "flex min-h-[64px] flex-col justify-center gap-1 border-r border-[var(--color-separator)] p-1 last:border-r-0",
+                  isOver(index, null) && "bg-[var(--color-accent)] ring-2 ring-inset ring-[var(--color-primary)]",
+                )}
+                role="gridcell"
+                data-drop-day={onMove ? index : undefined}
+                data-drop-person=""
+              >
                 {cellShifts(open, index).map((shift) => (
-                  <ShiftChip key={`open-${shift.key}`} shift={shift} color={positionColor(shift.position, positionOrder)} showPosition t={t} />
+                  <ShiftChip key={`open-${shift.key}`} color={positionColor(shift.position, positionOrder)} showPosition t={t} {...chipDrag(shift)} />
                 ))}
               </div>
             ))}
@@ -181,15 +339,24 @@ export function WeekGrid({
                           <div
                             key={day.iso}
                             role="gridcell"
+                            data-drop-day={onMove ? index : undefined}
+                            data-drop-person={person.id}
                             className={cn(
                               "group relative flex min-h-[64px] flex-col gap-1 border-r border-[var(--color-separator)] p-1 last:border-r-0",
                               day.isToday && "bg-[var(--color-accent)]/40",
+                              isOver(index, person.id) && "bg-[var(--color-accent)] ring-2 ring-inset ring-[var(--color-primary)]",
                             )}
                           >
                             {cell.map((shift) => (
-                              <ShiftChip key={shift.key} shift={shift} color={positionColor(shift.position, positionOrder)} showPosition={(shift.position ?? "").toLowerCase() !== position.toLowerCase()} t={t} />
+                              <ShiftChip
+                                key={shift.key}
+                                color={positionColor(shift.position, positionOrder)}
+                                showPosition={(shift.position ?? "").toLowerCase() !== position.toLowerCase()}
+                                t={t}
+                                {...chipDrag(shift)}
+                              />
                             ))}
-                            {onAdd && !cell.length ? (
+                            {onAdd && !cell.length && !drag.state ? (
                               <button
                                 type="button"
                                 aria-label={t("schedule.grid_add_for", { name: person.name, day: `${day.weekday} ${day.dayNumber}` })}
