@@ -120,6 +120,8 @@ export type SubscriptionSummary = {
   billable_seats?: number;
   billable_locations?: number;
   has_payment_method?: boolean;
+  /** The currency Stripe Checkout charges in for this business. */
+  checkout_currency?: "USD" | "PLN";
   features?: string[];
 };
 
@@ -558,6 +560,8 @@ export type PayrollSummaryRow = {
   /** US: hours over 40 in a workweek and the extra half-time paid for them. */
   overtime_hours?: string;
   overtime_premium?: string;
+  /** Polish rules: the minimum hourly rate this person's rate is below (PLN). */
+  below_minimum_rate?: string;
 };
 
 export type PayrollSummary = {

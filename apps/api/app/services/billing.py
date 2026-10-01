@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import Location, OrganizationMembership, OrganizationSubscription, SubscriptionPlanEnum, SubscriptionStatusEnum
+from app.models import Location, Organization, OrganizationMembership, OrganizationSubscription, SubscriptionPlanEnum, SubscriptionStatusEnum
 from app.schemas import SubscriptionSummaryOut
 
 logger = logging.getLogger("gastrowo.billing")
@@ -174,7 +174,26 @@ def build_subscription_summary(db: Session, organization_id: UUID | None) -> Sub
         extra_locations=extra_locations_for(plan, locations),
         has_payment_method=bool(subscription.stripe_subscription_id),
         features=allowed_features(plan),
+        checkout_currency=checkout_currency_for(getattr(db.get(Organization, organization_id), "country", None)),
     )
+
+
+def pln_prices_configured() -> bool:
+    return all(
+        (
+            settings.stripe_price_starter_pln_monthly,
+            settings.stripe_price_starter_pln_annual,
+            settings.stripe_price_pro_pln_monthly,
+            settings.stripe_price_pro_pln_annual,
+            settings.stripe_price_pro_extra_location_pln_monthly,
+            settings.stripe_price_pro_extra_location_pln_annual,
+        )
+    )
+
+
+def checkout_currency_for(country: str | None) -> str:
+    """Polish businesses pay in złoty once the PLN Stripe prices exist; everyone else (and until then) in dollars."""
+    return "PLN" if (country or "US").upper() == "PL" and pln_prices_configured() else "USD"
 
 
 def plan_price_table() -> dict[tuple[SubscriptionPlanEnum, str, str], str]:

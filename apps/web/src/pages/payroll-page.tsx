@@ -14,7 +14,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toLocalIso } from "@/lib/date";
 import { saveBlob } from "@/lib/file";
-import { currencyOf, formatDate, formatMoney } from "@/lib/format";
+import { currencyOf, formatDate, formatMoney, localeFor } from "@/lib/format";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/lib/toast";
 import type { PayrollSummaryRow, TimesheetEntry } from "@/lib/types";
@@ -43,10 +43,6 @@ function entryHours(entry: TimesheetEntry): number {
   return Math.max(minutes - (entry.break_minutes ?? 0), 0) / 60;
 }
 
-const hoursText = (value: number | string) => {
-  const number = Number(value);
-  return `${number % 1 ? number.toFixed(2) : number} h`;
-};
 
 export function PayrollPage() {
   const { token, me } = useAuth();
@@ -104,6 +100,11 @@ export function PayrollPage() {
   const totalPay = Number(summaryQuery.data?.total_payroll_pln ?? 0);
   const overtime = rows.reduce((total, row) => total + Number(row.overtime_hours ?? 0), 0);
   const money = (value: number | string) => formatMoney(value, currency, lang, { decimals: 2 });
+  const hoursText = (value: number | string) => {
+    const number = Number(value);
+    return `${number.toLocaleString(localeFor(lang), { maximumFractionDigits: 2, minimumFractionDigits: number % 1 ? 2 : 0 })} h`;
+  };
+  const lowRates = rows.filter((row) => row.below_minimum_rate);
   const mine = isStaff ? rows.find((row) => row.user_id === me?.id) ?? rows[0] : null;
 
   const entryList = (
@@ -177,6 +178,12 @@ export function PayrollPage() {
         </div>
       </div>
 
+      {!isStaff && lowRates.length ? (
+        <p className="mx-4 mb-4 rounded-[14px] bg-[var(--color-warning-fill,#fff4e5)] px-4 py-3 text-[14px] text-black sm:mx-0" role="note">
+          {t("payroll.below_minimum", { names: lowRates.map((row) => row.full_name).join(", "), rate: money(lowRates[0].below_minimum_rate ?? 0) })}
+        </p>
+      ) : null}
+
       {isStaff ? (
         entryList
       ) : (
@@ -211,7 +218,7 @@ export function PayrollPage() {
             <ListSection>
               <ListRow title={t("payroll.hours")} trailing={hoursText(openRow.approved_hours)} />
               <ListRow title={t("payroll.base_rate")} trailing={`${money(openRow.hourly_rate_default_pln)}/h`} />
-              {Number(openRow.overtime_hours ?? 0) > 0 ? (
+              {Number(openRow.overtime_hours ?? 0) > 0 && openRow.overtime_premium !== undefined ? (
                 <ListRow title={t("payroll.overtime_premium", { hours: hoursText(openRow.overtime_hours ?? 0) })} trailing={money(openRow.overtime_premium ?? 0)} />
               ) : null}
               <ListRow title={<span className="font-semibold">{t("payroll.gross")}</span>} trailing={<span className="font-semibold text-black">{money(openRow.payroll_pln)}</span>} />

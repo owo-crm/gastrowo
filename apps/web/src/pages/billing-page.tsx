@@ -34,8 +34,8 @@ export function BillingPage() {
   const { t, lang } = useLanguage();
   const toast = useToast();
   const [cycle, setCycle] = useState<BillingCheckoutCycle>("monthly");
-  // Plans are sold in dollars only (the checkout charges USD for every business).
-  const currency: Currency = "USD";
+  // The prices shown are the ones Checkout charges: złoty for Polish businesses once those prices exist.
+  const currency: Currency = me?.subscription?.checkout_currency ?? "USD";
 
   const subscriptionQuery = useQuery({
     queryKey: ["subscription"],

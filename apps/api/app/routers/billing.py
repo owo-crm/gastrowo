@@ -19,6 +19,7 @@ from app.db import get_db
 from app.models import Organization, OrganizationSubscription, RoleEnum, SubscriptionPlanEnum, SubscriptionStatusEnum
 from app.schemas import BillingCheckoutSessionOut, BillingCheckoutSessionRequest, BillingPortalSessionOut
 from app.services.billing import (
+    checkout_currency_for,
     STARTER_LOCATION_LIMIT,
     count_locations,
     extra_location_price_table,
@@ -180,8 +181,7 @@ def create_checkout_session(
     trial_end = subscription.trial_ends_at.replace(tzinfo=UTC) if subscription.trial_ends_at and subscription.trial_ends_at.tzinfo is None else subscription.trial_ends_at
     if subscription.status == SubscriptionStatusEnum.TRIALING and trial_end is not None and trial_end > datetime.now(UTC):
         raise HTTPException(status_code=409, detail=f"Your free Pro trial runs until {trial_end:%B %-d}. You can choose a plan when it ends.")
-    # Platofy sells in dollars only (US market); older Polish businesses pay the same USD prices.
-    currency = "USD"
+    currency = checkout_currency_for(organization.country)
     price_id = _price_id_for(payload.plan, payload.billing_cycle, currency)
     locations = count_locations(db, context.membership.organization_id)
     if payload.plan == SubscriptionPlanEnum.STANDARD and locations > STARTER_LOCATION_LIMIT:
