@@ -164,7 +164,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "payroll.hours": "Approved hours",
     "payroll.overtime": "Overtime",
     "payroll.overtime_us": "Hours over 40 a week",
-    "payroll.overtime_pl": "Tracked by the US rule only",
+    "payroll.overtime_pl": "Over 8 h a day or 40 h a week; the 50% or 100% supplement is set by payroll",
     "payroll.ot": "OT {{hours}}",
     "payroll.footer": "From approved timesheets. Tap a person to see their hours.",
     "payroll.empty": "No approved hours in this period.",
@@ -866,6 +866,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "schedule.drag_hint_published": "Edit week to move shifts by dragging",
     "schedule.move_failed": "Couldn't move the shift",
     "schedule.move_overlap": "This person already has a shift at that time.",
+    "payroll.below_minimum": "Below the Polish minimum hourly rate ({{rate}} gross): {{names}}. Check their rates in Team.",
     // @end-en
   },
   pl: {
@@ -1027,7 +1028,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "payroll.hours": "Zatwierdzone godziny",
     "payroll.overtime": "Nadgodziny",
     "payroll.overtime_us": "Godziny ponad 40 tygodniowo",
-    "payroll.overtime_pl": "Liczone tylko wg reguły USA",
+    "payroll.overtime_pl": "Ponad 8 h na dobę lub 40 h w tygodniu; dodatek 50% lub 100% nalicza kadrowa",
     "payroll.ot": "Nadg. {{hours}}",
     "payroll.footer": "Z zatwierdzonych godzin. Dotknij osoby, aby zobaczyć szczegóły.",
     "payroll.empty": "Brak zatwierdzonych godzin w tym okresie.",
@@ -1729,6 +1730,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "schedule.drag_hint_published": "Kliknij Edytuj tydzień, aby przeciągać zmiany",
     "schedule.move_failed": "Nie udało się przenieść zmiany",
     "schedule.move_overlap": "Ta osoba ma już zmianę w tym czasie.",
+    "payroll.below_minimum": "Poniżej minimalnej stawki godzinowej ({{rate}} brutto): {{names}}. Sprawdź stawki w Zespole.",
     // @end-pl
   },
 };

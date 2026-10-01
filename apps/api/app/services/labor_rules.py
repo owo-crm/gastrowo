@@ -15,6 +15,13 @@ from app.models import Location, Organization
 US_WEEKLY_OVERTIME_HOURS = 40.0
 US_OVERTIME_MULTIPLIER = 1.5
 
+# Kodeks pracy art. 151 §1: work beyond the 8-hour daily norm or the 40-hour week is overtime. The 50% or
+# 100% supplement depends on when it was worked and the settlement period, so payroll reports the hours only.
+PL_DAILY_NORM_HOURS = 8.0
+PL_WEEKLY_NORM_HOURS = 40.0
+# Minimum hourly rate (minimalna stawka godzinowa) for civil contracts, PLN gross, by the year it applies from.
+PL_MIN_HOURLY_RATE = {2025: 30.50, 2026: 31.40}
+
 CURRENCY_BY_COUNTRY = {"US": "USD", "PL": "PLN"}
 DEFAULT_TIMEZONE_BY_COUNTRY = {"US": "America/New_York", "PL": "Europe/Warsaw"}
 
@@ -37,6 +44,18 @@ def weekly_overtime_issue(country: str, hours_after_shift: float) -> list[str]:
     if labor_rules_for(country) == "US" and hours_after_shift > US_WEEKLY_OVERTIME_HOURS + 1e-9:
         return ["weekly_overtime"]
     return []
+
+
+def pl_min_hourly_rate(on: date) -> float | None:
+    years = [year for year in PL_MIN_HOURLY_RATE if year <= on.year]
+    return PL_MIN_HOURLY_RATE[max(years)] if years else None
+
+
+def pl_overtime_hours(day_hours: dict[date, float]) -> float:
+    """Hours over 8 in a day plus hours over 40 in the week that are not already daily overtime."""
+    daily = sum(max(0.0, hours - PL_DAILY_NORM_HOURS) for hours in day_hours.values())
+    weekly = max(0.0, sum(day_hours.values()) - daily - PL_WEEKLY_NORM_HOURS)
+    return daily + weekly
 
 
 def default_timezone_for(country: str) -> str:

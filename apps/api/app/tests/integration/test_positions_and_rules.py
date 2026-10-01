@@ -150,3 +150,54 @@ def test_polish_business_keeps_labour_code_and_skips_overtime_rule(client):
     assert me["organization_settings"]["labor_rules"] == "PL"
     locations = client.get("/locations", headers=auth_header(admin)).json()["data"]
     assert locations[0]["timezone"] == "Europe/Warsaw"
+
+
+def test_polish_payroll_counts_overtime_hours_and_flags_low_rates(client):
+    admin, location_id = signup_ADMIN(client, organization_name="Bistro Nadgodziny", email="owner@bistro-ng.pl")
+    assert client.patch("/organizations/current", headers=auth_header(admin), json={"country": "PL"}).status_code == 200
+    staff_token = invite_accept_login(client, ADMIN_token=admin, email="ola@bistro-ng.pl", full_name="Ola", location_id=location_id)
+    staff_id = get_user_id(client, token=admin, email="ola@bistro-ng.pl")
+    client.patch(f"/locations/{location_id}/members/{staff_id}", headers=auth_header(admin), json={"hourly_rate_pln": "25.00", "priority": 3})
+
+    monday = current_monday()
+    # Monday 11 h, Tuesday-Friday 9 h each: 3 + 4 x 1 = 7 h over the 8-hour daily norm, 47 h in the week.
+    for day, left in [(0, "19:00:00"), (1, "17:00:00"), (2, "17:00:00"), (3, "17:00:00"), (4, "17:00:00")]:
+        created = client.post(
+            "/timesheets",
+            headers=auth_header(staff_token),
+            json={"work_date": (monday + timedelta(days=day)).isoformat(), "arrived_at": "08:00:00", "left_at": left},
+        )
+        assert created.status_code == 200, created.text
+        _approve(client, admin, created.json()["data"]["id"])
+
+    period = {"start_date": monday.isoformat(), "end_date": (monday + timedelta(days=6)).isoformat()}
+    data = client.get("/payroll/summary", headers=auth_header(admin), params=period).json()["data"]
+    row = next(item for item in data["rows"] if item["user_id"] == staff_id)
+    assert data["currency"] == "PLN"
+    assert row["approved_hours"] == "47.00"
+    assert row["overtime_hours"] == "7.00"
+    assert "overtime_premium" not in row  # 50% or 100% depends on when it was worked: payroll leaves it to the accountant
+    assert row["payroll_pln"] == "1175.00"  # 47 h x 25.00, no premium added
+    assert row["below_minimum_rate"] in ("30.50", "31.40")
+
+    csv_lines = client.get("/payroll/export.csv", headers=auth_header(admin), params=period).content.decode("utf-8-sig").splitlines()
+    assert csv_lines[0].endswith(";Nadgodziny (8 h/dobę, 40 h/tydz.)")
+    assert any(line.startswith("Ola;") and line.endswith(";7,00") for line in csv_lines)
+
+
+def test_checkout_currency_follows_country_once_pln_prices_exist(monkeypatch):
+    from app.core.config import settings
+    from app.services.billing import checkout_currency_for
+    from app.services.labor_rules import pl_overtime_hours
+
+    assert checkout_currency_for("PL") == "USD"  # no PLN prices configured: charge dollars
+    for name in ("starter_pln_monthly", "starter_pln_annual", "pro_pln_monthly", "pro_pln_annual", "pro_extra_location_pln_monthly", "pro_extra_location_pln_annual"):
+        monkeypatch.setattr(settings, f"stripe_price_{name}", f"price_{name}")
+    assert checkout_currency_for("PL") == "PLN"
+    assert checkout_currency_for("US") == "USD"
+
+    from datetime import date
+
+    # Five 8-hour days are the norm; a sixth one is all weekly overtime.
+    week = {date(2026, 10, 5) + timedelta(days=day): 8.0 for day in range(6)}
+    assert pl_overtime_hours(week) == 8.0

@@ -19,7 +19,16 @@ from app.models import Location, LocationMembership, OrganizationMembership, Rol
 
 from app.services.worktime import worked_hours as timesheet_hours
 from app.services.billing import require_feature
-from app.services.labor_rules import US_OVERTIME_MULTIPLIER, US_WEEKLY_OVERTIME_HOURS, currency_for, labor_rules_for, local_today, organization_country
+from app.services.labor_rules import (
+    US_OVERTIME_MULTIPLIER,
+    US_WEEKLY_OVERTIME_HOURS,
+    currency_for,
+    labor_rules_for,
+    local_today,
+    organization_country,
+    pl_min_hourly_rate,
+    pl_overtime_hours,
+)
 from app.services.positions import positions_by_user, rate_for
 
 router = APIRouter(prefix="/payroll", tags=["payroll"])
@@ -75,6 +84,8 @@ def _build_payroll_rows(db: Session, organization_id: UUID, start_date: date, en
 
     member_positions = {str(user_id): rows for user_id, rows in positions_by_user(db, organization_id).items()}
     us_rules = labor_rules_for(organization_country(db, organization_id)) == "US"
+    # Polish rules: hours per person per day, grouped by workweek, for the 8 h / 40 h overtime count.
+    day_totals: dict[tuple[str, date], dict[date, float]] = defaultdict(lambda: defaultdict(float))
     # Straight-time hours and pay per person per workweek (Mon-Sun), for the FLSA overtime premium.
     week_totals: dict[tuple[str, date], list[Decimal]] = defaultdict(lambda: [Decimal("0"), Decimal("0")])
 
@@ -108,6 +119,7 @@ def _build_payroll_rows(db: Session, organization_id: UUID, start_date: date, en
         week = week_totals[(user_key, item.work_date - timedelta(days=item.work_date.weekday()))]
         week[0] += Decimal(str(worked_hours))
         week[1] += Decimal(str(worked_hours)) * resolved_rate
+        day_totals[(user_key, item.work_date - timedelta(days=item.work_date.weekday()))][item.work_date] += float(worked_hours)
         if item.is_restricted_entry:
             entry["restricted_hours"] += worked_hours
 
@@ -123,6 +135,13 @@ def _build_payroll_rows(db: Session, organization_id: UUID, start_date: date, en
             current_hours, current_premium = overtime_by_user.get(user_key, (Decimal("0"), Decimal("0")))
             overtime_by_user[user_key] = (current_hours + overtime_hours, current_premium + premium)
             payroll_acc[user_key]["payroll_pln"] += premium
+    else:
+        for (user_key, _week), days in day_totals.items():
+            hours = Decimal(str(pl_overtime_hours(days)))
+            if hours > 0:
+                current_hours, _ = overtime_by_user.get(user_key, (Decimal("0"), Decimal("0")))
+                overtime_by_user[user_key] = (current_hours + hours, Decimal("0"))
+    min_rate = None if us_rules else pl_min_hourly_rate(end_date)
 
     rows: list[dict] = []
     for user_key, membership in memberships_by_org_user.items():
@@ -156,7 +175,10 @@ def _build_payroll_rows(db: Session, organization_id: UUID, start_date: date, en
         overtime = overtime_by_user.get(user_key)
         if overtime:
             row["overtime_hours"] = str(overtime[0].quantize(Decimal("0.01")))
-            row["overtime_premium"] = str(overtime[1].quantize(Decimal("0.01")))
+            if us_rules:
+                row["overtime_premium"] = str(overtime[1].quantize(Decimal("0.01")))
+        if min_rate is not None and approved_hours > 0 and 0 < default_rate < Decimal(str(min_rate)):
+            row["below_minimum_rate"] = str(Decimal(str(min_rate)).quantize(Decimal("0.01")))
         rows.append(row)
 
     rows.sort(key=lambda item: (-Decimal(item["payroll_pln"]), item["full_name"].lower()))
@@ -240,7 +262,7 @@ def export_payroll_csv(
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=";" if polish else ",", lineterminator="\r\n")
     if polish:
-        header = ["Pracownik", "Stanowisko", "Rola", "Godziny zatwierdzone", f"Stawka {currency}/h", f"Wynagrodzenie {currency}", "Godziny poza grafikiem"]
+        header = ["Pracownik", "Stanowisko", "Rola", "Godziny zatwierdzone", f"Stawka {currency}/h", f"Wynagrodzenie {currency}", "Godziny poza grafikiem", "Nadgodziny (8 h/dobę, 40 h/tydz.)"]
     else:
         header = ["Employee", "Position", "Role", "Approved hours", f"Rate {currency}/h", f"Gross pay {currency}", "Unscheduled hours", "Overtime hours", f"Overtime premium {currency}"]
     writer.writerow(header)
@@ -254,14 +276,15 @@ def export_payroll_csv(
             number(row["payroll_pln"]),
             number(row.get("restricted_hours", "0.00")),
         ]
-        if not polish:
+        if polish:
+            cells += [number(row.get("overtime_hours", "0.00"))]
+        else:
             cells += [row.get("overtime_hours", "0.00"), row.get("overtime_premium", "0.00")]
         writer.writerow(cells)
     total_hours = sum((Decimal(row["approved_hours"]) for row in rows), Decimal("0.00"))
     total_payroll = sum((Decimal(row["payroll_pln"]) for row in rows), Decimal("0.00"))
     total_row = ["RAZEM" if polish else "TOTAL", "", "", number(f"{total_hours:.2f}"), "", number(f"{total_payroll:.2f}"), ""]
-    if not polish:
-        total_row += ["", ""]
+    total_row += [""] if polish else ["", ""]
     writer.writerow(total_row)
 
     filename = f"payroll_{start_date.isoformat()}_{end_date.isoformat()}.csv"
