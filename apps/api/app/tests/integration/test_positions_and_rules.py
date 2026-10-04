@@ -201,3 +201,18 @@ def test_checkout_currency_follows_country_once_pln_prices_exist(monkeypatch):
     # Five 8-hour days are the norm; a sixth one is all weekly overtime.
     week = {date(2026, 10, 5) + timedelta(days=day): 8.0 for day in range(6)}
     assert pl_overtime_hours(week) == 8.0
+
+
+def test_request_approval_treats_availability_as_the_managers_call(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+
+    from app.routers import schedule
+
+    monkeypatch.setattr(schedule, "collect_assignment_validation_issues", lambda **_: ["availability_window_mismatch", "weekly_overtime"])
+    schedule._ensure_request_assignment_valid(db=None, organization_id=None, user_id=None, shift=None)  # no error
+
+    monkeypatch.setattr(schedule, "collect_assignment_validation_issues", lambda **_: ["overlap", "availability_missing"])
+    with pytest.raises(HTTPException) as error:
+        schedule._ensure_request_assignment_valid(db=None, organization_id=None, user_id=None, shift=None)
+    assert error.value.detail == "Can't approve: they already work at that time"
