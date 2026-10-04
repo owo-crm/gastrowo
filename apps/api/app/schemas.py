@@ -677,6 +677,15 @@ class ShiftRequestOut(APIModel):
     resolved_by: UUID | None
     created_at: datetime
     resolved_at: datetime | None
+    # The requester's shift and, for a swap, the coworker's shift they would take instead (shown to managers).
+    shift_date: date | None = None
+    shift_start_time: time | None = None
+    shift_end_time: time | None = None
+    shift_position: str | None = None
+    target_name: str | None = None
+    target_shift_date: date | None = None
+    target_shift_start_time: time | None = None
+    target_shift_end_time: time | None = None
 
 
 class SchedulePreviewAssignmentOut(BaseModel):
