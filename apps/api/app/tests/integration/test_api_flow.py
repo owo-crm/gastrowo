@@ -555,6 +555,11 @@ def test_staff_calendar_and_shift_request_flow(client):
     ).json()["data"]
     target_shift_after = next(item for item in shifts_after if item["id"] == pickup_target["shift_id"])
     assert len(target_shift_after["assignments"]) == 2
+    # The incoming list carries the shift's own date and times, not just its id.
+    assert incoming_ADMIN.json()["data"][0]["shift_date"] == target_shift_after["date"]
+    # The worker is told which shift is now theirs.
+    bell = client.get("/notifications", headers=auth_header(staff_b_token)).json()["data"]["items"]
+    assert any(item["title"] == "Shift is yours" and item["body"].startswith("You picked up ") for item in bell)
 
 
 def test_staff_self_signup_email_pending_and_link_flow(client):

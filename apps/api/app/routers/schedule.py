@@ -417,7 +417,16 @@ def _notify_manager_and_ADMIN_about_request(
         )
 
 
-SOFT_REQUEST_ISSUES = {"weekly_overtime", "staff_position_mismatch"}
+# The manager's call when they approve: the person asked for the shift (or swap) themselves, so their
+# availability, overtime or a different position don't block it. Overlaps, rest rules and location do.
+SOFT_REQUEST_ISSUES = {"weekly_overtime", "staff_position_mismatch", "availability_missing", "availability_window_mismatch"}
+REQUEST_ISSUE_TEXT = {
+    "overlap": "they already work at that time",
+    "daily_rest_violation": "they would get less than 11 hours of rest",
+    "weekly_rest_violation": "they would get less than 35 hours of rest that week",
+    "not_in_location": "they don't work at this location",
+    "location_priority_blocked": "they are blocked at this location",
+}
 
 
 def _ensure_request_assignment_valid(
@@ -434,10 +443,48 @@ def _ensure_request_assignment_valid(
         shift=shift,
         exclude_assignment_ids=exclude_assignment_ids,
     )
-    # Overtime and a different position are the manager's call when they approve; they don't block it.
     blocking = [issue for issue in issues if issue not in SOFT_REQUEST_ISSUES]
     if blocking:
-        raise HTTPException(status_code=422, detail=f"Cannot approve request: {', '.join(blocking)}")
+        reasons = "; ".join(REQUEST_ISSUE_TEXT.get(issue, issue.replace("_", " ")) for issue in blocking)
+        raise HTTPException(status_code=422, detail=f"Can't approve: {reasons}")
+
+
+def _shift_label(shift: Shift | None) -> str:
+    if shift is None:
+        return "the shift"
+    return f"{shift.date:%a, %b} {shift.date.day} · {shift.start_time:%H:%M}–{shift.end_time:%H:%M}"
+
+
+def _request_outcome_notifications(db: Session, organization_id: UUID, request_item: ShiftRequest) -> list[InAppNotification]:
+    """Tell the requester what changed, and on an approved swap also the coworker who now has the other shift."""
+    asked_shift = db.get(Shift, request_item.shift_id)
+    own_assignment = db.get(Assignment, request_item.requester_assignment_id) if request_item.requester_assignment_id else None
+    own_shift = db.get(Shift, own_assignment.shift_id) if own_assignment else None
+    swap = request_item.request_type == ShiftRequestTypeEnum.SWAP
+    approved = request_item.status == ShiftRequestStatusEnum.APPROVED
+
+    def note(user_id: UUID, title: str, body: str) -> InAppNotification:
+        return InAppNotification(
+            organization_id=organization_id,
+            user_id=user_id,
+            type=NotificationTypeEnum.SHIFT_REQUEST,
+            title=title,
+            body=body,
+            action_url="/schedule",
+        )
+
+    if not approved:
+        what = f"swap for {_shift_label(own_shift)}" if swap and own_shift else f"request for {_shift_label(asked_shift)}"
+        return [note(request_item.requester_user_id, "Request declined", f"Your {what} was declined.")]
+    if not swap:
+        return [note(request_item.requester_user_id, "Shift is yours", f"You picked up {_shift_label(asked_shift)}.")]
+    notes = [note(request_item.requester_user_id, "Swap approved", f"You now work {_shift_label(asked_shift)} instead of {_shift_label(own_shift)}.")]
+    # After the swap the requester's old assignment belongs to the coworker.
+    if own_assignment is not None and own_assignment.user_id != request_item.requester_user_id:
+        requester = db.get(User, request_item.requester_user_id)
+        who = requester.full_name if requester else "A coworker"
+        notes.append(note(own_assignment.user_id, "Shift swapped", f"{who} swapped with you: you now work {_shift_label(own_shift)} instead of {_shift_label(asked_shift)}."))
+    return notes
 
 
 def _approve_pickup_request(db: Session, organization_id: UUID, request_item: ShiftRequest) -> None:
@@ -1511,16 +1558,8 @@ def patch_shift_request(
 
         request_item.resolved_by = context.user.id
         request_item.resolved_at = now
-        db.add(
-            InAppNotification(
-                organization_id=organization_id,
-                user_id=request_item.requester_user_id,
-                type=NotificationTypeEnum.SHIFT_REQUEST,
-                title="Shift request updated",
-                body=f"Your request has been {request_item.status.value}.",
-                action_url="/schedule/requests",
-            )
-        )
+        for notification in _request_outcome_notifications(db, organization_id, request_item):
+            db.add(notification)
     else:
         raise HTTPException(status_code=422, detail="Unknown action")
 
