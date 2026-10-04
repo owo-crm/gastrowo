@@ -867,6 +867,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "schedule.move_failed": "Couldn't move the shift",
     "schedule.move_overlap": "This person already has a shift at that time.",
     "payroll.below_minimum": "Below the Polish minimum hourly rate ({{rate}} gross): {{names}}. Check their rates in Team.",
+    "schedule.swap_with": "⇄ {{name}} · {{shift}}",
     // @end-en
   },
   pl: {
@@ -1731,6 +1732,7 @@ export const v2Translations: Record<Lang, Record<string, string>> = {
     "schedule.move_failed": "Nie udało się przenieść zmiany",
     "schedule.move_overlap": "Ta osoba ma już zmianę w tym czasie.",
     "payroll.below_minimum": "Poniżej minimalnej stawki godzinowej ({{rate}} brutto): {{names}}. Sprawdź stawki w Zespole.",
+    "schedule.swap_with": "⇄ {{name}} · {{shift}}",
     // @end-pl
   },
 };

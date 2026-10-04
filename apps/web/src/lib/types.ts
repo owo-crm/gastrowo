@@ -480,6 +480,14 @@ export type ShiftRequest = {
   resolved_by: string | null;
   created_at: string;
   resolved_at: string | null;
+  shift_date?: string | null;
+  shift_start_time?: string | null;
+  shift_end_time?: string | null;
+  shift_position?: string | null;
+  target_name?: string | null;
+  target_shift_date?: string | null;
+  target_shift_start_time?: string | null;
+  target_shift_end_time?: string | null;
 };
 
 export type Task = {

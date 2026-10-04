@@ -3193,9 +3193,21 @@ export function SchedulePage({ section = "calendar" }: { section?: ScheduleSecti
                           {item.request_type === "swap" ? t("schedule.swap") : t("schedule.pickup")}
                         </Badge>
                       </p>
-                      <p className="truncate text-[14px] text-[#3c3c43]">
-                        {shift ? `${formatDate(shift.date, lang)} · ${formatTime(shift.start_time)}–${formatTime(shift.end_time)}${shift.staff_position ? ` · ${shift.staff_position}` : ""}` : item.shift_id.slice(0, 8)}
+                      <p className="text-[14px] text-[#3c3c43]">
+                        {item.shift_date && item.shift_start_time && item.shift_end_time
+                          ? `${formatDate(item.shift_date, lang)} · ${formatTime(item.shift_start_time)}–${formatTime(item.shift_end_time)}${item.shift_position ? ` · ${item.shift_position}` : ""}`
+                          : shift
+                            ? `${formatDate(shift.date, lang)} · ${formatTime(shift.start_time)}–${formatTime(shift.end_time)}${shift.staff_position ? ` · ${shift.staff_position}` : ""}`
+                            : null}
                       </p>
+                      {item.request_type === "swap" && item.target_name && item.target_shift_date && item.target_shift_start_time && item.target_shift_end_time ? (
+                        <p className="text-[14px] text-[#3c3c43]">
+                          {t("schedule.swap_with", {
+                            name: item.target_name,
+                            shift: `${formatDate(item.target_shift_date, lang)} · ${formatTime(item.target_shift_start_time)}–${formatTime(item.target_shift_end_time)}`,
+                          })}
+                        </p>
+                      ) : null}
                       {item.note ? <p className="mt-0.5 text-[14px] text-black">“{item.note}”</p> : null}
                     </div>
                     <RoundAction tone="approve" label={t("schedule.approve")} onClick={() => reviewShiftRequestMutation.mutate({ requestId: item.id, action: "approve" })} disabled={reviewShiftRequestMutation.isPending} />

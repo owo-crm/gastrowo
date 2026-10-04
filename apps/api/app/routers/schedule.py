@@ -361,8 +361,23 @@ def _build_preview_calendar(plan, users: list[tuple[OrganizationMembership, User
     ).model_dump(mode="json")
 
 
-def _serialize_shift_request(item: ShiftRequest, requester_name: str) -> dict:
+def _serialize_shift_request(item: ShiftRequest, requester_name: str, db: Session | None = None) -> dict:
+    details: dict = {}
+    if db is not None:
+        # A swap points at the coworker's shift; the requester's own shift comes from their assignment.
+        own = db.get(Assignment, item.requester_assignment_id) if item.requester_assignment_id else None
+        shift = db.get(Shift, own.shift_id if own is not None else item.shift_id)
+        if shift is not None:
+            details.update(shift_date=shift.date, shift_start_time=shift.start_time, shift_end_time=shift.end_time, shift_position=shift.staff_position)
+        target = db.get(Assignment, item.target_assignment_id) if item.target_assignment_id else None
+        if target is not None:
+            target_shift = db.get(Shift, target.shift_id)
+            target_user = db.get(User, target.user_id)
+            details["target_name"] = target_user.full_name if target_user else None
+            if target_shift is not None:
+                details.update(target_shift_date=target_shift.date, target_shift_start_time=target_shift.start_time, target_shift_end_time=target_shift.end_time)
     return ShiftRequestOut(
+        **details,
         id=item.id,
         shift_id=item.shift_id,
         requester_user_id=item.requester_user_id,
@@ -1454,7 +1469,7 @@ def list_shift_requests(
     requesters = db.scalars(select(User).where(User.id.in_(requester_ids))).all() if requester_ids else []
     requester_name_by_id = {user.id: user.full_name for user in requesters}
 
-    data = [_serialize_shift_request(item, requester_name_by_id.get(item.requester_user_id, "Employee")) for item in requests]
+    data = [_serialize_shift_request(item, requester_name_by_id.get(item.requester_user_id, "Employee"), db) for item in requests]
     return ok(data)
 
 
