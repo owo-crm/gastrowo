@@ -1,7 +1,8 @@
 /**
  * Build step: writes a static HTML file for every public marketing page (dist/<path>.html, the
  * landing page as dist/index.html) with its own title, description, canonical URL, FAQ schema and
- * the text in the markup, plus sitemap.xml and robots.txt. The untouched app shell becomes
+ * the text in the markup, a Markdown twin of each page (<path>.md) and llms.txt for AI agents, plus
+ * sitemap.xml and robots.txt. The untouched app shell becomes
  * dist/app.html and is what server.mjs serves for every app route.
  */
 import fs from "node:fs";
@@ -12,8 +13,72 @@ import { PRERENDERED, SITE_LINKS, SITE_URL, type SeoPage } from "./src/lib/seo-p
 
 const esc = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+const ORGANIZATION = {
+  "@type": "Organization",
+  "@id": `${SITE_URL}/#organization`,
+  name: "Platofy",
+  url: SITE_URL,
+  logo: `${SITE_URL}/brand/platofy/platofy-icon-512.png`,
+  email: "support@platofy.app",
+};
+const SOFTWARE = {
+  "@type": "SoftwareApplication",
+  "@id": `${SITE_URL}/#app`,
+  name: "Platofy",
+  applicationCategory: "BusinessApplication",
+  applicationSubCategory: "Employee scheduling for restaurants",
+  operatingSystem: "Web, iOS, Android",
+  url: SITE_URL,
+  description:
+    "Staff scheduling for restaurants, cafés and bars: build the week from staff availability in one click, shift swaps and pickups, time clock on phone or tablet, approved hours and payroll export.",
+  publisher: { "@id": `${SITE_URL}/#organization` },
+  offers: [
+    { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD", description: "1 location, up to 15 people" },
+    { "@type": "Offer", name: "Starter", price: "26", priceCurrency: "USD", description: "Per month. 1 location, up to 30 people, auto-scheduling, overtime checks, timesheets" },
+    { "@type": "Offer", name: "Pro", price: "58", priceCurrency: "USD", description: "Per month. Up to 3 locations, payroll export, labor cost %, manager permissions" },
+  ],
+};
+
+/** Markdown twin of a page, for AI agents (served at <path>.md and for Accept: text/markdown). */
+function markdown(page: SeoPage): string {
+  const url = `${SITE_URL}${page.path === "/" ? "/" : page.path}`;
+  const faq = page.faq.length ? `\n## Frequently asked questions\n\n${page.faq.map((item) => `### ${item.q}\n\n${item.a}\n`).join("\n")}` : "";
+  const links = SITE_LINKS.map((link) => `- [${link.label}](${SITE_URL}${link.href === "/" ? "/" : link.href})`).join("\n");
+  return `# ${page.h1}\n\n> ${page.description}\n\nSource: ${url}\n\n${page.intro}\n${faq}\n## Explore Platofy\n\n${links}\n`;
+}
+
+const mdPath = (page: SeoPage) => (page.path === "/" ? "/index.md" : `${page.path}.md`);
+
+function llmsTxt(): string {
+  const section = (pages: SeoPage[]) => pages.map((page) => `- [${page.h1}](${SITE_URL}${mdPath(page)}): ${page.description}`).join("\n");
+  return `# Platofy
+
+> Platofy is staff scheduling software for restaurants, cafés and bars (1–3 locations). Staff send availability from their phone, the manager builds the week in one click and adjusts it by drag and drop, staff swap and pick up shifts with manager approval, clock in on a phone or a shared tablet with a PIN, and approved hours export to payroll.
+
+Key facts:
+- Plans: Free ($0, 1 location, up to 15 people), Starter ($26/month, 1 location, up to 30 people), Pro ($58/month, up to 3 locations, +$15 per extra location). New businesses get 30 days of Pro free.
+- Live demo with a sample restaurant, no sign-up: ${SITE_URL}/demo
+- Works in the browser and installs on iPhone and Android as an app. English and Polish.
+- US labor rules (overtime over 40 h a week) and Polish rules (11 h daily and 35 h weekly rest).
+- Contact: support@platofy.app
+
+## Pages
+
+${section(PRERENDERED)}
+
+## Optional
+
+- [Terms](${SITE_URL}/terms)
+- [Privacy](${SITE_URL}/privacy)
+`;
+}
+
 function head(page: SeoPage): string {
   const url = `${SITE_URL}${page.path === "/" ? "" : page.path}`;
+  const graph = `<script type="application/ld+json">${JSON.stringify({
+    "@context": "https://schema.org",
+    "@graph": [ORGANIZATION, { "@type": "WebSite", "@id": `${SITE_URL}/#website`, name: "Platofy", url: SITE_URL, publisher: { "@id": `${SITE_URL}/#organization` } }, SOFTWARE],
+  })}</script>`;
   const faq = page.faq.length
     ? `<script type="application/ld+json">${JSON.stringify({
         "@context": "https://schema.org",
@@ -32,6 +97,8 @@ function head(page: SeoPage): string {
     `<meta property="og:url" content="${url}" />`,
     `<meta property="og:image" content="${SITE_URL}/brand/platofy/platofy-icon-512.png" />`,
     `<meta name="twitter:card" content="summary" />`,
+    `<link rel="alternate" type="text/markdown" href="${SITE_URL}${mdPath(page)}" />`,
+    graph,
     faq,
   ].join("\n    ");
 }
@@ -61,13 +128,31 @@ export function prerender(): Plugin {
         const file = page.path === "/" ? path.join(dist, "index.html") : path.join(dist, `${page.path}.html`);
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, html);
+        fs.writeFileSync(path.join(dist, mdPath(page)), markdown(page));
       }
+      fs.writeFileSync(path.join(dist, "llms.txt"), llmsTxt());
+      fs.writeFileSync(path.join(dist, "llms-full.txt"), [llmsTxt(), ...PRERENDERED.map(markdown)].join("\n---\n\n"));
       const today = new Date().toISOString().slice(0, 10);
       const urls = PRERENDERED.map((page) => `  <url><loc>${SITE_URL}${page.path === "/" ? "/" : page.path}</loc><lastmod>${today}</lastmod></url>`).join("\n");
       fs.writeFileSync(path.join(dist, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
       fs.writeFileSync(
         path.join(dist, "robots.txt"),
-        `User-agent: *\nAllow: /\nDisallow: /schedule\nDisallow: /team\nDisallow: /settings\nDisallow: /overview\nDisallow: /payroll\nDisallow: /platform\nDisallow: /kiosk\n\nSitemap: ${SITE_URL}/sitemap.xml\n`,
+        [
+          "# Search engines and AI assistants are welcome to read and cite the public pages.",
+          "# Content signals (contentsignals.org): search=yes, ai-input=yes, ai-train=yes",
+          "Content-Signal: search=yes, ai-input=yes, ai-train=yes",
+          "",
+          "User-agent: *",
+          "Allow: /",
+          ...["/schedule", "/team", "/settings", "/overview", "/payroll", "/platform", "/kiosk", "/start", "/tasks"].map((p) => `Disallow: ${p}`),
+          "",
+          ...["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "PerplexityBot", "Perplexity-User", "Google-Extended", "Applebot-Extended", "CCBot"].flatMap((bot) => [`User-agent: ${bot}`]),
+          "Allow: /",
+          ...["/schedule", "/team", "/settings", "/overview", "/payroll", "/platform", "/kiosk", "/start", "/tasks"].map((p) => `Disallow: ${p}`),
+          "",
+          `Sitemap: ${SITE_URL}/sitemap.xml`,
+          "",
+        ].join("\n"),
       );
     },
   };
