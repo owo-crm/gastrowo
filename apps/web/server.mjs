@@ -31,6 +31,13 @@ const TYPES = {
   ".mp4": "video/mp4",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
+const LINKS = [
+  '</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json"',
+  '</openapi.json>; rel="service-desc"; type="application/vnd.oai.openapi+json"',
+  '</developers.md>; rel="service-doc"; type="text/markdown"',
+  '</llms.txt>; rel="describedby"; type="text/plain"',
+  '</index.md>; rel="alternate"; type="text/markdown"',
+].join(", ");
 const COMPRESS = new Set([".md", ".html", ".js", ".mjs", ".css", ".json", ".webmanifest", ".xml", ".txt", ".csv", ".svg"]);
 
 function file(path) {
@@ -66,12 +73,15 @@ createServer((req, res) => {
     return;
   }
   const ext = extname(path);
+  const catalog = clean === "/.well-known/api-catalog";
   const headers = {
-    "Content-Type": TYPES[ext] ?? "application/octet-stream",
+    "Content-Type": catalog ? "application/linkset+json; charset=utf-8" : (TYPES[ext] ?? "application/octet-stream"),
     "Cache-Control": pathname.startsWith("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
     "X-Content-Type-Options": "nosniff",
     Vary: "Accept-Encoding, Accept",
   };
+  // RFC 8288 / RFC 9727: point agents at the machine-readable resources from the homepage.
+  if (clean === "/") headers.Link = LINKS;
   if (ext === ".xlsx" || ext === ".csv") headers["Content-Disposition"] = `attachment; filename="${path.split("/").pop()}"`;
   const gzip = COMPRESS.has(ext) && /\bgzip\b/.test(req.headers["accept-encoding"] ?? "");
   if (gzip) headers["Content-Encoding"] = "gzip";
