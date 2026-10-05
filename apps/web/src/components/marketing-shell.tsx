@@ -6,6 +6,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { api } from "@/lib/api";
 import { trackMarketingEvent } from "@/lib/marketing-analytics";
 import type { SeoFaq } from "@/lib/seo-pages";
+import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /** Header, footer and building blocks shared by the public marketing pages (tools, comparisons). */
@@ -49,6 +50,12 @@ const NAV = [
   { to: "/#faq", label: "FAQ" },
 ];
 
+const NAV_PL = [
+  { to: "/pl#features", label: "Funkcje" },
+  { to: "/pl#pricing", label: "Cennik" },
+  { to: "/pl#faq", label: "Pytania" },
+];
+
 /**
  * One header for every public page (landing, How it works, tools, comparisons), so the menu is the
  * same everywhere. Section links point at the landing page ("/#pricing"); the landing scrolls to them.
@@ -56,20 +63,22 @@ const NAV = [
 export function MarketingHeader() {
   const { pathname, hash } = useLocation();
   const [open, setOpen] = useState(false);
+  const polish = useLanguage().lang === "pl";
+  const nav = polish ? NAV_PL : NAV;
   const active = (to: string) => {
     const [path, anchor] = to.split("#");
-    if (anchor) return pathname === "/" && hash === `#${anchor}`;
+    if (anchor) return pathname === path && hash === `#${anchor}`;
     return pathname === path || pathname.startsWith(`${path}/`);
   };
   return (
     <header className="ios-bar sticky top-0 z-30 border-b border-[var(--color-separator)]">
       <Container className="flex h-14 items-center justify-between gap-3">
-        <Link to="/" className="shrink-0" aria-label="Platofy home" onClick={() => setOpen(false)}>
+        <Link to={polish ? "/pl" : "/"} className="shrink-0" aria-label="Platofy" onClick={() => setOpen(false)}>
           <BrandLogo kind="wordmark" className="text-[1.8rem]" />
         </Link>
         <nav aria-label="Main" className="hidden md:block">
           <ul className="flex items-center gap-6 text-[15px] font-medium">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <li key={item.to}>
                 <Link
                   to={item.to}
@@ -84,9 +93,11 @@ export function MarketingHeader() {
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
           <Link to="/login?mode=signin" className="px-1 text-[15px] font-semibold text-[var(--color-primary-strong)]">
-            Sign in
+            {polish ? "Zaloguj się" : "Sign in"}
           </Link>
-          <SignupButton context="header" className="min-h-9 rounded-full px-4 text-[15px]" />
+          <SignupButton context="header" className="min-h-9 rounded-full px-4 text-[15px]">
+            {polish ? "Zacznij za darmo" : "Start free"}
+          </SignupButton>
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
@@ -101,7 +112,7 @@ export function MarketingHeader() {
       {open ? (
         <nav aria-label="Main" className="border-t border-[var(--color-separator)] bg-white md:hidden">
           <ul className="mx-auto max-w-5xl px-4 py-2">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <li key={item.to}>
                 <Link to={item.to} onClick={() => setOpen(false)} className="flex min-h-12 items-center border-b border-[var(--color-separator)] text-[17px] font-medium text-black last:border-0">
                   {item.label}

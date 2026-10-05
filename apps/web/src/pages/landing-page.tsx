@@ -18,7 +18,7 @@ const SIGNIN_URL = "/login?mode=signin";
 
 type Copy = {
   nav: { features: string; pricing: string; faq: string; signIn: string; start: string };
-  hero: { title: string; highlight: string; body: string; primary: string; secondary: string; note: (price: string) => string };
+  hero: { title: string; highlight: string; body: string; primary: string; secondary: string; secondaryHref: string; note: (price: string) => string };
   preview: { title: string; published: string; roles: [string, string, string, string]; laborCost: string; hours: string; rules: string; days: string[] };
   featuresTitle: string;
   features: Array<{ icon: LucideIcon; title: string; body: string }>;
@@ -34,9 +34,11 @@ type Copy = {
   finalTitle: string;
   finalBody: string;
   legal: { terms: string; privacy: string; cookies: string };
+  /** Link to the other language version of the landing page. */
+  otherLanguage: { href: string; label: string };
 };
 
-const COPY: Record<"en", Copy> = {
+const COPY: Record<Lang, Copy> = {
   en: {
     nav: { features: "Features", pricing: "Pricing", faq: "FAQ", signIn: "Sign in", start: "Start free" },
     hero: {
@@ -45,6 +47,7 @@ const COPY: Record<"en", Copy> = {
       body: "Availability, overtime and labor cost are handled for you. You just hit publish.",
       primary: "Start free",
       secondary: "See how it works",
+      secondaryHref: "/how-it-works",
       note: (price) => `30-day Pro trial · no card · from ${price} a month`,
     },
     preview: {
@@ -95,8 +98,76 @@ const COPY: Record<"en", Copy> = {
     finalTitle: "Build your first schedule today",
     finalBody: "30 days of Pro, free. No card, no contract.",
     legal: { terms: "Terms", privacy: "Privacy", cookies: "Cookies" },
+    otherLanguage: { href: "/pl", label: "Polski" },
+  },
+  pl: {
+    nav: { features: "Funkcje", pricing: "Cennik", faq: "Pytania", signIn: "Zaloguj się", start: "Zacznij za darmo" },
+    hero: {
+      title: "Grafik pracy dla restauracji",
+      highlight: "w 10 minut",
+      body: "Dyspozycyjność, odpoczynki i koszty pracy liczą się same. Ty tylko publikujesz grafik.",
+      primary: "Zacznij za darmo",
+      secondary: "Zobacz funkcje",
+      secondaryHref: "/pl#features",
+      note: (price) => `30 dni Pro za darmo · bez karty · od ${price} miesięcznie`,
+    },
+    preview: {
+      title: "Grafik · 20–26 maja",
+      published: "Opublikowany",
+      roles: ["Kuchnia", "Sala", "Bar", "Manager"],
+      laborCost: "Koszt pracy 28,6%",
+      hours: "186 h",
+      rules: "Odpoczynki OK",
+      days: ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"],
+    },
+    featuresTitle: "Wszystko, czego potrzebuje zmiana. Nic więcej.",
+    features: [
+      { icon: CalendarCheck2, title: "Grafik układa się sam", body: "Z dyspozycyjności, stanowisk i priorytetów. Ty poprawiasz i publikujesz." },
+      { icon: Scale, title: "Kodeks pracy pod kontrolą", body: "Automatyczny grafik pilnuje 11 godzin odpoczynku dobowego i 35 godzin tygodniowego, a nadgodziny widzisz od razu." },
+      { icon: Users, title: "Jedna osoba, kilka stanowisk", body: "Kelner, który staje też za barem, ma oba stanowiska, każde z własną stawką." },
+      { icon: Repeat2, title: "Zamiany bez grupowych czatów", body: "Pracownicy proszą o zamianę albo przejęcie zmiany w aplikacji. Akceptujesz jednym kliknięciem." },
+      { icon: Clock3, title: "Czas pracy: telefon lub tablet", body: "Pracownicy odbijają się telefonem albo PIN-em na tablecie przy wejściu, razem z przerwami. Punktualne wejścia akceptują się same." },
+      { icon: Bell, title: "Aplikacja na każdym telefonie", body: "Dodaj ją do ekranu głównego i dostawaj powiadomienie, gdy pojawi się nowy grafik, zamiana lub zadanie." },
+      { icon: PieChart, title: "Koszt pracy na bieżąco", body: "Wpisz dzisiejszą sprzedaż i zobacz, jaka jej część idzie na wynagrodzenia." },
+      { icon: FileSpreadsheet, title: "Eksport do płac i kalendarze", body: "Plik CSV dla księgowej z kolumną nadgodzin i każda zmiana w kalendarzu Google lub Apple pracownika." },
+    ],
+    stepsTitle: "Pierwszy grafik jeszcze dziś",
+    steps: [
+      { title: "Załóż konto", body: "Nazwa lokalu i e-mail. Bez karty." },
+      { title: "Zaproś zespół", body: "Wklej listę z arkusza. Każdy dołącza przez link i podaje swoją dyspozycyjność." },
+      { title: "Opublikuj grafik", body: "Wygeneruj tydzień, popraw go i wyślij." },
+    ],
+    pricingTitle: "Jedna cena za cały zespół",
+    pricingBody: "Nigdy za osobę. Za darmo na zawsze dla jednego małego lokalu, Pro obejmuje do trzech lokali. Każde nowe konto zaczyna od 30 dni Pro.",
+    pricingCta: { free: "Zacznij za darmo", paid: "Wypróbuj 30 dni za darmo" },
+    mostPopular: "Najczęściej wybierany",
+    compare: (percent) => `${percent}% taniej niż 7shifts`,
+    faqTitle: "Pytania",
+    faq: [
+      {
+        q: "Ile to kosztuje?",
+        a: "Plan Free obejmuje jeden lokal i do 15 osób, na zawsze. Starter kosztuje 99 zł miesięcznie za jeden lokal i do 30 osób. Pro to 219 zł miesięcznie za maksymalnie trzy lokale bez limitu osób i 59 zł za każdy kolejny lokal. Przy płatności rocznej dwa miesiące gratis.",
+      },
+      { q: "Czy potrzebuję karty, żeby zacząć?", a: "Nie. Przez 30 dni masz pełny plan Pro, potem wybierasz plan płatny albo zostajesz na Free." },
+      { q: "Czy zespół musi instalować aplikację?", a: "Nie trzeba niczego pobierać ze sklepu. Pracownicy otwierają link z zaproszeniem, ustawiają hasło i mogą dodać Platofy do ekranu głównego, żeby dostawać powiadomienia." },
+      {
+        q: "Czy Platofy pilnuje Kodeksu pracy?",
+        a: "Tak. Automatyczny grafik nie łamie 11 godzin odpoczynku dobowego i 35 godzin tygodniowego, a nadgodziny ponad 8 godzin na dobę i 40 w tygodniu widać w ewidencji i w eksporcie do płac.",
+      },
+      { q: "Czy jedna osoba może pracować na różnych stanowiskach?", a: "Tak. Przypisz kilka stanowisk, wybierz główne i ustaw stawkę dla każdego. Automatyczny grafik może korzystać z każdego z nich." },
+    ],
+    finalTitle: "Ułóż pierwszy grafik jeszcze dziś",
+    finalBody: "30 dni Pro za darmo. Bez karty, bez umowy.",
+    legal: { terms: "Regulamin", privacy: "Prywatność", cookies: "Cookies" },
+    otherLanguage: { href: "/", label: "English" },
   },
 };
+
+/** "10–6" in the US preview means 10 AM–6 PM; Polish readers expect 24-hour times. */
+function to24h(time: string): string {
+  const [start, end] = time.split("–").map(Number);
+  return `${start < 7 ? start + 12 : start}–${end === 12 ? 24 : end <= 3 ? end : end + 12}`;
+}
 
 const ROLE_COLORS = ["#b25000", "#1f5bd6", "#8e44ad", "#248a3d"];
 const PREVIEW: Array<Array<{ name: string; time: string; role: number }>> = [
@@ -109,8 +180,8 @@ const PREVIEW: Array<Array<{ name: string; time: string; role: number }>> = [
   [{ name: "Jake", time: "12–8", role: 0 }, { name: "Leo", time: "12–8", role: 1 }],
 ];
 
-function currencyForLang(_lang: Lang): Currency {
-  return "USD";
+function currencyForLang(lang: Lang): Currency {
+  return lang === "pl" ? "PLN" : "USD";
 }
 
 function Container({ children, className }: { children: ReactNode; className?: string }) {
@@ -135,7 +206,7 @@ function SignupLink({ context, className, children, variant = "filled" }: { cont
   );
 }
 
-function WeekPreview({ copy }: { copy: Copy["preview"] }) {
+function WeekPreview({ copy, hours24 }: { copy: Copy["preview"]; hours24: boolean }) {
   return (
     <div className="overflow-hidden rounded-[14px] border border-[var(--color-separator)] bg-white shadow-[0_30px_80px_-30px_rgba(0,0,0,0.35)]">
       <div className="flex items-center justify-between gap-3 border-b border-[var(--color-separator)] px-4 py-3 sm:px-5">
@@ -156,7 +227,7 @@ function WeekPreview({ copy }: { copy: Copy["preview"] }) {
                   style={{ backgroundColor: `${ROLE_COLORS[shift.role]}14`, boxShadow: `inset 3px 0 0 ${ROLE_COLORS[shift.role]}` }}
                 >
                   <p className="truncate text-[12px] font-semibold text-black">{shift.name}</p>
-                  <p className="text-[11px] text-[var(--color-text-muted)]">{shift.time}</p>
+                  <p className="text-[11px] text-[var(--color-text-muted)]">{hours24 ? to24h(shift.time) : shift.time}</p>
                 </div>
               ))}
             </div>
@@ -187,7 +258,7 @@ function WeekPreview({ copy }: { copy: Copy["preview"] }) {
 export function LandingPage() {
   const { lang, t } = useLanguage();
   useScrollToHash();
-  const copy = COPY.en;
+  const copy = COPY[lang];
   const currency = currencyForLang(lang);
   const fromPrice = formatMoney(PLAN_PRICE[currency].standard.monthly, currency, lang);
 
@@ -217,7 +288,7 @@ export function LandingPage() {
                 >
                   <PlayCircle className="size-5" /> {t("demo.cta")}
                 </Link>
-                <Link to="/how-it-works" className="inline-flex min-h-[50px] w-full items-center justify-center rounded-[12px] bg-[var(--color-fill)] px-6 text-[17px] font-semibold text-black sm:w-auto">
+                <Link to={copy.hero.secondaryHref} className="inline-flex min-h-[50px] w-full items-center justify-center rounded-[12px] bg-[var(--color-fill)] px-6 text-[17px] font-semibold text-black sm:w-auto">
                   {copy.hero.secondary}
                 </Link>
               </div>
@@ -225,7 +296,7 @@ export function LandingPage() {
               <p className="mt-5 text-[15px] text-[var(--color-text-muted)]">{copy.hero.note(fromPrice)}</p>
             </div>
             <div className="mx-auto mt-12 max-w-5xl sm:mt-16">
-              <WeekPreview copy={copy.preview} />
+              <WeekPreview copy={copy.preview} hours24={lang === "pl"} />
             </div>
           </Container>
         </section>
@@ -358,21 +429,25 @@ export function LandingPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <Link to="/tools" className="hover:text-black">
-              Free tools
-            </Link>
-            <Link to="/tools/restaurant-schedule-template" className="hover:text-black">
-              Schedule template
-            </Link>
-            <Link to="/tools/labor-cost-calculator" className="hover:text-black">
-              Labor cost calculator
-            </Link>
-            <Link to="/compare/7shifts" className="hover:text-black">
-              7shifts alternative
-            </Link>
-            <Link to="/switch" className="hover:text-black">
-              Free switch-over
-            </Link>
+            {lang === "en" ? (
+              <>
+              <Link to="/tools" className="hover:text-black">
+                Free tools
+              </Link>
+              <Link to="/tools/restaurant-schedule-template" className="hover:text-black">
+                Schedule template
+              </Link>
+              <Link to="/tools/labor-cost-calculator" className="hover:text-black">
+                Labor cost calculator
+              </Link>
+              <Link to="/compare/7shifts" className="hover:text-black">
+                7shifts alternative
+              </Link>
+              <Link to="/switch" className="hover:text-black">
+                Free switch-over
+              </Link>
+              </>
+            ) : null}
             <Link to={legalLinks(lang).terms} className="hover:text-black">
               {copy.legal.terms}
             </Link>
@@ -381,6 +456,9 @@ export function LandingPage() {
             </Link>
             <Link to={legalLinks(lang).cookies} className="hover:text-black">
               {copy.legal.cookies}
+            </Link>
+            <Link to={copy.otherLanguage.href} hrefLang={copy.otherLanguage.href === "/pl" ? "pl" : "en"} className="font-semibold hover:text-black">
+              {copy.otherLanguage.label}
             </Link>
             <span>© 2026 Platofy</span>
           </div>

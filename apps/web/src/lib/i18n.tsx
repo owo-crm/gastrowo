@@ -1201,23 +1201,37 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 }
 
 /** The marketing site (landing, How it works, tools, comparisons, legal) is always in English. */
-export function EnglishOnly({ children }: { children: ReactNode }) {
+/** Renders children in one fixed language (marketing pages), whatever the visitor's app language is. */
+function FixedLanguage({ lang, children }: { lang: Lang; children: ReactNode }) {
   const outer = useContext(I18nContext);
   const value = useMemo<I18nContextValue>(
     () => ({
-      lang: "en",
+      lang,
       setLang: outer?.setLang ?? (() => undefined),
-      t: (key, params) => translateKey("en", key, params),
+      t: (key, params) => translateKey(lang, key, params),
     }),
-    [outer?.setLang],
+    [lang, outer?.setLang],
   );
   useEffect(() => {
-    document.documentElement.lang = "en";
+    document.documentElement.lang = lang;
     return () => {
       document.documentElement.lang = outer?.lang ?? "en";
     };
-  }, [outer?.lang]);
+  }, [lang, outer?.lang]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+export function EnglishOnly({ children }: { children: ReactNode }) {
+  return <FixedLanguage lang="en">{children}</FixedLanguage>;
+}
+
+/** Polish marketing pages. Visiting one also makes Polish the app language, so sign-up continues in Polish. */
+export function PolishOnly({ children }: { children: ReactNode }) {
+  const outer = useContext(I18nContext);
+  useEffect(() => {
+    if (outer && outer.lang !== "pl") outer.setLang("pl");
+  }, [outer]);
+  return <FixedLanguage lang="pl">{children}</FixedLanguage>;
 }
 
 export function useLanguage() {

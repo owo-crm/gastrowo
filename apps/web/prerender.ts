@@ -40,11 +40,18 @@ const SOFTWARE = {
 };
 
 /** Markdown twin of a page, for AI agents (served at <path>.md and for Accept: text/markdown). */
+const HEADINGS = {
+  en: { faq: "Frequently asked questions", explore: "Explore Platofy" },
+  pl: { faq: "Najczęściej zadawane pytania", explore: "Platofy" },
+};
+const pageUrl = (path: string) => `${SITE_URL}${path === "/" ? "/" : path}`;
+
 function markdown(page: SeoPage): string {
-  const url = `${SITE_URL}${page.path === "/" ? "/" : page.path}`;
-  const faq = page.faq.length ? `\n## Frequently asked questions\n\n${page.faq.map((item) => `### ${item.q}\n\n${item.a}\n`).join("\n")}` : "";
+  const url = pageUrl(page.path);
+  const text = HEADINGS[page.lang ?? "en"];
+  const faq = page.faq.length ? `\n## ${text.faq}\n\n${page.faq.map((item) => `### ${item.q}\n\n${item.a}\n`).join("\n")}` : "";
   const links = SITE_LINKS.map((link) => `- [${link.label}](${SITE_URL}${link.href === "/" ? "/" : link.href})`).join("\n");
-  return `# ${page.h1}\n\n> ${page.description}\n\nSource: ${url}\n\n${page.intro}\n${faq}\n## Explore Platofy\n\n${links}\n`;
+  return `# ${page.h1}\n\n> ${page.description}\n\nSource: ${url}\n\n${page.intro}\n${faq}\n## ${text.explore}\n\n${links}\n`;
 }
 
 const mdPath = (page: SeoPage) => (page.path === "/" ? "/index.md" : `${page.path}.md`);
@@ -58,7 +65,7 @@ function llmsTxt(): string {
 Key facts:
 - Plans: Free ($0, 1 location, up to 15 people), Starter ($26/month, 1 location, up to 30 people), Pro ($58/month, up to 3 locations, +$15 per extra location). New businesses get 30 days of Pro free.
 - Live demo with a sample restaurant, no sign-up: ${SITE_URL}/demo
-- Works in the browser and installs on iPhone and Android as an app. English and Polish.
+- Works in the browser and installs on iPhone and Android as an app. English and Polish (Polish site: ${SITE_URL}/pl).
 - US labor rules (overtime over 40 h a week) and Polish rules (11 h daily and 35 h weekly rest).
 - Contact: support@platofy.app
 
@@ -99,18 +106,21 @@ function head(page: SeoPage): string {
     `<meta property="og:image" content="${SITE_URL}/brand/platofy/platofy-icon-512.png" />`,
     `<meta name="twitter:card" content="summary" />`,
     `<link rel="alternate" type="text/markdown" href="${SITE_URL}${mdPath(page)}" />`,
+    ...Object.entries(page.alternates ?? {}).map(([lang, href]) => `<link rel="alternate" hreflang="${lang}" href="${pageUrl(href)}" />`),
+    ...(page.lang === "pl" ? [`<meta property="og:locale" content="pl_PL" />`] : []),
     graph,
     faq,
   ].join("\n    ");
 }
 
 function body(page: SeoPage): string {
+  const text = HEADINGS[page.lang ?? "en"];
   const faq = page.faq.length
-    ? `<section><h2>Frequently asked questions</h2>${page.faq.map((item) => `<h3>${esc(item.q)}</h3><p>${esc(item.a)}</p>`).join("")}</section>`
+    ? `<section><h2>${text.faq}</h2>${page.faq.map((item) => `<h3>${esc(item.q)}</h3><p>${esc(item.a)}</p>`).join("")}</section>`
     : "";
   const links = SITE_LINKS.map((link) => `<li><a href="${link.href}">${esc(link.label)}</a></li>`).join("");
   // Replaced by the React app as soon as it starts; this is what crawlers and no-JS visitors read.
-  return `<main style="max-width:720px;margin:0 auto;padding:40px 16px;font-family:system-ui,sans-serif;line-height:1.5"><h1>${esc(page.h1)}</h1><p>${esc(page.intro)}</p>${faq}<nav aria-label="Platofy"><h2>Explore Platofy</h2><ul>${links}</ul></nav></main>`;
+  return `<main style="max-width:720px;margin:0 auto;padding:40px 16px;font-family:system-ui,sans-serif;line-height:1.5"><h1>${esc(page.h1)}</h1><p>${esc(page.intro)}</p>${faq}<nav aria-label="Platofy"><h2>${text.explore}</h2><ul>${links}</ul></nav></main>`;
 }
 
 export function prerender(): Plugin {
@@ -124,6 +134,7 @@ export function prerender(): Plugin {
       const withoutTitle = shell.replace(/<title>[\s\S]*?<\/title>\s*/, "").replace(/<meta name="description"[^>]*>\s*/, "");
       for (const page of PRERENDERED) {
         const html = withoutTitle
+          .replace('<html lang="en">', `<html lang="${page.lang ?? "en"}">`)
           .replace("</head>", `    ${head(page)}\n  </head>`)
           .replace('<div id="root"></div>', `<div id="root">${body(page)}</div>`);
         const file = page.path === "/" ? path.join(dist, "index.html") : path.join(dist, `${page.path}.html`);
@@ -153,8 +164,16 @@ export function prerender(): Plugin {
       );
       fs.writeFileSync(path.join(dist, "llms-full.txt"), [llmsTxt(), ...PRERENDERED.map(markdown)].join("\n---\n\n"));
       const today = new Date().toISOString().slice(0, 10);
-      const urls = PRERENDERED.map((page) => `  <url><loc>${SITE_URL}${page.path === "/" ? "/" : page.path}</loc><lastmod>${today}</lastmod></url>`).join("\n");
-      fs.writeFileSync(path.join(dist, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
+      const urls = PRERENDERED.map((page) => {
+        const alternates = Object.entries(page.alternates ?? {})
+          .map(([lang, href]) => `<xhtml:link rel="alternate" hreflang="${lang}" href="${pageUrl(href)}"/>`)
+          .join("");
+        return `  <url><loc>${pageUrl(page.path)}</loc><lastmod>${today}</lastmod>${alternates}</url>`;
+      }).join("\n");
+      fs.writeFileSync(
+        path.join(dist, "sitemap.xml"),
+        `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls}\n</urlset>\n`,
+      );
       fs.writeFileSync(
         path.join(dist, "robots.txt"),
         [
