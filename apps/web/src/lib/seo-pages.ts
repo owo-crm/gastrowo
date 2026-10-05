@@ -13,7 +13,14 @@ export type SeoPage = {
   h1: string;
   intro: string;
   faq: SeoFaq[];
+  /** Page language; English when missing. */
+  lang?: "en" | "pl";
+  /** Language versions of this page (hreflang), including itself. */
+  alternates?: Record<string, string>;
 };
+
+/** The landing page exists in English and Polish; Google shows each to people searching in that language. */
+const LANDING_ALTERNATES = { en: "/", pl: "/pl", "x-default": "/" };
 
 export const SITE_URL = "https://platofy.app";
 
@@ -333,6 +340,7 @@ export const SWITCH_PAGE: SeoPage = {
 export const SITE_PAGES: SeoPage[] = [
   {
     path: "/",
+    alternates: LANDING_ALTERNATES,
     title: "Platofy — Restaurant Scheduling App, Time Clock & Payroll Export",
     description:
       "Restaurant employee scheduling built from your team's availability, shift swaps on every phone, a tablet time clock and approved hours exported for payroll. Free for one location.",
@@ -355,6 +363,31 @@ export const SITE_PAGES: SeoPage[] = [
     ],
   },
   {
+    path: "/pl",
+    lang: "pl",
+    alternates: LANDING_ALTERNATES,
+    title: "Platofy — Grafik pracy dla restauracji, ewidencja czasu pracy i eksport do płac",
+    description:
+      "Grafik pracy dla restauracji, kawiarni i barów układany z dyspozycyjności zespołu, zamiany zmian w telefonie, rejestracja czasu pracy na tablecie i eksport godzin do płac. Za darmo dla jednego lokalu.",
+    h1: "Grafik pracy dla restauracji w 10 minut",
+    intro:
+      "Platofy układa tydzień z dyspozycyjności, stanowisk i priorytetów zespołu, wysyła grafik na każdy telefon, obsługuje zamiany i urlopy, rejestruje czas pracy na telefonie lub tablecie przy wejściu i eksportuje zatwierdzone godziny do płac. Pilnuje odpoczynku dobowego i tygodniowego z Kodeksu pracy. Za darmo dla jednego lokalu i do 15 osób, plany płatne od 99 zł miesięcznie.",
+    faq: [
+      {
+        q: "Co robi Platofy?",
+        a: "Zastępuje arkusz i grupowy czat: dyspozycyjność, automatyczny grafik tygodniowy, zamiany i przejmowanie zmian, rejestrację czasu pracy, akceptację godzin, koszt pracy i eksport do płac, w jednej aplikacji dla managera i zespołu.",
+      },
+      {
+        q: "Ile kosztuje Platofy?",
+        a: "Za darmo dla jednego lokalu i do 15 osób. Starter kosztuje 99 zł miesięcznie za jeden lokal i do 30 osób, Pro 219 zł miesięcznie za maksymalnie trzy lokale bez limitu osób. Każde nowe konto dostaje 30 dni Pro za darmo, bez karty.",
+      },
+      {
+        q: "Czy Platofy pilnuje Kodeksu pracy?",
+        a: "Tak. Automatyczny grafik zachowuje 11 godzin odpoczynku dobowego i 35 godzin tygodniowego, a nadgodziny ponad 8 godzin na dobę i 40 w tygodniu są widoczne w ewidencji i w eksporcie do płac.",
+      },
+    ],
+  },
+  {
     path: "/how-it-works",
     title: "How Platofy Works — Restaurant Scheduling, Time Clock & Payroll",
     description:
@@ -369,6 +402,7 @@ export const SITE_PAGES: SeoPage[] = [
 /** Links every prerendered page carries, so crawlers can reach the whole public site. */
 export const SITE_LINKS: Array<{ href: string; label: string }> = [
   { href: "/", label: "Platofy home" },
+  { href: "/pl", label: "Platofy po polsku" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/tools", label: "Free tools" },
   { href: "/tools/restaurant-schedule-template", label: "Restaurant schedule template" },

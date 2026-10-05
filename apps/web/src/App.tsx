@@ -9,7 +9,7 @@ import { LoginPage } from "@/pages/login-page";
 import { PendingLinkPage } from "@/pages/pending-link-page";
 import { useAuth } from "@/lib/auth";
 import { getHomeRoute } from "@/lib/navigation";
-import { EnglishOnly, useLanguage } from "@/lib/i18n";
+import { EnglishOnly, PolishOnly, useLanguage } from "@/lib/i18n";
 
 // App pages load on demand so the landing and login stay small.
 const DemoPage = lazy(() => import("@/pages/demo-page").then((module) => ({ default: module.DemoPage })));
@@ -181,6 +181,10 @@ export function App() {
       <Route
         path="/"
         element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : hasUnresolvedSession ? <PendingLinkPage /> : <EnglishOnly><LandingPage /></EnglishOnly>}
+      />
+      <Route
+        path="/pl"
+        element={effectiveToken && effectiveMe ? <Navigate to={linkedDefaultRoute} replace /> : hasUnresolvedSession ? <PendingLinkPage /> : <PolishOnly><LandingPage /></PolishOnly>}
       />
       <Route
         path="/login"
