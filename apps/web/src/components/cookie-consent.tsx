@@ -5,11 +5,13 @@ import { useLanguage } from "@/lib/i18n";
 import { legalLinks } from "@/lib/legal-links";
 
 /**
- * Ad measurement (Meta Pixel, Google Analytics) only loads after the visitor accepts it.
- * Without VITE_META_PIXEL_ID / VITE_GA_ID nothing is loaded and no banner is shown.
+ * Visit and ad measurement (Google Analytics, Meta Pixel) only loads after the visitor accepts it.
+ * Google Analytics runs on the live site only, so local runs and previews don't count as visits;
+ * VITE_GA_ID overrides the property. Without any ID nothing is loaded and no banner is shown.
  */
 const PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID as string | undefined;
-const GA_ID = import.meta.env.VITE_GA_ID as string | undefined;
+const LIVE = typeof window !== "undefined" && window.location.hostname === "platofy.app";
+const GA_ID = (import.meta.env.VITE_GA_ID as string | undefined) || (LIVE ? "G-RRBM144GKX" : undefined);
 const STORAGE = "plato_cookie_consent";
 
 function readConsent(): "granted" | "denied" | null {

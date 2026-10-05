@@ -3,6 +3,7 @@ import { ArrowRight, Check, Menu, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand-logo";
+import { CookieConsent } from "@/components/cookie-consent";
 import { api } from "@/lib/api";
 import { trackMarketingEvent } from "@/lib/marketing-analytics";
 import type { SeoFaq } from "@/lib/seo-pages";
@@ -151,6 +152,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
       <MarketingHeader />
       <main>{children}</main>
       <MarketingFooter />
+      <CookieConsent />
     </div>
   );
 }
