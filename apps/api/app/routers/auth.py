@@ -6,7 +6,7 @@ import time as time_module
 import secrets
 from uuid import UUID
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -50,6 +50,7 @@ from app.schemas import (
     OwnerOnboardingCompleteRequest,
     SessionBootstrapResponse,
 )
+from app.services.signup_alerts import notify_new_business
 from app.services.auth_email import send_otp_email
 from app.services.labor_rules import locale_settings, timezone_or_default
 from app.services.billing import DEFAULT_LOCATION_PRIORITY, build_subscription_summary, grant_comp_pro
@@ -334,7 +335,7 @@ def verify_otp(payload: OtpVerifyRequest, response: Response, db: Session = Depe
 
 
 @router.post("/onboarding/owner/complete")
-def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, response: Response, db: Session = Depends(get_db)):
+def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, response: Response, background: BackgroundTasks, db: Session = Depends(get_db)):
     try:
         token_payload = decode_token(payload.verification_token)
         subject = str(token_payload.get("sub", ""))
@@ -393,6 +394,7 @@ def complete_owner_onboarding(payload: OwnerOnboardingCompleteRequest, response:
     _create_remembered_session(db, response, user, [membership])
     db.commit()
     db.refresh(user)
+    notify_new_business(background, org, user, referred_by=referrer.name if referrer else None)
     return ok(_issue_auth_payload(user, [membership]))
 
 

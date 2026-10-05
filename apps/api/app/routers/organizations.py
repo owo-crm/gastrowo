@@ -5,7 +5,7 @@ import uuid
 from uuid import UUID
 
 from email_validator import EmailNotValidError, validate_email
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -43,6 +43,7 @@ from app.schemas import (
     TeamImportRequest,
 )
 from app.services.auth_email import send_invite_email
+from app.services.signup_alerts import notify_new_business
 from app.services.positions import ensure_catalog
 from app.services.demo_access import is_demo_account
 from app.services.demo_restaurant import display_name
@@ -164,6 +165,7 @@ def list_organizations(user: User = Depends(get_current_user), db: Session = Dep
 @router.post("")
 def create_organization(
     payload: OrganizationCreate,
+    background: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -197,6 +199,7 @@ def create_organization(
         )
     )
     db.commit()
+    notify_new_business(background, org, user)
 
     return ok(OrganizationOut.model_validate(org).model_dump(mode="json"))
 
