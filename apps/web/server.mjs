@@ -18,6 +18,7 @@ const TYPES = {
   ".webmanifest": "application/manifest+json; charset=utf-8",
   ".xml": "application/xml; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
   ".csv": "text/csv; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
@@ -30,7 +31,7 @@ const TYPES = {
   ".mp4": "video/mp4",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
-const COMPRESS = new Set([".html", ".js", ".mjs", ".css", ".json", ".webmanifest", ".xml", ".txt", ".csv", ".svg"]);
+const COMPRESS = new Set([".md", ".html", ".js", ".mjs", ".css", ".json", ".webmanifest", ".xml", ".txt", ".csv", ".svg"]);
 
 function file(path) {
   const full = normalize(join(ROOT, path));
@@ -56,7 +57,10 @@ createServer((req, res) => {
     res.writeHead(400).end();
     return;
   }
-  const path = resolveRequest(pathname);
+  // AI agents that ask for Markdown get the page's Markdown twin when there is one.
+  const wantsMarkdown = /\btext\/markdown\b/.test(req.headers.accept ?? "");
+  const clean = pathname.replace(/\/+$/, "") || "/";
+  const path = (wantsMarkdown && !extname(clean) && file(clean === "/" ? "index.md" : `${clean}.md`)) || resolveRequest(pathname);
   if (!path) {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("Not found");
     return;
@@ -66,7 +70,7 @@ createServer((req, res) => {
     "Content-Type": TYPES[ext] ?? "application/octet-stream",
     "Cache-Control": pathname.startsWith("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
     "X-Content-Type-Options": "nosniff",
-    Vary: "Accept-Encoding",
+    Vary: "Accept-Encoding, Accept",
   };
   if (ext === ".xlsx" || ext === ".csv") headers["Content-Disposition"] = `attachment; filename="${path.split("/").pop()}"`;
   const gzip = COMPRESS.has(ext) && /\bgzip\b/.test(req.headers["accept-encoding"] ?? "");
