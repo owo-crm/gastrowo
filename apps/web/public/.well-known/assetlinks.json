@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.platofy",
+      "sha256_cert_fingerprints": ["F2:DB:A6:9B:AE:7E:68:60:71:C8:A1:52:7E:33:89:E2:D5:42:3C:59:14:49:12:85:6C:E7:3F:D2:4B:79:A9:8E"]
+    }
+  }
+]
