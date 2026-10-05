@@ -34,6 +34,11 @@ const TOOL_LINKS = [
   { to: "/tools/labor-cost-calculator", label: "Labor cost calculator" },
   { to: "/tools/overtime-calculator", label: "Overtime calculator" },
   { to: "/tools/tip-pool-calculator", label: "Tip pool calculator" },
+  { to: "/tools/food-cost-calculator", label: "Food cost calculator" },
+  { to: "/tools/menu-price-calculator", label: "Menu price calculator" },
+  { to: "/tools/prime-cost-calculator", label: "Prime cost calculator" },
+  { to: "/tools/restaurant-break-even-calculator", label: "Break-even calculator" },
+  { to: "/tools/time-card-calculator", label: "Time card calculator" },
 ];
 
 const NAV = [

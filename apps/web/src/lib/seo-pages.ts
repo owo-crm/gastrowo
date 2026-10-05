@@ -122,13 +122,128 @@ export const TOOL_PAGES: SeoPage[] = [
       },
     ],
   },
+  {
+    path: "/tools/food-cost-calculator",
+    title: "Food Cost Calculator: Plate Cost & Food Cost % | Platofy",
+    description:
+      "Free restaurant food cost calculator. Add a recipe's ingredients to get plate cost and food cost percentage, or work out food cost % for a week or month from inventory.",
+    h1: "Food cost calculator",
+    intro:
+      "Work out what a dish costs to make and what share of its menu price goes to ingredients. Or calculate food cost % for a whole week or month from your inventory counts.",
+    faq: [
+      {
+        q: "How do you calculate food cost percentage?",
+        a: "For one dish: ingredient cost per plate ÷ menu price × 100. For a period: (beginning inventory + purchases − ending inventory) ÷ food sales × 100.",
+      },
+      {
+        q: "What is a good food cost percentage for a restaurant?",
+        a: "Most restaurants aim for 28–35%. Pizzerias and cafés often run lower, steakhouses and seafood places higher. What matters is the trend: a rise of a few points usually means waste, portioning or supplier prices.",
+      },
+      {
+        q: "Should I include waste and trim in plate cost?",
+        a: "Yes. Use the cost of the usable portion: if a 10 lb case yields 8 lb after trimming, divide the case price by 8, not 10. A small buffer of 3–5% for waste keeps plate costs honest.",
+      },
+    ],
+  },
+  {
+    path: "/tools/menu-price-calculator",
+    title: "Menu Price Calculator: Price Dishes by Food Cost % | Platofy",
+    description:
+      "Free menu pricing calculator for restaurants. Enter plate cost and target food cost % to get the menu price, with prices at common targets and a rounded menu-friendly price.",
+    h1: "Menu price calculator",
+    intro:
+      "Enter what a dish costs to make and the food cost % you're aiming for. Get the price to put on the menu, rounded to a menu-friendly number, plus how much each sale leaves you.",
+    faq: [
+      {
+        q: "How do you price a menu item?",
+        a: "The most common method: menu price = plate cost ÷ target food cost %. A dish that costs $4.20 to make at a 30% target sells for $14. Then check it against what nearby restaurants charge.",
+      },
+      {
+        q: "What food cost % should I use for pricing?",
+        a: "Many restaurants use 28–32% as a starting point. Drinks often run 18–24% and desserts lower still, which lets a few high-cost dishes stay on the menu.",
+      },
+      {
+        q: "Why do menu prices end in .49 or .99?",
+        a: "Charm pricing reads as a lower price at a glance. Many full-service places drop the cents altogether instead. Either way, round up so the rounding never eats into your margin.",
+      },
+    ],
+  },
+  {
+    path: "/tools/prime-cost-calculator",
+    title: "Prime Cost Calculator for Restaurants (COGS + Labor) | Platofy",
+    description:
+      "Free prime cost calculator: add cost of goods sold and total labor, divide by sales. See your prime cost % against the 60% benchmark.",
+    h1: "Prime cost calculator",
+    intro:
+      "Prime cost is your two biggest costs added together: what you spend on food and drinks, and what you spend on people. Keep it near 60% of sales and the rest of the P&L usually works.",
+    faq: [
+      {
+        q: "What is prime cost in a restaurant?",
+        a: "Prime cost = cost of goods sold (food, beverage, packaging) + total labor cost (wages, salaries, payroll taxes and benefits). It is usually shown as a % of total sales.",
+      },
+      {
+        q: "What is a good prime cost percentage?",
+        a: "60% of sales or less is the common target. Quick-service restaurants often reach 55–60%, full-service ones 60–65%. Above 65% leaves little for rent, utilities and profit.",
+      },
+      {
+        q: "How often should I calculate prime cost?",
+        a: "Weekly. Monthly numbers arrive too late to fix anything. A weekly inventory count and payroll report are enough to do it in a few minutes.",
+      },
+    ],
+  },
+  {
+    path: "/tools/restaurant-break-even-calculator",
+    title: "Restaurant Break-Even Calculator (Sales & Covers) | Platofy",
+    description:
+      "Free break-even calculator for restaurants. Enter monthly fixed costs, variable cost % and average check to see the sales and guests you need each month and each day.",
+    h1: "Restaurant break-even calculator",
+    intro:
+      "Find out how much you need to sell to cover your costs, in dollars and in guests per day. Every dollar of sales above that line is profit.",
+    faq: [
+      {
+        q: "How do you calculate a restaurant's break-even point?",
+        a: "Break-even sales = fixed costs ÷ (1 − variable costs as a % of sales). With $30,000 of fixed costs and 65% variable costs, you need $30,000 ÷ 0.35 = $85,714 a month.",
+      },
+      {
+        q: "What are fixed and variable costs in a restaurant?",
+        a: "Fixed costs stay the same however busy you are: rent, salaried managers, insurance, loan payments, software. Variable costs move with sales: food and drink, hourly labor, card fees, packaging and delivery commissions.",
+      },
+      {
+        q: "How can I lower my break-even point?",
+        a: "Lower variable costs (portioning, waste, scheduling to demand), cut fixed costs, or raise the average check. Hourly labor is often the quickest lever: matching shifts to busy hours can take several points off.",
+      },
+    ],
+  },
+  {
+    path: "/tools/time-card-calculator",
+    title: "Time Card Calculator with Breaks & Overtime | Platofy",
+    description:
+      "Free weekly time card calculator. Enter clock-in and clock-out times and unpaid breaks for each day to get total hours, overtime and gross pay. Overnight shifts supported.",
+    h1: "Time card calculator",
+    intro:
+      "Type in when someone clocked in and out each day, and how long their unpaid breaks were. Get hours per day, the weekly total, overtime past 40 hours and gross pay.",
+    faq: [
+      {
+        q: "How do I calculate hours worked from a time card?",
+        a: "For each day: clock-out time − clock-in time − unpaid break. Add up the days for the weekly total. Convert minutes to decimals by dividing by 60: 7 h 45 min is 7.75 hours.",
+      },
+      {
+        q: "What about shifts that end after midnight?",
+        a: "If the clock-out time is earlier than the clock-in time, the calculator treats it as the next day. A shift from 6:00 PM to 2:00 AM counts as 8 hours.",
+      },
+      {
+        q: "Are breaks paid?",
+        a: "Under US federal law, short breaks of 5–20 minutes are paid, while meal breaks of 30 minutes or more can be unpaid if the employee is fully relieved of duty. Only enter unpaid breaks here.",
+      },
+    ],
+  },
 ];
 
 export const TOOLS_HUB: SeoPage = {
   path: "/tools",
   title: "Free Tools for Restaurant Managers | Platofy",
   description:
-    "Free restaurant schedule template and calculators for labor cost, overtime and tip pooling. No sign-up needed.",
+    "Free restaurant schedule template and calculators for food cost, menu pricing, prime cost, break-even, labor cost, overtime, time cards and tip pooling. No sign-up needed.",
   h1: "Free tools for restaurant managers",
   intro: "Templates and calculators for the numbers you deal with every week. No sign-up needed.",
   faq: [],
@@ -260,6 +375,11 @@ export const SITE_LINKS: Array<{ href: string; label: string }> = [
   { href: "/tools/labor-cost-calculator", label: "Labor cost calculator" },
   { href: "/tools/overtime-calculator", label: "Overtime calculator" },
   { href: "/tools/tip-pool-calculator", label: "Tip pool calculator" },
+  { href: "/tools/food-cost-calculator", label: "Food cost calculator" },
+  { href: "/tools/menu-price-calculator", label: "Menu price calculator" },
+  { href: "/tools/prime-cost-calculator", label: "Prime cost calculator" },
+  { href: "/tools/restaurant-break-even-calculator", label: "Restaurant break-even calculator" },
+  { href: "/tools/time-card-calculator", label: "Time card calculator" },
   { href: "/compare/7shifts", label: "7shifts alternative" },
   { href: "/compare/homebase", label: "Homebase alternative" },
   { href: "/compare/when-i-work", label: "When I Work alternative" },
