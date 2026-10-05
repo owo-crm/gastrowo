@@ -60,7 +60,16 @@ if settings.sentry_dsn:
     sentry_sdk.init(dsn=settings.sentry_dsn, environment=settings.app_env, traces_sample_rate=0.0, send_default_pii=False)
 logger = logging.getLogger("workdish.api")
 
-app = FastAPI(title="Workdish API", version="0.1.0")
+# The full internal schema is not published in production; the public part is described at
+# https://platofy.app/openapi.json (linked from /.well-known/api-catalog).
+_public_docs = settings.app_env != "production"
+app = FastAPI(
+    title="Platofy API",
+    version="0.1.0",
+    docs_url="/docs" if _public_docs else None,
+    redoc_url="/redoc" if _public_docs else None,
+    openapi_url="/openapi.json" if _public_docs else None,
+)
 
 
 

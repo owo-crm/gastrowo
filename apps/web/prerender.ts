@@ -68,6 +68,7 @@ ${section(PRERENDERED)}
 
 ## Optional
 
+- [Developers and AI agents](${SITE_URL}/developers.md): public API, OpenAPI, auth.md
 - [Terms](${SITE_URL}/terms)
 - [Privacy](${SITE_URL}/privacy)
 `;
@@ -131,6 +132,25 @@ export function prerender(): Plugin {
         fs.writeFileSync(path.join(dist, mdPath(page)), markdown(page));
       }
       fs.writeFileSync(path.join(dist, "llms.txt"), llmsTxt());
+      // RFC 9727 API catalog (served by server.mjs as application/linkset+json).
+      fs.mkdirSync(path.join(dist, ".well-known"), { recursive: true });
+      fs.writeFileSync(
+        path.join(dist, ".well-known", "api-catalog"),
+        JSON.stringify(
+          {
+            linkset: [
+              {
+                anchor: "https://api.platofy.app/",
+                "service-desc": [{ href: `${SITE_URL}/openapi.json`, type: "application/vnd.oai.openapi+json" }],
+                "service-doc": [{ href: `${SITE_URL}/developers.md`, type: "text/markdown" }],
+                status: [{ href: "https://api.platofy.app/health", type: "application/json" }],
+              },
+            ],
+          },
+          null,
+          2,
+        ),
+      );
       fs.writeFileSync(path.join(dist, "llms-full.txt"), [llmsTxt(), ...PRERENDERED.map(markdown)].join("\n---\n\n"));
       const today = new Date().toISOString().slice(0, 10);
       const urls = PRERENDERED.map((page) => `  <url><loc>${SITE_URL}${page.path === "/" ? "/" : page.path}</loc><lastmod>${today}</lastmod></url>`).join("\n");

@@ -1,0 +1,70 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Platofy public API",
+    "version": "1.0.0",
+    "description": "The public, unauthenticated part of the Platofy API: service health and the contact form used on platofy.app (template downloads, calculators, switch-over requests). Everything else in the Platofy app requires a signed-in user and is not a public API.",
+    "contact": { "name": "Platofy", "email": "support@platofy.app", "url": "https://platofy.app" }
+  },
+  "servers": [{ "url": "https://api.platofy.app" }],
+  "externalDocs": { "description": "Developer notes", "url": "https://platofy.app/developers.md" },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Service health",
+        "description": "Returns 200 when the API and its database answer.",
+        "responses": {
+          "200": {
+            "description": "Healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "object", "properties": { "status": { "type": "string", "example": "ok" } } },
+                    "error": { "type": ["object", "null"] }
+                  }
+                }
+              }
+            }
+          },
+          "503": { "description": "Database unavailable" }
+        }
+      }
+    },
+    "/marketing/leads": {
+      "post": {
+        "operationId": "createLead",
+        "summary": "Leave contact details",
+        "description": "Sends a restaurant's contact details to the Platofy team (for example a free switch-over request). Rate limited per network. Only submit on behalf of a person who asked you to.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "kind"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "kind": { "type": "string", "enum": ["template", "calculator", "migration", "compare"] },
+                  "source": { "type": "string", "maxLength": 120 },
+                  "name": { "type": "string", "maxLength": 120 },
+                  "business": { "type": "string", "maxLength": 160 },
+                  "current_tool": { "type": "string", "maxLength": 80 },
+                  "team_size": { "type": "string", "maxLength": 40 },
+                  "message": { "type": "string", "maxLength": 4000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Received" },
+          "422": { "description": "Invalid input" },
+          "429": { "description": "Too many requests" }
+        }
+      }
+    }
+  }
+}
