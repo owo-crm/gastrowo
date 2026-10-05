@@ -1,0 +1,68 @@
+name: Android app
+
+# Builds the Platofy Android app (a Trusted Web Activity around platofy.app) and publishes the
+# signed APK as a GitHub release, so the latest build is always at
+# https://github.com/owo-crm/gastrowo/releases/latest/download/platofy.apk
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "apps/android/**"
+      - ".github/workflows/android.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Signing key
+        env:
+          ANDROID_SIGNING_KEY: ${{ secrets.ANDROID_SIGNING_KEY }}
+        run: |
+          if [ -z "$ANDROID_SIGNING_KEY" ]; then
+            echo "::error::Add the ANDROID_SIGNING_KEY secret (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          # The secret is "<password>:<base64 PKCS12 keystore>".
+          echo "::add-mask::${ANDROID_SIGNING_KEY%%:*}"
+          echo "ANDROID_KEYSTORE_PASSWORD=${ANDROID_SIGNING_KEY%%:*}" >> "$GITHUB_ENV"
+          echo "${ANDROID_SIGNING_KEY#*:}" | base64 -d > "$RUNNER_TEMP/upload.p12"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.p12" >> "$GITHUB_ENV"
+
+      - name: Build
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.0.${{ github.run_number }}
+        run: |
+          gradle --no-daemon assembleRelease bundleRelease
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk out/platofy.apk
+          cp app/build/outputs/bundle/release/app-release.aab out/platofy.aab
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v1.0.${{ github.run_number }}
+          name: Platofy for Android 1.0.${{ github.run_number }}
+          body: Install platofy.apk on an Android phone. The .aab is for Google Play.
+          make_latest: true
+          files: |
+            apps/android/out/platofy.apk
+            apps/android/out/platofy.aab
