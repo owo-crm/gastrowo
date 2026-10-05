@@ -33,6 +33,11 @@ const ScheduleTemplatePage = lazy(() => import("@/pages/tools-pages").then((modu
 const LaborCostPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.LaborCostPage })));
 const OvertimePage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.OvertimePage })));
 const TipPoolPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.TipPoolPage })));
+const FoodCostPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.FoodCostPage })));
+const MenuPricePage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.MenuPricePage })));
+const PrimeCostPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.PrimeCostPage })));
+const BreakEvenPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.BreakEvenPage })));
+const TimeCardPage = lazy(() => import("@/pages/tools-pages").then((module) => ({ default: module.TimeCardPage })));
 const ComparePage = lazy(() => import("@/pages/compare-pages").then((module) => ({ default: module.ComparePage })));
 const SwitchPage = lazy(() => import("@/pages/compare-pages").then((module) => ({ default: module.SwitchPage })));
 const ReferralsPage = lazy(() => import("@/pages/referrals-page").then((module) => ({ default: module.ReferralsPage })));
@@ -195,6 +200,11 @@ export function App() {
       <Route path="/tools/labor-cost-calculator" element={<EnglishOnly><LaborCostPage /></EnglishOnly>} />
       <Route path="/tools/overtime-calculator" element={<EnglishOnly><OvertimePage /></EnglishOnly>} />
       <Route path="/tools/tip-pool-calculator" element={<EnglishOnly><TipPoolPage /></EnglishOnly>} />
+      <Route path="/tools/food-cost-calculator" element={<EnglishOnly><FoodCostPage /></EnglishOnly>} />
+      <Route path="/tools/menu-price-calculator" element={<EnglishOnly><MenuPricePage /></EnglishOnly>} />
+      <Route path="/tools/prime-cost-calculator" element={<EnglishOnly><PrimeCostPage /></EnglishOnly>} />
+      <Route path="/tools/restaurant-break-even-calculator" element={<EnglishOnly><BreakEvenPage /></EnglishOnly>} />
+      <Route path="/tools/time-card-calculator" element={<EnglishOnly><TimeCardPage /></EnglishOnly>} />
       <Route path="/terms" element={<EnglishOnly><TermsPageEn /></EnglishOnly>} />
       <Route path="/privacy" element={<EnglishOnly><PrivacyPageEn /></EnglishOnly>} />
       <Route path="/cookies" element={<EnglishOnly><CookiesPageEn /></EnglishOnly>} />
