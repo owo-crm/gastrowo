@@ -204,7 +204,7 @@ export function LaborCostPage() {
     <MarketingShell>
       <PageHero eyebrow="Free calculator" title={page.h1} intro={page.intro} />
       <Container>
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
           <Card>
             <h2 className="text-[19px] font-bold">Hours and wages</h2>
             <div className="mt-3 space-y-3">
@@ -300,7 +300,7 @@ export function OvertimePage() {
     <MarketingShell>
       <PageHero eyebrow="Free calculator" title={page.h1} intro={page.intro} />
       <Container>
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
           <Card>
             <div className="grid gap-3 sm:grid-cols-2">
               <NumberField label="Hourly rate" prefix="$" value={rate} onChange={setRate} />
@@ -519,7 +519,7 @@ export function FoodCostPage() {
     <MarketingShell>
       <PageHero eyebrow="Free calculator" title={page.h1} intro={page.intro} />
       <Container>
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
           <Card>
             <Segmented label="Calculate" value={mode} onChange={setMode} options={[["dish", "One dish"], ["period", "Week or month"]]} />
             {mode === "dish" ? (
@@ -624,7 +624,7 @@ export function MenuPricePage() {
     <MarketingShell>
       <PageHero eyebrow="Free calculator" title={page.h1} intro={page.intro} />
       <Container>
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
           <Card>
             <div className="grid gap-3 sm:grid-cols-2">
               <NumberField label="Cost per plate" prefix="$" value={cost} onChange={setCost} />
@@ -710,7 +710,7 @@ export function PrimeCostPage() {
     <MarketingShell>
       <PageHero eyebrow="Free calculator" title={page.h1} intro={page.intro} />
       <Container>
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
           <Card>
             <NumberField label="Total sales for the period" prefix="$" value={sales} onChange={setSales} />
             <h2 className="mt-5 text-[17px] font-bold">Cost of goods sold</h2>
@@ -791,7 +791,7 @@ export function BreakEvenPage() {
     <MarketingShell>
       <PageHero eyebrow="Free calculator" title={page.h1} intro={page.intro} />
       <Container>
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
           <Card>
             <h2 className="text-[17px] font-bold">Fixed costs per month</h2>
             <div className="mt-2 space-y-3">
@@ -891,7 +891,7 @@ export function TimeCardPage() {
     <MarketingShell>
       <PageHero eyebrow="Free calculator" title={page.h1} intro={page.intro} />
       <Container>
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
           <Card>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[480px] text-[15px]">
